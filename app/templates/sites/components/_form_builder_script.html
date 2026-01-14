@@ -36,7 +36,6 @@ NOTA: Richiede che il template che include questo file fornisca:
         formSchema: {
         id: '',
         name: '',
-        category: 'artifact',
         fields: []
     },
 
@@ -55,7 +54,6 @@ NOTA: Richiede che il template che include questo file fornisca:
         this.formSchema = {
             id: '',
             name: '',
-            category: 'artifact',
             fields: []
         };
         this.isEditing = false;
@@ -80,7 +78,6 @@ NOTA: Richiede che il template che include questo file fornisca:
         this.formSchema = {
             id: schema.id,
             name: schema.name,
-            category: schema.category,
             fields: fields
         };
         this.isEditing = true;
@@ -236,7 +233,6 @@ NOTA: Richiede che il template che include questo file fornisca:
                             id: result.schema_id,
                             name: this.formSchema.name,
                             description: this.formSchema.description || '',
-                            category: this.formSchema.category,
                             schema: result.schema
                         };
                     }
@@ -247,7 +243,6 @@ NOTA: Richiede che il template che include questo file fornisca:
                         id: result.schema_id,
                         name: this.formSchema.name,
                         description: this.formSchema.description || '',
-                        category: this.formSchema.category,
                         schema: result.schema
                     });
                     alert('Form salvato con successo!');
@@ -274,6 +269,16 @@ NOTA: Richiede che il template che include questo file fornisca:
             return;
         }
         this.showPreviewModal = true;
+    },
+
+    openFillForm(schema) {
+        // Create a properly structured schema for the renderer
+        this.fillingSchema = {
+            id: schema.id,
+            name: schema.name,
+            fields: schema.fields || schema.schema?.fields || []
+        };
+        this.showFillModal = true;
     },
 
     // --- Data Viewer Logic ---
@@ -321,43 +326,43 @@ NOTA: Richiede che il template che include questo file fornisca:
     renderFieldPreview(field) {
         switch (field.type) {
             case 'text':
-                return `<input type="text" class="w-full border-gray-300 rounded text-sm" placeholder="${field.label}" disabled>`;
+                return `<input type="text" class="w-full border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="${field.label}" disabled>`;
 
             case 'textarea':
-                return `<textarea class="w-full border-gray-300 rounded text-sm" rows="3" placeholder="${field.label}" disabled></textarea>`;
+                return `<textarea class="w-full border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" rows="3" placeholder="${field.label}" disabled></textarea>`;
 
             case 'select':
                 const options = field.options?.map(opt => `<option>${opt.label}</option>`).join('') || '<option>Opzione esempio</option>';
-                return `<select class="w-full border-gray-300 rounded text-sm" disabled>${options}</select>`;
+                return `<select class="w-full border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" disabled>${options}</select>`;
 
             case 'multiselect':
                 const multiOptions = field.options?.map(opt =>
-                    `<label class="flex items-center text-xs"><input type="checkbox" class="mr-1" disabled> ${opt.label}</label>`
-                ).join('<br>') || '<label class="flex items-center text-xs"><input type="checkbox" class="mr-1" disabled> Opzione esempio</label>';
+                    `<label class="flex items-center text-xs text-gray-700 dark:text-gray-300"><input type="checkbox" class="mr-1" disabled> ${opt.label}</label>`
+                ).join('<br>') || '<label class="flex items-center text-xs text-gray-700 dark:text-gray-300"><input type="checkbox" class="mr-1" disabled> Opzione esempio</label>';
                 return `<div class="space-y-1">${multiOptions}</div>`;
 
             case 'radio':
                 const radioOptions = field.options?.map((opt, idx) =>
-                    `<label class="flex items-center text-xs"><input type="radio" name="${field.id}_preview" class="mr-1" disabled> ${opt.label}</label>`
-                ).join('<br>') || '<label class="flex items-center text-xs"><input type="radio" class="mr-1" disabled> Opzione esempio</label>';
+                    `<label class="flex items-center text-xs text-gray-700 dark:text-gray-300"><input type="radio" name="${field.id}_preview" class="mr-1" disabled> ${opt.label}</label>`
+                ).join('<br>') || '<label class="flex items-center text-xs text-gray-700 dark:text-gray-300"><input type="radio" class="mr-1" disabled> Opzione esempio</label>';
                 return `<div class="space-y-1">${radioOptions}</div>`;
 
             case 'number':
-                return `<input type="number" class="w-full border-gray-300 rounded text-sm" placeholder="0" disabled>`;
+                return `<input type="number" class="w-full border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="0" disabled>`;
 
             case 'date':
-                return `<input type="date" class="w-full border-gray-300 rounded text-sm" disabled>`;
+                return `<input type="date" class="w-full border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white" disabled>`;
 
             case 'file':
-                return `<div class="border-2 border-dashed border-gray-300 rounded p-4 text-center text-sm text-gray-500">
+                return `<div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded p-4 text-center text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800">
                                 📎 ${field.multiple ? 'Seleziona files' : 'Seleziona file'}
                             </div>`;
 
             case 'checkbox':
-                return `<label class="flex items-center text-sm"><input type="checkbox" class="mr-2" disabled> ${field.label}</label>`;
+                return `<label class="flex items-center text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" class="mr-2" disabled> ${field.label}</label>`;
 
             default:
-                return `<div class="text-gray-400 text-sm">Preview ${field.type}</div>`;
+                return `<div class="text-gray-400 dark:text-gray-500 text-sm">Preview ${field.type}</div>`;
         }
     },
 

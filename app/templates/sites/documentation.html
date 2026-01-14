@@ -67,6 +67,11 @@
                     class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
                     🛠️ Form Builder
                 </button>
+                <button @click="activeTab = 'formData'"
+                    :class="(activeTab || 'documents') === 'formData' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
+                    class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                    📊 Dati Raccolti
+                </button>
             </nav>
         </div>
     </div>
@@ -414,6 +419,206 @@
         {% include 'sites/components/_form_builder.html' %}
     </div>
 
+    <!-- Form Data Tab Content -->
+    <div x-show="(activeTab || 'documents') === 'formData'" x-data="formBuilder()" style="display: none;"
+        class="h-[calc(100vh-220px)] min-h-[600px] flex flex-col lg:flex-row gap-4">
+        <!-- Sidebar: Form Selection -->
+        <div class="w-full lg:w-1/4 flex flex-col gap-4 overflow-hidden">
+            <div
+                class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-full overflow-hidden">
+                <div
+                    class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10">
+                    <h3 class="font-semibold text-gray-900 dark:text-white">Seleziona Form</h3>
+                </div>
+                <div class="overflow-y-auto p-2 space-y-2 flex-1">
+                    <template x-for="schema in existingSchemas" :key="schema.id">
+                        <div @click="viewFormSubmissions(schema)"
+                            :class="formSchema && formSchema.id === schema.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'"
+                            class="p-3 rounded-md border cursor-pointer transition-all">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-medium text-sm text-gray-900 dark:text-white truncate"
+                                    x-text="schema.name"></span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                                <span x-text="schema.category"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Area: Data Table -->
+        <div
+            class="w-full lg:w-3/4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+            <div
+                class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center sticky top-0 z-10">
+                <h3 class="font-semibold text-gray-900 dark:text-white">
+                    <span
+                        x-text="formSchema && formSchema.id ? 'Dati: ' + formSchema.name : 'Seleziona un form per vedere i dati'"></span>
+                </h3>
+                <div x-show="formSchema && formSchema.id">
+                    <button @click="openFillForm(formSchema)"
+                        class="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded shadow-sm transition-colors">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4">
+                            </path>
+                        </svg>
+                        Compila
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1 h-full">
+                <!-- Loading State -->
+                <div x-show="isLoadingSubmissions" class="flex justify-center py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+
+                <!-- Empty/Initial State -->
+                <div x-show="!formSchema || !formSchema.id"
+                    class="h-full flex flex-col items-center justify-center text-center text-gray-400 opacity-50">
+                    <span class="text-6xl mb-4">👈</span>
+                    <p>Seleziona un form dalla lista a sinistra</p>
+                </div>
+
+                <!-- No Data State -->
+                <div x-show="formSchema && formSchema.id && !isLoadingSubmissions && currentSubmissions.length === 0"
+                    class="text-center py-12 text-gray-500 dark:text-gray-400">
+                    Nessun dato raccolto per questo form.
+                </div>
+
+                <!-- Data Table -->
+                <div x-show="!isLoadingSubmissions && currentSubmissions.length > 0">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700/50">
+                            <tr>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    Data</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    Utente</th>
+                                <th
+                                    class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            <template x-for="sub in currentSubmissions" :key="sub.id">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200"
+                                        x-text="formatDate(sub.created_at)"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                        Utente FastZoom</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button @click="viewSubmissionDetail(sub)"
+                                            class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium">Visualizza</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submission Detail Modal (Inline in the tab context) -->
+        <template x-teleport="body">
+            <div x-show="showSubmissionDetailModal" class="fixed inset-0 z-[9999] overflow-y-auto"
+                style="display: none;" x-cloak>
+                <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                    <div class="fixed inset-0 bg-black dark:bg-gray-900 opacity-50"
+                        @click="showSubmissionDetailModal = false"></div>
+
+                    <!-- Spacer element to center modal -->
+                    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                    <div
+                        class="relative inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full max-h-[90vh] overflow-y-auto">
+                        <div
+                            class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800 z-10 rounded-t-lg">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                📝 Dettaglio Compilazione
+                            </h3>
+                            <button @click="showSubmissionDetailModal = false"
+                                class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <template x-if="showSubmissionDetailModal && selectedSubmission">
+                                <div x-data="dynamicFormRenderer(formSchema, selectedSubmission.data)">
+                                    <form class="space-y-4">
+                                        <template x-for="field in schema.fields">
+                                            <div class="opacity-75 pointer-events-none select-none">
+                                                <!-- Read-only look -->
+                                                <div class="mb-4" x-html="renderFormField(field)"></div>
+                                            </div>
+                                        </template>
+                                    </form>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+                            <button @click="showSubmissionDetailModal = false"
+                                class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-200 dark:hover:bg-gray-600">Chiudi</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+        <!-- Fill Modal -->
+        <template x-teleport="body">
+            <div x-show="showFillModal" class="fixed inset-0 z-[9999] overflow-y-auto" style="display: none;" x-cloak>
+                <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                    <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="showFillModal = false">
+                        <div class="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
+                    </div>
+
+                    <!-- Spacer element to center modal -->
+                    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+                    <div
+                        class="relative inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                        <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4"
+                                x-text="'Compila: ' + (fillingSchema?.name || 'Nuovo Modulo')"></h3>
+
+                            <div x-data="dynamicFormRenderer(fillingSchema)"
+                                @refresh-submissions="viewFormSubmissions(formSchema)"
+                                @close-preview="showFillModal = false">
+
+                                <form @submit.prevent="submitForm" class="space-y-4">
+                                    <template x-for="field in schema?.fields" :key="field.id">
+                                        <div class="mb-4" x-html="renderFormField(field)"></div>
+                                    </template>
+
+                                    <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                                        <button type="submit"
+                                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:col-start-2 sm:text-sm"
+                                            :disabled="isSubmitting">
+                                            <span x-show="!isSubmitting">Salva</span>
+                                            <span x-show="isSubmitting">Salvataggio...</span>
+                                        </button>
+                                        <button type="button"
+                                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                                            @click="showFillModal = false">
+                                            Annulla
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
     {% include 'sites/components/_form_builder_script.html' %}
 
     <script>
@@ -422,7 +627,8 @@
                 // Add tab management
                 activeTab: 'documents',
                 // Data
-                documents: {{ documents| tojson if documents else '[]'}},
+                documents: {{ documents| tojson if documents else '[]'
+        }},
             filteredDocuments: [],
 
             // Stats
