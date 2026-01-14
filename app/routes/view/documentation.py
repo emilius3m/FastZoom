@@ -221,7 +221,7 @@ async def site_documentation(
 
     # Prepara context per il template
     context = await get_base_template_context(
-        request, current_user_id, user_sites, db, site, permission, "documentation"
+        request, current_user.id, user_sites, db, site, permission, "documentation"
     )
     context.update({
         "documents": documents,
