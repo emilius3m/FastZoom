@@ -25,7 +25,7 @@ from app.routes.sites_router import get_site_access
 form_schemas_router = APIRouter(tags=["form-schemas"])
 
 
-@form_schemas_router.post("/site/{site_id}/form-schemas")
+@form_schemas_router.post("/sites/{site_id}/form-schemas")
 async def save_form_schema(
         site_id: UUID,
         schema_data: dict,
@@ -53,7 +53,7 @@ async def save_form_schema(
         if schema_id:
             # Aggiornamento schemas esistente
             existing_schema_query = select(FormSchema).where(
-                and_(FormSchema.id == UUID(schema_id), FormSchema.site_id == site_id)
+                and_(FormSchema.id == str(UUID(schema_id)), FormSchema.site_id == str(site_id))
             )
             existing_schema = await db.execute(existing_schema_query)
             existing_schema = existing_schema.scalar_one_or_none()
@@ -74,8 +74,8 @@ async def save_form_schema(
             # Log attività
             await log_user_activity(
                 db=db,
-                user_id=current_user_id,
-                site_id=site_id,
+                user_id=str(current_user_id),
+                site_id=str(site_id),
                 activity_type="UPDATE",
                 activity_desc=f"Aggiornato form schemas: {existing_schema.name}",
                 extra_data={
@@ -97,8 +97,8 @@ async def save_form_schema(
                 description=schema_data.get('description', ''),
                 category=schema_data.get('category', 'artifact'),
                 schema_json=json.dumps(schema_data),
-                site_id=site_id,
-                created_by=current_user_id
+                site_id=str(site_id),
+                created_by=str(current_user_id)
             )
             
             db.add(new_schema)
@@ -108,8 +108,8 @@ async def save_form_schema(
             # Log attività
             await log_user_activity(
                 db=db,
-                user_id=current_user_id,
-                site_id=site_id,
+                user_id=str(current_user_id),
+                site_id=str(site_id),
                 activity_type="CREATE",
                 activity_desc=f"Creato form schemas: {new_schema.name}",
                 extra_data={
@@ -132,7 +132,7 @@ async def save_form_schema(
         raise HTTPException(status_code=500, detail=f"Errore nel salvataggio: {str(e)}")
 
 
-@form_schemas_router.get("/site/{site_id}/form-schemas")
+@form_schemas_router.get("/sites/{site_id}/form-schemas")
 async def get_form_schemas(
         site_id: UUID,
         site_access: tuple = Depends(get_site_access),
@@ -147,7 +147,7 @@ async def get_form_schemas(
     try:
         # Query per ottenere tutti i form schemas del sito
         schemas_query = select(FormSchema).where(
-            and_(FormSchema.site_id == site_id, FormSchema.is_active == True)
+            and_(FormSchema.site_id == str(site_id), FormSchema.is_active == True)
         ).order_by(FormSchema.created_at.desc())
         
         schemas = await db.execute(schemas_query)
@@ -182,7 +182,7 @@ async def get_form_schemas(
         raise HTTPException(status_code=500, detail=f"Errore nel recupero degli schemas: {str(e)}")
 
 
-@form_schemas_router.get("/site/{site_id}/form-schemas/{schema_id}")
+@form_schemas_router.get("/sites/{site_id}/form-schemas/{schema_id}")
 async def get_form_schema(
         site_id: UUID,
         schema_id: UUID,
@@ -197,7 +197,7 @@ async def get_form_schema(
     
     try:
         schema_query = select(FormSchema).where(
-            and_(FormSchema.id == schema_id, FormSchema.site_id == site_id)
+            and_(FormSchema.id == str(schema_id), FormSchema.site_id == str(site_id))
         )
         schema = await db.execute(schema_query)
         schema = schema.scalar_one_or_none()
@@ -227,7 +227,7 @@ async def get_form_schema(
         raise HTTPException(status_code=500, detail=f"Errore nel recupero dello schemas: {str(e)}")
 
 
-@form_schemas_router.delete("/site/{site_id}/form-schemas/{schema_id}")
+@form_schemas_router.delete("/sites/{site_id}/form-schemas/{schema_id}")
 async def delete_form_schema(
         site_id: UUID,
         schema_id: UUID,
@@ -243,7 +243,7 @@ async def delete_form_schema(
     
     try:
         schema_query = select(FormSchema).where(
-            and_(FormSchema.id == schema_id, FormSchema.site_id == site_id)
+            and_(FormSchema.id == str(schema_id), FormSchema.site_id == str(site_id))
         )
         schema = await db.execute(schema_query)
         schema = schema.scalar_one_or_none()
@@ -260,8 +260,8 @@ async def delete_form_schema(
         # Log attività
         await log_user_activity(
             db=db,
-            user_id=current_user_id,
-            site_id=site_id,
+            user_id=str(current_user_id),
+            site_id=str(site_id),
             activity_type="DELETE",
             activity_desc=f"Eliminato form schemas: {schema_name}",
             extra_data={
@@ -299,8 +299,8 @@ async def log_user_activity(
 
         # Crea attività
         activity = UserActivity(
-            user_id=user_id,
-            site_id=site_id,
+            user_id=str(user_id),
+            site_id=str(site_id),
             activity_type=activity_type,
             activity_desc=activity_desc,
             extra_data=extra_data_json

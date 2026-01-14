@@ -179,8 +179,8 @@ async def v1_upload_document(
     site_info = verify_site_access(site_id, user_sites)
     
     # Verifica permessi di upload
-    if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise InsufficientPermissionsError("Upload documenti richiede permessi editor o admin")
+    if site_info.get("permission_level") not in ["admin", "editor", "regional_admin"]:
+        raise InsufficientPermissionsError("Upload documenti richiede permessi editor, admin o regional admin")
     
     # Simula request form data
     class MockRequest:
@@ -386,8 +386,8 @@ async def v1_update_document(
     site_info = verify_site_access(site_id, user_sites)
     
     # Verifica permessi di modifica
-    if site_info.get("permission_level") not in ["admin", "editor"]:
-        raise InsufficientPermissionsError("Modifica documenti richiede permessi editor o admin")
+    if site_info.get("permission_level") not in ["admin", "editor", "regional_admin"]:
+        raise InsufficientPermissionsError("Modifica documenti richiede permessi editor, admin o regional admin")
     
     # Simula request form data
     class MockRequest:
@@ -522,8 +522,8 @@ async def v1_delete_document(
     site_info = verify_site_access(site_id, user_sites)
     
     # Verifica permessi di eliminazione
-    if site_info.get("permission_level") not in ["admin"]:
-        raise InsufficientPermissionsError("Eliminazione documenti richiede permessi admin")
+    if site_info.get("permission_level") not in ["admin", "regional_admin"]:
+        raise InsufficientPermissionsError("Eliminazione documenti richiede permessi admin o regional admin")
     
     # Direct implementation
     try:

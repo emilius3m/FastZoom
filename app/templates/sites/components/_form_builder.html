@@ -1,0 +1,424 @@
+<!-- templates/sites/components/_form_builder.html - FORM BUILDER COMPONENT -->
+<!-- 
+    Questo componente contiene il Form Builder per creare e gestire form dinamici.
+    Richiede Alpine.js e deve essere incluso all'interno di un contesto con x-data="formBuilder()"
+    
+    Uso: {% include 'sites/components/_form_builder.html' %}
+-->
+
+<div class="h-[calc(100vh-220px)] min-h-[600px] flex flex-col lg:flex-row gap-4">
+
+    <!-- LEFT SIDEBAR: Explorer & Tools (25%) -->
+    <div class="w-full lg:w-1/4 flex flex-col gap-4 overflow-hidden">
+
+        <!-- My Forms List -->
+        <div
+            class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-1/2 overflow-hidden">
+            <div
+                class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center sticky top-0 z-10">
+                <h3 class="font-semibold text-gray-900 dark:text-white">🗂️ I Miei Form</h3>
+                <button @click="createNewForm()"
+                    class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                    title="Nuovo Form">
+                    + Nuovo
+                </button>
+            </div>
+            <div class="overflow-y-auto p-2 space-y-2 flex-1">
+                <template x-for="schema in existingSchemas" :key="schema.id">
+                    <div @click="loadExistingSchema(schema)"
+                        :class="currentSchemaId === schema.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'"
+                        class="p-3 rounded-md border cursor-pointer transition-all group">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-medium text-sm text-gray-900 dark:text-white truncate"
+                                x-text="schema.name"></span>
+                            <button @click.stop="deleteSchema(schema.id)"
+                                class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                    </path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                            <span x-text="schema.category"></span>
+                            <span x-text="(schema.schema?.fields?.length || 0) + ' campi'"></span>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="existingSchemas.length === 0" class="text-center py-4 text-xs text-gray-400">
+                    Nessun form creato
+                </div>
+            </div>
+        </div>
+
+        <!-- Components Palette -->
+        <div
+            class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-1/2 overflow-hidden">
+            <div
+                class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10">
+                <h3 class="font-semibold text-gray-900 dark:text-white">🧩 Componenti</h3>
+            </div>
+            <div class="overflow-y-auto p-2 grid grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2">
+                <template x-for="component in availableComponents">
+                    <div @dragstart="startDrag(component, $event)" draggable="true"
+                        class="flex items-center p-2 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800 cursor-move hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-sm transition-all select-none">
+                        <span class="text-lg mr-2" x-text="component.icon"></span>
+                        <span class="text-sm text-gray-700 dark:text-gray-300" x-text="component.label"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- CENTER: Canvas (50%) -->
+    <div
+        class="w-full lg:w-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden min-w-[300px]">
+        <!-- Canvas Toolbar -->
+        <div
+            class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center sticky top-0 z-20">
+            <div class="flex-1 w-full sm:w-auto flex gap-3">
+                <div class="flex-1">
+                    <input x-model="formSchema.name"
+                        class="w-full bg-transparent border-0 border-b border-gray-300 dark:border-gray-600 focus:border-blue-500 focus:ring-0 px-0 py-1 text-lg font-semibold text-gray-900 dark:text-white placeholder-gray-400"
+                        placeholder="Nome del Modulo...">
+                </div>
+                <div class="w-32">
+                    <select x-model="formSchema.category"
+                        class="w-full bg-transparent border-0 border-b border-gray-300 dark:border-gray-600 focus:border-blue-500 focus:ring-0 px-0 py-1 text-sm text-gray-600 dark:text-gray-300">
+                        <option value="artifact">🏺 Reperto</option>
+                        <option value="structure">🏛️ Struttura</option>
+                        <option value="stratigraphy">🪨 Stratigrafia</option>
+                        <option value="sample">🧪 Campione</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-2 shrink-0">
+                <button @click="previewForm()"
+                    class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                    title="Anteprima">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+                        </path>
+                    </svg>
+                </button>
+                <button @click="saveFormSchema()"
+                    class="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded shadow-sm transition-colors">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4">
+                        </path>
+                    </svg>
+                    Salva
+                </button>
+            </div>
+        </div>
+
+        <!-- Drop Zone -->
+        <div @dragover="allowDrop($event)" @drop="dropComponent($event)"
+            class="flex-1 overflow-y-auto p-6 bg-gray-50/50 dark:bg-gray-900/50">
+            <div class="max-w-3xl mx-auto min-h-full space-y-4 pb-20">
+
+                <template x-if="formSchema.fields.length === 0">
+                    <div
+                        class="h-64 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800">
+                        <span class="text-4xl mb-3 opacity-50">🏗️</span>
+                        <p class="text-gray-500 dark:text-gray-400 font-medium">Trascina qui i componenti</p>
+                        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Costruisci il tuo form
+                            personalizzato</p>
+                    </div>
+                </template>
+
+                <template x-for="(field, index) in formSchema.fields" :key="field.id">
+                    <div @click="selectField(field)"
+                        :class="selectedField === field ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900 border-blue-500' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'"
+                        class="bg-white dark:bg-gray-800 p-4 rounded-lg border shadow-sm relative group transition-all">
+
+                        <!-- Field Controls Overlay -->
+                        <div
+                            class="absolute right-2 top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-gray-800 shadow-sm rounded-md p-1 border border-gray-100 dark:border-gray-700 z-10">
+                            <button @click.stop="moveFieldUp(index)" :disabled="index === 0"
+                                class="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-30 text-gray-500">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 15l7-7 7 7"></path>
+                                </svg>
+                            </button>
+                            <button @click.stop="moveFieldDown(index)"
+                                :disabled="index === formSchema.fields.length - 1"
+                                class="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-30 text-gray-500">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div class="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1 self-center"></div>
+                            <button @click.stop="removeField(index)"
+                                class="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="pr-12 pointer-events-none">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <span x-text="field.label"></span>
+                                <span x-show="field.required" class="text-red-500 ml-0.5">*</span>
+                            </label>
+                            <div x-html="renderFieldPreview(field)"></div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR: Properties (25%) -->
+    <div
+        class="w-full lg:w-1/4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10">
+            <h3 class="font-semibold text-gray-900 dark:text-white">⚙️ Proprietà</h3>
+        </div>
+
+        <div class="overflow-y-auto p-4 flex-1">
+            <template x-if="selectedField">
+                <div class="space-y-6">
+                    <div>
+                        <label
+                            class="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Base</label>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Etichetta</label>
+                                <input x-model="selectedField.label"
+                                    class="block w-full text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Identificativo
+                                    (ID)</label>
+                                <div class="flex">
+                                    <span
+                                        class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-500 sm:text-sm">#</span>
+                                    <input x-model="selectedField.id"
+                                        class="flex-1 min-w-0 block w-full text-sm border-gray-300 dark:border-gray-600 rounded-r-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-blue-500">
+                                </div>
+                            </div>
+                            <div class="flex items-center mt-2">
+                                <input x-model="selectedField.required" type="checkbox"
+                                    class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                <label class="ml-2 block text-sm text-gray-700 dark:text-gray-300">Obbligatorio</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <label
+                            class="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Specifiche</label>
+
+                        <!-- Options for Select/Radio -->
+                        <template x-if="['select', 'multiselect', 'radio'].includes(selectedField.type)">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center mb-2">
+                                    <label class="text-sm text-gray-700 dark:text-gray-300">Opzioni</label>
+                                    <button @click="addOption(selectedField)"
+                                        class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">+
+                                        Aggiungi</button>
+                                </div>
+                                <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                    <template x-for="(option, optIndex) in selectedField.options">
+                                        <div class="flex gap-1 items-start">
+                                            <div class="grid grid-cols-2 gap-1 flex-1">
+                                                <input x-model="option.label" placeholder="Label"
+                                                    class="text-xs border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                                                <input x-model="option.value" placeholder="Value"
+                                                    class="text-xs border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-800 text-gray-500">
+                                            </div>
+                                            <button @click="removeOption(selectedField, optIndex)"
+                                                class="p-1.5 text-gray-400 hover:text-red-500">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Numeric Defaults -->
+                        <template x-if="selectedField.type === 'number'">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Minimo</label>
+                                    <input x-model="selectedField.min" type="number"
+                                        class="w-full text-sm border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Massimo</label>
+                                    <input x-model="selectedField.max" type="number"
+                                        class="w-full text-sm border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Step</label>
+                                    <input x-model="selectedField.step" type="number" step="any"
+                                        class="w-full text-sm border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- File Props -->
+                        <template x-if="selectedField.type === 'file'">
+                            <div class="space-y-3">
+                                <div class="flex items-center">
+                                    <input x-model="selectedField.multiple" type="checkbox"
+                                        class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <label class="ml-2 block text-sm text-gray-700 dark:text-gray-300">Caricamento
+                                        Multiplo</label>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Tipi File (es.
+                                        image/*)</label>
+                                    <input x-model="selectedField.accept"
+                                        class="w-full text-sm border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700">
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <template x-if="!selectedField">
+                <div class="h-full flex flex-col items-center justify-center text-center text-gray-400 p-4">
+                    <svg class="w-12 h-12 mb-2 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122">
+                        </path>
+                    </svg>
+                    <p class="text-sm">Seleziona un campo nel canvas per modificarne le proprietà</p>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+
+<!-- Form Preview Modal -->
+<div x-show="showPreviewModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto"
+    @click.self="showPreviewModal = false">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black opacity-50"></div>
+        <div class="relative bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">👁️ Anteprima Form: <span
+                            x-text="formSchema.name"></span></h3>
+                    <button @click="showPreviewModal = false"
+                        class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6" x-data="dynamicFormRenderer(formSchema)">
+                <form @submit.prevent="submitForm()">
+                    <template x-for="field in schema.fields">
+                        <div class="mb-4" x-html="renderFormField(field)"></div>
+                    </template>
+                    <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button type="button" @click="$dispatch('close-preview')"
+                            class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                            Chiudi
+                        </button>
+                        <button type="submit"
+                            class="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-800">
+                            Invia Dati
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fill Modal -->
+<div x-show="showFillModal" class="fixed inset-0 z-[60] overflow-y-auto" style="display: none;">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity" aria-hidden="true" @click="showFillModal = false">
+            <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <div
+            class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900"
+                            x-text="'Compila: ' + (fillingSchema?.name || 'Nuovo Modulo')"></h3>
+                        <div class="mt-4" x-data="dynamicFormRenderer(fillingSchema)"
+                            @close-preview.window="showFillModal = false">
+                            <form @submit.prevent="submitForm" class="space-y-4">
+                                <template x-for="field in schema?.fields" :key="field.id">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700"
+                                            x-text="field.label"></label>
+
+                                        <!-- Dynamic Field Rendering -->
+                                        <template x-if="['text', 'email', 'number', 'date'].includes(field.type)">
+                                            <input :type="field.type" x-model="formData[field.id]"
+                                                :required="field.required"
+                                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                        </template>
+
+                                        <template x-if="field.type === 'textarea'">
+                                            <textarea x-model="formData[field.id]" :required="field.required"
+                                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+                                        </template>
+
+                                        <template x-if="field.type === 'select'">
+                                            <select x-model="formData[field.id]" :required="field.required"
+                                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                                <option value="">Seleziona...</option>
+                                                <template x-for="option in field.options" :key="option">
+                                                    <option :value="option" x-text="option"></option>
+                                                </template>
+                                            </select>
+                                        </template>
+
+                                        <template x-if="field.type === 'checkbox'">
+                                            <div class="flex items-center mt-1">
+                                                <input type="checkbox" x-model="formData[field.id]"
+                                                    class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                                <span class="ml-2 text-sm text-gray-600" x-text="field.label"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                                    <button type="submit"
+                                        class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm"
+                                        :disabled="isSubmitting">
+                                        <span x-show="!isSubmitting">Salva Dati</span>
+                                        <span x-show="isSubmitting">Salvataggio...</span>
+                                    </button>
+                                    <button type="button"
+                                        class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                                        @click="showFillModal = false">
+                                        Annulla
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
