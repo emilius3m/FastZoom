@@ -1,14 +1,14 @@
-<!-- templates/sites/components/_form_builder_script.html - FORM BUILDER ALPINE.JS COMPONENTS -->
-<!--
-    Script Alpine.js per il Form Builder.
-    Include i componenti 'formBuilder' e 'dynamicFormRenderer'.
-    
-    Uso: {% include 'sites/components/_form_builder_script.html' %}
-    
-    NOTA: Richiede che il template che include questo file fornisca:
-    - site.id (variabile Jinja2)
-    - form_schemas (variabile Jinja2, opzionale, default: [])
--->
+{#
+FORM BUILDER ALPINE.JS COMPONENTS
+Script Alpine.js per il Form Builder.
+Include i componenti 'formBuilder' e 'dynamicFormRenderer'.
+
+Uso: {% include 'sites/components/_form_builder_script.html' %}
+
+NOTA: Richiede che il template che include questo file fornisca:
+- site.id (variabile Jinja2)
+- form_schemas (variabile Jinja2, opzionale, default: [])
+#}
 
 <script>
     document.addEventListener('alpine:init', () => {
@@ -74,11 +74,14 @@
 
         // Carica schemas esistente per modifica
         loadExistingSchema(schema) {
+        console.log('Loading schema:', schema);
+        const fields = (schema.schema && schema.schema.fields) ? [...schema.schema.fields] : [];
+
         this.formSchema = {
             id: schema.id,
             name: schema.name,
             category: schema.category,
-            fields: [...schema.schema.fields] // Clone the fields array
+            fields: fields
         };
         this.isEditing = true;
         this.currentSchemaId = schema.id;
@@ -234,7 +237,7 @@
                             name: this.formSchema.name,
                             description: this.formSchema.description || '',
                             category: this.formSchema.category,
-                            schema: this.formSchema
+                            schema: result.schema
                         };
                     }
                     alert('Form aggiornato con successo!');
@@ -245,7 +248,7 @@
                         name: this.formSchema.name,
                         description: this.formSchema.description || '',
                         category: this.formSchema.category,
-                        schema: this.formSchema
+                        schema: result.schema
                     });
                     alert('Form salvato con successo!');
 
@@ -362,11 +365,6 @@
         init() {
             this.initializeFormData();
             this.$watch('schema', () => this.initializeFormData());
-
-            // Listen for close preview event
-            this.$el.addEventListener('close-preview', () => {
-                this.$parent.showPreviewModal = false;
-            });
         },
 
         initializeFormData() {
@@ -414,22 +412,22 @@
             switch (field.type) {
                 case 'text':
                     return `
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                             ${field.label} ${requiredStar}
                         </label>
                         <input type="text"
                                x-model="formData['${field.id}']"
-                               class="w-full border-gray-300 rounded-md"
+                               class="w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                                ${required}>
                     `;
 
                 case 'textarea':
                     return `
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                             ${field.label} ${requiredStar}
                         </label>
                         <textarea x-model="formData['${field.id}']"
-                                  class="w-full border-gray-300 rounded-md"
+                                  class="w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                                   rows="3"
                                   ${required}></textarea>
                     `;
@@ -439,11 +437,11 @@
                         `<option value="${opt.value}">${opt.label}</option>`
                     ).join('') || '';
                     return `
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                             ${field.label} ${requiredStar}
                         </label>
                         <select x-model="formData['${field.id}']"
-                                class="w-full border-gray-300 rounded-md"
+                                class="w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                                 ${required}>
                             <option value="">Seleziona...</option>
                             ${selectOptions}
@@ -452,12 +450,12 @@
 
                 case 'number':
                     return `
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                             ${field.label} ${requiredStar}
                         </label>
                         <input type="number"
                                x-model="formData['${field.id}']"
-                               class="w-full border-gray-300 rounded-md"
+                               class="w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                                min="${field.min || ''}"
                                step="${field.step || 1}"
                                ${required}>
@@ -465,12 +463,12 @@
 
                 case 'date':
                     return `
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
                             ${field.label} ${requiredStar}
                         </label>
                         <input type="date"
                                x-model="formData['${field.id}']"
-                               class="w-full border-gray-300 rounded-md"
+                               class="w-full border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                                ${required}>
                     `;
 
@@ -479,9 +477,9 @@
                         <div class="flex items-center">
                             <input type="checkbox"
                                    x-model="formData['${field.id}']"
-                                   class="mr-2"
+                                   class="mr-2 rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-gray-700 dark:border-gray-600"
                                    ${required}>
-                            <label class="text-sm text-gray-700">
+                            <label class="text-sm text-gray-700 dark:text-gray-200">
                                 ${field.label} ${requiredStar}
                             </label>
                         </div>

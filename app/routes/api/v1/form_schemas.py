@@ -88,7 +88,7 @@ async def save_form_schema(
             return JSONResponse({
                 "message": "Schema aggiornato con successo",
                 "schema_id": str(existing_schema.id),
-                "schemas": schema_data
+                "schema": schema_data
             })
         else:
             # Nuovo schemas
@@ -122,7 +122,7 @@ async def save_form_schema(
             return JSONResponse({
                 "message": "Schema salvato con successo",
                 "schema_id": str(new_schema.id),
-                "schemas": schema_data
+                "schema": schema_data
             })
             
     except HTTPException:
@@ -166,7 +166,7 @@ async def get_form_schemas(
                     "created_at": schema.created_at.isoformat(),
                     "updated_at": schema.updated_at.isoformat(),
                     "created_by": str(schema.created_by),
-                    "schemas": schema_json
+                    "schema": schema_json
                 })
             except json.JSONDecodeError:
                 logger.warning(f"Invalid JSON in schemas {schema.id}")
@@ -215,7 +215,7 @@ async def get_form_schema(
                 "created_at": schema.created_at.isoformat(),
                 "updated_at": schema.updated_at.isoformat(),
                 "created_by": str(schema.created_by),
-                "schemas": schema_json
+                "schema": schema_json
             })
         except json.JSONDecodeError:
             raise HTTPException(status_code=500, detail="Schema corrotto nel database")

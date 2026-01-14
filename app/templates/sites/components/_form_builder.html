@@ -1,10 +1,10 @@
-<!-- templates/sites/components/_form_builder.html - FORM BUILDER COMPONENT -->
-<!-- 
-    Questo componente contiene il Form Builder per creare e gestire form dinamici.
-    Richiede Alpine.js e deve essere incluso all'interno di un contesto con x-data="formBuilder()"
-    
-    Uso: {% include 'sites/components/_form_builder.html' %}
--->
+{#
+FORM BUILDER COMPONENT
+Questo componente contiene il Form Builder per creare e gestire form dinamici.
+Richiede Alpine.js e deve essere incluso all'interno di un contesto con x-data="formBuilder()"
+
+Uso: {% include 'sites/components/_form_builder.html' %}
+#}
 
 <div class="h-[calc(100vh-220px)] min-h-[600px] flex flex-col lg:flex-row gap-4">
 
@@ -42,7 +42,8 @@
                         </div>
                         <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                             <span x-text="schema.category"></span>
-                            <span x-text="(schema.schema?.fields?.length || 0) + ' campi'"></span>
+                            <span
+                                x-text="((schema.schema?.fields?.length || schema.schemas?.fields?.length) || 0) + ' campi'"></span>
                         </div>
                     </div>
                 </template>
@@ -308,8 +309,8 @@
 </div>
 
 <!-- Form Preview Modal -->
-<div x-show="showPreviewModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto"
-    @click.self="showPreviewModal = false">
+<div x-show="showPreviewModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto" @click.self="showPreviewModal = false"
+    @close-preview="showPreviewModal = false">
     <div class="flex items-center justify-center min-h-screen px-4">
         <div class="fixed inset-0 bg-black opacity-50"></div>
         <div class="relative bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
@@ -326,22 +327,26 @@
                     </button>
                 </div>
             </div>
-            <div class="p-6" x-data="dynamicFormRenderer(formSchema)">
-                <form @submit.prevent="submitForm()">
-                    <template x-for="field in schema.fields">
-                        <div class="mb-4" x-html="renderFormField(field)"></div>
-                    </template>
-                    <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <button type="button" @click="$dispatch('close-preview')"
-                            class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
-                            Chiudi
-                        </button>
-                        <button type="submit"
-                            class="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-800">
-                            Invia Dati
-                        </button>
+            <div class="p-6">
+                <template x-if="showPreviewModal">
+                    <div x-data="dynamicFormRenderer(formSchema)">
+                        <form @submit.prevent="submitForm()">
+                            <template x-for="field in schema.fields">
+                                <div class="mb-4" x-html="renderFormField(field)"></div>
+                            </template>
+                            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                <button type="button" @click="$dispatch('close-preview')"
+                                    class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                    Chiudi
+                                </button>
+                                <button type="submit"
+                                    class="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-800">
+                                    Invia Dati
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                </form>
+                </template>
             </div>
         </div>
     </div>

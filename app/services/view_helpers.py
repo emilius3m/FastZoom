@@ -546,7 +546,7 @@ async def get_form_schemas_safe(db: AsyncSession, site_id: UUID) -> List[Dict[st
                     "category": schema.category,
                     "created_at": schema.created_at.isoformat(),
                     "updated_at": schema.updated_at.isoformat(),
-                    "schemas": schema_json
+                    "schema": schema_json
                 })
             except json.JSONDecodeError:
                 continue
