@@ -276,6 +276,47 @@ NOTA: Richiede che il template che include questo file fornisca:
         this.showPreviewModal = true;
     },
 
+    // --- Data Viewer Logic ---
+    showSubmissionsModal: false,
+        showSubmissionDetailModal: false,
+            currentSubmissions: [],
+                selectedSubmission: null,
+                    isLoadingSubmissions: false,
+
+                        async viewFormSubmissions(schema) {
+        this.formSchema = { ...schema, fields: schema.schema.fields }; // Load schema to context
+        this.currentSubmissions = [];
+        this.showSubmissionsModal = true;
+        this.isLoadingSubmissions = true;
+
+        try {
+            const response = await fetch(`/api/v1/sites/{{ site.id }}/forms/${schema.id}/data`);
+            if (response.ok) {
+                this.currentSubmissions = await response.json();
+            } else {
+                console.error('Error fetching submissions');
+                alert('Impossibile caricare i dati');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Errore di connessione');
+        } finally {
+            this.isLoadingSubmissions = false;
+        }
+    },
+
+    viewSubmissionDetail(submission) {
+        this.selectedSubmission = submission;
+        this.showSubmissionDetailModal = true;
+    },
+
+    formatDate(dateStr) {
+        if (!dateStr) return '-';
+        return new Date(dateStr).toLocaleString('it-IT');
+    },
+
+    // --- End Data Viewer Logic ---
+
     // Field Preview Renderer
     renderFieldPreview(field) {
         switch (field.type) {
@@ -357,13 +398,16 @@ NOTA: Richiede che il template che include questo file fornisca:
     }));
 
     // Dynamic Form Renderer Component
-    Alpine.data('dynamicFormRenderer', (schema) => ({
+    Alpine.data('dynamicFormRenderer', (schema, initialData = null) => ({
         schema: schema,
         formData: {},
         isSubmitting: false,
 
         init() {
             this.initializeFormData();
+            if (initialData) {
+                this.formData = JSON.parse(JSON.stringify(initialData)); // Deep copy/safety
+            }
             this.$watch('schema', () => this.initializeFormData());
         },
 
@@ -392,11 +436,30 @@ NOTA: Richiede che il template che include questo file fornisca:
         },
 
         async submitForm() {
+            if (!this.schema.id) {
+                alert('Salva il form prima di inviare dati di prova.');
+                return;
+            }
+
             try {
                 this.isSubmitting = true;
-                console.log('Form Data:', this.formData);
-                alert('Dati del form inviati! Controlla la console per i dettagli.');
-                this.$dispatch('close-preview');
+
+                const response = await fetch(`/api/v1/sites/{{ site.id }}/forms/${this.schema.id}/submit`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(this.formData)
+                });
+
+                if (response.ok) {
+                    alert('Dati inviati con successo!');
+                    this.$dispatch('close-preview');
+                    this.$dispatch('refresh-submissions'); // Event to notify parent if needed
+                } else {
+                    const error = await response.json();
+                    alert('Errore nell\'invio: ' + (error.detail || 'Errore sconosciuto'));
+                }
             } catch (error) {
                 console.error('Form submission error:', error);
                 alert('Errore nell\'invio del form');

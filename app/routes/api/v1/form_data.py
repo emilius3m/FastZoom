@@ -47,7 +47,9 @@ async def submit_form_data(
             site_id=str(site_id),
             schema_id=str(schema_id),
             data=data,
-            submitted_by=str(current_user_id)
+            submitted_by=str(current_user_id),
+            created_by=str(current_user_id),
+            updated_by=str(current_user_id)
         )
         
         db.add(new_submission)
