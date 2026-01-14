@@ -73,10 +73,12 @@ api_v1_router.include_router(tus_uploads_router, tags=["TUS Uploads"])
 
 # Moved routers from V0
 from app.routes.api.v1.form_schemas import form_schemas_router
+from app.routes.api.v1.form_data import router as form_data_router
 from app.routes.api.v1.archaeological_plans import plans_router
 from app.routes.api.v1.iccd_records import iccd_router
 
 api_v1_router.include_router(form_schemas_router)
+api_v1_router.include_router(form_data_router)
 api_v1_router.include_router(plans_router)
 api_v1_router.include_router(iccd_router)
 

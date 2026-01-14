@@ -202,6 +202,8 @@ from app.models.documentation_and_field import (
     get_photos_by_types
 )
 
+from app.models.form_data import FormData
+
 # ===== IMPORT CANTIERE =====
 from app.models.cantiere import (
     Cantiere
@@ -354,6 +356,7 @@ __all__ = [
     'OperatoreCantiere',
     'GiornaleCantiere',
     'FormSchema',
+    'FormData',
     'giornale_operatori_association',
     'DocumentCategoryEnum',
     'PhotoStatusEnum',
