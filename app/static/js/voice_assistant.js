@@ -205,7 +205,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         /**
-         * Start listening for voice input
+         * Start listening for voice input - RAW PCM VERSION
          */
         async startListening() {
             if (!this.isConnected) {
@@ -224,20 +224,36 @@ document.addEventListener('alpine:init', () => {
                     }
                 });
 
-                this.audioContext = new AudioContext({ sampleRate: 16000 });
-
-                this.mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'audio/webm;codecs=opus'
+                // Use AudioContext to get Raw PCM data
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 16000
                 });
 
-                this.mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0 && this.websocket?.readyState === WebSocket.OPEN) {
-                        // Send audio chunk
-                        this.websocket.send(event.data);
+                const source = this.audioContext.createMediaStreamSource(stream);
+                // Buffer size 4096 = ~256ms chunks
+                this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+
+                this.processor.onaudioprocess = (e) => {
+                    if (this.websocket?.readyState !== WebSocket.OPEN || !this.isListening) return;
+
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    // Convert Float32 to Int16
+                    const buffer = new ArrayBuffer(inputData.length * 2);
+                    const view = new DataView(buffer);
+                    for (let i = 0; i < inputData.length; i++) {
+                        let s = Math.max(-1, Math.min(1, inputData[i]));
+                        s = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                        view.setInt16(i * 2, s, true); // Little endian
                     }
+                    this.websocket.send(buffer);
                 };
 
-                this.mediaRecorder.start(100); // Send chunks every 100ms
+                source.connect(this.processor);
+                this.processor.connect(this.audioContext.destination);
+
+                // Keep references to cleanup
+                this.mediaStream = stream;
+
                 this.isListening = true;
                 this.statusMessage = 'Sto ascoltando...';
 
@@ -257,15 +273,19 @@ document.addEventListener('alpine:init', () => {
          * Stop listening
          */
         stopListening() {
-            if (this.mediaRecorder && this.isListening) {
-                this.mediaRecorder.stop();
-                this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                this.mediaRecorder = null;
-            }
-
-            if (this.audioContext) {
-                this.audioContext.close();
-                this.audioContext = null;
+            if (this.isListening) {
+                if (this.processor) {
+                    this.processor.disconnect();
+                    this.processor = null;
+                }
+                if (this.mediaStream) {
+                    this.mediaStream.getTracks().forEach(track => track.stop());
+                    this.mediaStream = null;
+                }
+                if (this.audioContext) {
+                    this.audioContext.close();
+                    this.audioContext = null;
+                }
             }
 
             this.isListening = false;

@@ -118,134 +118,126 @@ async def voice_stream(
 ):
     """
     WebSocket endpoint for real-time voice streaming.
-    
-    Protocol:
-    1. Client connects and sends {"type": "init", "token": "..."}
-    2. Server responds with {"type": "ready"} or {"type": "error"}
-    3. Client sends audio chunks as binary data
-    4. Server sends back:
-       - {"type": "transcript", "text": "..."} for STT results
-       - {"type": "response", "text": "..."} for LLM text
-       - {"type": "audio", "data": "..."} for TTS audio (base64)
-       - {"type": "function", "name": "...", "result": {...}}
-    5. Either party can close the connection
+    Uses local AI services (Whisper STT + Ollama LLM).
     """
     await websocket.accept()
     session_id = str(id(websocket))
     
     logger.info(f"Voice assistant WebSocket connected: {session_id}")
     
-    # Check if service is available
     if not pipecat_service.is_available:
         await websocket.send_json({
             "type": "error",
-            "message": "Voice assistant not configured. Please set API keys in .env"
+            "message": "Voice assistant not configured."
         })
-        await websocket.close(code=1008, reason="Service not configured")
+        await websocket.close(code=1008)
         return
     
     try:
-        # Wait for initialization message
-        init_msg = await websocket.receive_json()
+        # Import local services
+        from app.services.pipecat_local_services import LocalWhisperSTT, LocalOllamaLLM, LOCAL_AI_AVAILABLE
         
-        if init_msg.get("type") != "init":
+        if not LOCAL_AI_AVAILABLE:
             await websocket.send_json({
                 "type": "error",
-                "message": "Expected init message"
+                "message": "Local AI dependencies not installed (ollama, whisper)"
             })
-            await websocket.close(code=1002)
+            await websocket.close(code=1008)
             return
         
-        # TODO: Validate token and get user
-        # For now, accept connection without auth validation
-        # In production, verify the token against the auth system
+        # Initialize services
+        stt = LocalWhisperSTT(model="base", device="auto", language="it")
+        llm = LocalOllamaLLM(model="llama3.2:3b")
         
+        if not stt.is_ready:
+            await websocket.send_json({
+                "type": "error", 
+                "message": "Whisper model failed to load"
+            })
+            await websocket.close(code=1008)
+            return
+        
+        # Wait for init message
+        init_msg = await websocket.receive_json()
+        if init_msg.get("type") != "init":
+            await websocket.close(code=1002)
+            return
+
         await websocket.send_json({
             "type": "ready",
             "session_id": session_id,
-            "language": pipecat_settings.pipecat_voice_language,
-            "message": "Assistente vocale pronto. Parla pure!"
+            "message": "Assistente Locale Pronto (Whisper/Ollama)"
         })
         
-        # Main message loop
+        # Message history for LLM context
+        messages_history = [{"role": "system", "content": "Sei un assistente utile per FastZoom, un sistema di documentazione archeologica. Rispondi in italiano in modo conciso."}]
+        
         while True:
             try:
-                # Handle both text and binary messages
                 message = await websocket.receive()
                 
-                if "text" in message:
-                    # Text message (commands, control)
+                if "bytes" in message:
+                    # Process Audio
+                    audio_data = message["bytes"]
+                    
+                    # Add to STT buffer
+                    ready = stt.add_audio(audio_data)
+                    
+                    if ready:
+                        # Transcribe
+                        result = await stt.transcribe()
+                        
+                        if result and result.text:
+                            # Send transcript
+                            await websocket.send_json({
+                                "type": "transcript",
+                                "text": result.text,
+                                "is_final": True
+                            })
+                            
+                            # Add to history and query LLM
+                            messages_history.append({"role": "user", "content": result.text})
+                            
+                            await websocket.send_json({"type": "status", "text": "Elaborazione..."})
+                            
+                            # Get LLM response
+                            response_text = await llm.simple_chat(messages_history)
+                            
+                            messages_history.append({"role": "assistant", "content": response_text})
+                            
+                            await websocket.send_json({
+                                "type": "response",
+                                "text": response_text
+                            })
+                            
+                elif "text" in message:
+                    # Handle text commands
                     data = json.loads(message["text"])
                     msg_type = data.get("type")
                     
-                    if msg_type == "text":
-                        # Process text input (for testing without mic)
-                        text = data.get("text", "")
-                        await websocket.send_json({
-                            "type": "transcript",
-                            "text": text,
-                            "is_final": True
-                        })
-                        
-                        # TODO: Send to LLM and get response
-                        # For now, echo back as placeholder
-                        await websocket.send_json({
-                            "type": "response",
-                            "text": f"Hai detto: {text}. L'elaborazione vocale completa sarà disponibile quando configurerai le API keys."
-                        })
-                        
-                    elif msg_type == "function":
-                        # Direct function call
-                        result = await pipecat_service.handle_function_call(
-                            function_name=data.get("function"),
-                            arguments=data.get("arguments", {}),
-                            user_id=None,  # TODO: Get from auth
-                            site_id=None
-                        )
-                        await websocket.send_json({
-                            "type": "function",
-                            "name": data.get("function"),
-                            "result": result
-                        })
-                        
-                    elif msg_type == "ping":
-                        await websocket.send_json({"type": "pong"})
-                        
-                    elif msg_type == "close":
+                    if msg_type == "close":
                         break
+                    elif msg_type == "text":
+                        # Direct text input (for testing)
+                        text = data.get("text", "")
+                        if text:
+                            messages_history.append({"role": "user", "content": text})
+                            response_text = await llm.simple_chat(messages_history)
+                            messages_history.append({"role": "assistant", "content": response_text})
+                            await websocket.send_json({
+                                "type": "response",
+                                "text": response_text
+                            })
                         
-                elif "bytes" in message:
-                    # Binary audio data
-                    audio_data = message["bytes"]
-                    
-                    # TODO: When Pipecat pipeline is fully configured,
-                    # send audio to STT service
-                    # For now, acknowledge receipt
-                    await websocket.send_json({
-                        "type": "audio_received",
-                        "size": len(audio_data)
-                    })
-                    
             except WebSocketDisconnect:
-                logger.info(f"Voice assistant client disconnected: {session_id}")
                 break
-            except json.JSONDecodeError as e:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": f"Invalid JSON: {str(e)}"
-                })
                 
-    except WebSocketDisconnect:
-        logger.info(f"Voice assistant disconnected during init: {session_id}")
     except Exception as e:
-        logger.error(f"Voice assistant error: {e}")
+        logger.error(f"Voice loop error: {e}")
         try:
-            await websocket.send_json({
-                "type": "error",
-                "message": str(e)
-            })
+            await websocket.send_json({"type": "error", "message": str(e)})
         except:
             pass
     finally:
         await pipecat_service.cleanup_session(session_id)
-        logger.info(f"Voice assistant session cleaned up: {session_id}")
+        logger.info(f"Voice session closed: {session_id}")
