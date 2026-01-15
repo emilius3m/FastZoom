@@ -195,20 +195,33 @@ async def voice_stream(
                                 "is_final": True
                             })
                             
-                            # Add to history and query LLM
-                            messages_history.append({"role": "user", "content": result.text})
+                            # Check for voice commands first
+                            from app.services.voice_commands import parse_voice_command
+                            cmd = parse_voice_command(result.text)
                             
-                            await websocket.send_json({"type": "status", "text": "Elaborazione..."})
-                            
-                            # Get LLM response
-                            response_text = await llm.simple_chat(messages_history)
-                            
-                            messages_history.append({"role": "assistant", "content": response_text})
-                            
-                            await websocket.send_json({
-                                "type": "response",
-                                "text": response_text
-                            })
+                            if cmd["is_command"]:
+                                # Send command to frontend
+                                await websocket.send_json({
+                                    "type": "command",
+                                    "action": cmd["action"],
+                                    "target": cmd["target"],
+                                    "params": cmd["params"]
+                                })
+                                # Send response text
+                                await websocket.send_json({
+                                    "type": "response",
+                                    "text": cmd["response_text"]
+                                })
+                            else:
+                                # Not a command - use LLM
+                                messages_history.append({"role": "user", "content": result.text})
+                                await websocket.send_json({"type": "status", "text": "Elaborazione..."})
+                                response_text = await llm.simple_chat(messages_history)
+                                messages_history.append({"role": "assistant", "content": response_text})
+                                await websocket.send_json({
+                                    "type": "response",
+                                    "text": response_text
+                                })
                             
                 elif "text" in message:
                     # Handle text commands

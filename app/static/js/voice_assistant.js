@@ -159,6 +159,12 @@ document.addEventListener('alpine:init', () => {
                     }
                     break;
 
+                case 'command':
+                    // Voice command - execute action
+                    console.log('🎤 Voice command:', data);
+                    this.executeVoiceCommand(data);
+                    break;
+
                 case 'response':
                     this.response = data.text;
                     this.addMessage('assistant', data.text);
@@ -180,6 +186,65 @@ document.addEventListener('alpine:init', () => {
 
                 case 'pong':
                     // Keepalive response
+                    break;
+            }
+        },
+
+        /**
+         * Execute voice command action
+         */
+        executeVoiceCommand(data) {
+            const { action, target, params } = data;
+
+            switch (action) {
+                case 'navigate':
+                    const routes = {
+                        'dashboard': '/',
+                        'sites': '/sites',
+                        'photos': '/photos',
+                        'giornale': '/giornale',
+                        'home': '/',
+                        'back': null
+                    };
+                    if (target === 'back') {
+                        window.history.back();
+                    } else if (routes[target]) {
+                        window.location.href = routes[target];
+                    }
+                    break;
+
+                case 'create':
+                    if (target === 'giornale') {
+                        // Try multiple ways to open the modal
+                        this.$dispatch('open-new-giornale-modal');
+                        window.dispatchEvent(new CustomEvent('open-new-giornale-modal'));
+                        // Also try clicking the button if it exists
+                        const btn = document.querySelector('[data-action="new-giornale"]');
+                        if (btn) btn.click();
+                    } else if (target === 'site') {
+                        this.$dispatch('open-new-site-modal');
+                        window.dispatchEvent(new CustomEvent('open-new-site-modal'));
+                    } else if (target === 'photo') {
+                        this.$dispatch('open-photo-upload');
+                        window.dispatchEvent(new CustomEvent('open-photo-upload'));
+                    }
+                    break;
+
+                case 'search':
+                    const query = params?.query || '';
+                    if (target === 'photos') {
+                        window.location.href = `/photos?search=${encodeURIComponent(query)}`;
+                    } else {
+                        this.$dispatch('global-search', { query });
+                    }
+                    break;
+
+                case 'confirm':
+                    this.$dispatch('voice-confirm');
+                    break;
+
+                case 'cancel':
+                    this.$dispatch('voice-cancel');
                     break;
             }
         },
