@@ -87,5 +87,9 @@ api_v1_router.include_router(us_word_export_router, prefix="/us-export", tags=["
 api_v1_router.include_router(database_monitoring_router, prefix="/database", tags=["Database Monitoring"])
 api_v1_router.include_router(archeologia_avanzata_router, prefix="/archeologia", tags=["Archeologia Avanzata"])
 
+# Voice Assistant
+from app.routes.api.v1.pipecat import router as pipecat_router
+api_v1_router.include_router(pipecat_router, tags=["Voice Assistant"])
+
 # Esporta il router principale
 __all__ = ["api_v1_router"]

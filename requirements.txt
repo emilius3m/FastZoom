@@ -61,3 +61,7 @@ psutil
 pymupdf
 tuspy
 aiofiles
+# Pipecat Voice Assistant
+pipecat-ai[deepgram,openai,silero,websocket]
+websockets
+aiohttp

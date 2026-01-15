@@ -441,7 +441,7 @@ NOTA: Richiede che il template che include questo file fornisca:
         },
 
         async submitForm() {
-            if (!this.schema.id) {
+            if (!this.schema || !this.schema.id) {
                 alert('Salva il form prima di inviare dati di prova.');
                 return;
             }

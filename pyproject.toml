@@ -30,6 +30,10 @@ python-dotenv = "^1.0.0"
 python-multipart = "^0.0.9"
 pillow = "11.3.0"
 loguru = "^0.7.2"
+# Pipecat Voice Assistant
+pipecat-ai = {extras = ["deepgram", "openai", "silero", "websocket"], version = "^0.0.53"}
+websockets = "^12.0"
+aiohttp = "^3.9.0"
 
 
 [tool.poetry.group.dev.dependencies]

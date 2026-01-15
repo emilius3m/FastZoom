@@ -588,29 +588,39 @@
                             <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4"
                                 x-text="'Compila: ' + (fillingSchema?.name || 'Nuovo Modulo')"></h3>
 
-                            <div x-data="dynamicFormRenderer(fillingSchema)"
-                                @refresh-submissions="viewFormSubmissions(formSchema)"
-                                @close-preview="showFillModal = false">
+                            <!-- Use x-if to ensure dynamicFormRenderer is re-created when modal opens with valid schema -->
+                            <template x-if="showFillModal && fillingSchema && fillingSchema.fields">
+                                <div x-data="dynamicFormRenderer(fillingSchema)"
+                                    @refresh-submissions.window="$dispatch('close-preview'); viewFormSubmissions(formSchema)"
+                                    @close-preview.window="showFillModal = false">
 
-                                <form @submit.prevent="submitForm" class="space-y-4">
-                                    <template x-for="field in schema?.fields" :key="field.id">
-                                        <div class="mb-4" x-html="renderFormField(field)"></div>
-                                    </template>
+                                    <form @submit.prevent="submitForm" class="space-y-4">
+                                        <template x-for="field in schema.fields" :key="field.id">
+                                            <div class="mb-4" x-html="renderFormField(field)"></div>
+                                        </template>
 
-                                    <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
-                                        <button type="submit"
-                                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:col-start-2 sm:text-sm"
-                                            :disabled="isSubmitting">
-                                            <span x-show="!isSubmitting">Salva</span>
-                                            <span x-show="isSubmitting">Salvataggio...</span>
-                                        </button>
-                                        <button type="button"
-                                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm"
-                                            @click="showFillModal = false">
-                                            Annulla
-                                        </button>
-                                    </div>
-                                </form>
+                                        <div
+                                            class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                                            <button type="submit"
+                                                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:col-start-2 sm:text-sm"
+                                                :disabled="isSubmitting">
+                                                <span x-show="!isSubmitting">Salva</span>
+                                                <span x-show="isSubmitting">Salvataggio...</span>
+                                            </button>
+                                            <button type="button"
+                                                class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                                                @click="showFillModal = false">
+                                                Annulla
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </template>
+
+                            <!-- Loading state when modal opens but schema not yet available -->
+                            <div x-show="showFillModal && (!fillingSchema || !fillingSchema.fields)"
+                                class="text-center text-gray-500 dark:text-gray-400 py-8">
+                                Caricamento modulo...
                             </div>
                         </div>
                     </div>
