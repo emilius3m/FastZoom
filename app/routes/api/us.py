@@ -20,7 +20,7 @@ from app.schemas.us import (
     USMCreate, USMUpdate, USMOut
 )
 
-us_router = APIRouter(prefix="/api", tags=["us-usm"])
+us_router = APIRouter(prefix="/api")
 
 async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> bool:
     return any(s["site_id"] == str(site_id) for s in user_sites)

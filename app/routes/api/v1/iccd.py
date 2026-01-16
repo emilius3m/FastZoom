@@ -32,12 +32,7 @@ from app.routes.api.iccd_records import (
 
 router = APIRouter()
 
-def add_deprecation_headers(response: Response, new_endpoint: str):
-    """Aggiunge headers di deprecazione per backward compatibility"""
-    response.headers["X-API-Deprecated"] = "true"
-    response.headers["X-API-Deprecated-Reason"] = "Endpoint ristrutturato. Usa la nuova API v1."
-    response.headers["X-API-New-Endpoint"] = new_endpoint
-    response.headers["X-API-Sunset"] = "2025-12-31"  # Data rimozione vecchi endpoint
+
 
 def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Verifica accesso al sito e restituisce informazioni sul sito"""
@@ -108,46 +103,3 @@ async def v1_get_authority_files(
         site_id, authority_type, db
     )
 
-# ENDPOINT DI BACKWARD COMPATIBILITY CON DEPRECAZIONE
-
-@router.get("/legacy/iccd/{site_id}/hierarchy", summary="[DEPRECATED] Gerarchia ICCD legacy", tags=["ICCD Cataloging - Legacy"])
-async def legacy_get_iccd_hierarchy(
-    site_id: UUID,
-    db: AsyncSession = Depends(get_database_session)
-):
-    """
-    ⚠️ DEPRECATED: Gerarchia ICCD endpoint legacy.
-    
-    Usa /api/v1/iccd/sites/{site_id}/hierarchy invece di questo endpoint.
-    Questo endpoint sarà rimosso il 31/12/2025.
-    """
-    logger.warning(f"Legacy ICCD hierarchy endpoint used for site {site_id} - deprecated")
-    response = await get_iccd_hierarchy_api__site_id__api_iccd_hierarchy_get(site_id, db)
-    if hasattr(response, 'headers'):
-        add_deprecation_headers(response, f"/api/v1/iccd/sites/{site_id}/hierarchy")
-    return response
-
-# MIGRATION HELPER
-
-@router.get("/migration/help", summary="Aiuto migrazione API ICCD", tags=["ICCD Cataloging - Migration"])
-async def migration_help():
-    """
-    Fornisce informazioni sulla migrazione dalla vecchia alla nuova API structure per ICCD.
-    """
-    return {
-        "migration_guide": {
-            "old_endpoints": {
-                "/api/{site_id}/api/iccd/hierarchy": "/api/v1/iccd/sites/{site_id}/hierarchy",
-                "/api/{site_id}/api/iccd/records": "/api/v1/iccd/sites/{site_id}/records",
-                "/api/{site_id}/api/iccd/authority-files": "/api/v1/iccd/sites/{site_id}/authority-files"
-            },
-            "changes": [
-                "Standardizzazione URL patterns",
-                "Agregazione endpoints ICCD in dominio unico",
-                "Headers di deprecazione automatici",
-                "Documentazione migliorata"
-            ],
-            "deadline": "2025-12-31",
-            "action_required": "Aggiornare client applications per usare nuovi endpoints ICCD"
-        }
-    }
