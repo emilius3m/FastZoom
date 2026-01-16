@@ -145,11 +145,13 @@ async def voice_stream(
             await websocket.close(code=1008)
             return
         
-        # Initialize services
-        stt = LocalWhisperSTT(model="base", device="auto", language="it")
+        # Initialize services - medium model for quality/speed balance
+        stt = LocalWhisperSTT(model="medium", device="auto", language="it")
         llm = LocalOllamaLLM(model="llama3.2:3b")
         
-        if not stt.is_ready:
+        # Load model asynchronously (singleton, non-blocking)
+        model_ready = await stt.ensure_model_loaded()
+        if not model_ready:
             await websocket.send_json({
                 "type": "error", 
                 "message": "Whisper model failed to load"
@@ -162,6 +164,10 @@ async def voice_stream(
         if init_msg.get("type") != "init":
             await websocket.close(code=1002)
             return
+        
+        # Extract site_id from init message (sent by frontend)
+        current_site_id = init_msg.get("site_id")
+        logger.info(f"Voice session {session_id} - site_id: {current_site_id}")
 
         await websocket.send_json({
             "type": "ready",
@@ -195,22 +201,23 @@ async def voice_stream(
                                 "is_final": True
                             })
                             
-                            # Check for voice commands first
+                            # Check for voice commands first (with site context)
                             from app.services.voice_commands import parse_voice_command
-                            cmd = parse_voice_command(result.text)
+                            cmd = parse_voice_command(result.text, current_site_id)
                             
                             if cmd["is_command"]:
                                 # Send command to frontend
                                 await websocket.send_json({
                                     "type": "command",
                                     "action": cmd["action"],
-                                    "target": cmd["target"],
-                                    "params": cmd["params"]
+                                    "path": cmd.get("path"),
+                                    "target": cmd.get("target"),
+                                    "query": cmd.get("query")
                                 })
                                 # Send response text
                                 await websocket.send_json({
                                     "type": "response",
-                                    "text": cmd["response_text"]
+                                    "text": cmd["response"]
                                 })
                             else:
                                 # Not a command - use LLM

@@ -34,7 +34,8 @@
 </div>
 
 <!-- Main Content -->
-<div class="w-full px-4 pb-8 sm:px-6 lg:px-8" x-data="cantieriApp('{{ site_id }}')">
+<div class="w-full px-4 pb-8 sm:px-6 lg:px-8" x-data="cantieriApp('{{ site_id }}')"
+    @open-new-giornale-modal.window="openCreateModal()">
 
     <!-- Header Section -->
     <div class="mb-8">
@@ -657,6 +658,7 @@
             // Data
             cantieri: {{ cantieri | tojson | safe }},
 
+
     // Statistics
     stats: {{ stats | tojson | safe }},
 
@@ -688,6 +690,14 @@
         this.loadCantieri();
         this.loadStats();
         this.watchFilters();
+        
+        // Check if we should auto-open the create modal (from voice command)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('openModal') === 'true') {
+            // Clean up URL and open modal
+            window.history.replaceState({}, '', window.location.pathname);
+            setTimeout(() => this.openCreateModal(), 300);
+        }
     },
 
             // Computed: Filtered Cantieri

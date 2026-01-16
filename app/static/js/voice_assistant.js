@@ -23,6 +23,10 @@ document.addEventListener('alpine:init', () => {
         audioContext: null,
         audioChunks: [],
 
+        // Recording for download
+        recordingChunks: [],
+        hasRecording: false,
+
         // UI
         statusMessage: 'Clicca per iniziare',
         transcript: '',
@@ -49,6 +53,13 @@ document.addEventListener('alpine:init', () => {
                     this.toggle();
                 }
             });
+
+            // Auto-reopen if was active before page navigation
+            if (sessionStorage.getItem('voiceAssistantActive') === 'true') {
+                console.log('🎤 Voice assistant: auto-reconnecting after navigation');
+                // Small delay to let the page fully load
+                setTimeout(() => this.open(), 500);
+            }
         },
 
         /**
@@ -67,6 +78,7 @@ document.addEventListener('alpine:init', () => {
          */
         async open() {
             this.isOpen = true;
+            sessionStorage.setItem('voiceAssistantActive', 'true');
             await this.connect();
         },
 
@@ -75,6 +87,7 @@ document.addEventListener('alpine:init', () => {
          */
         close() {
             this.isOpen = false;
+            sessionStorage.removeItem('voiceAssistantActive');
             this.disconnect();
             this.stopListening();
         },
@@ -91,10 +104,15 @@ document.addEventListener('alpine:init', () => {
                 this.websocket = new WebSocket(this.wsUrl);
 
                 this.websocket.onopen = () => {
-                    // Send init message
+                    // Extract site_id from current URL (e.g., /view/{site_id}/...)
+                    const siteIdMatch = window.location.pathname.match(/\/view\/([a-f0-9-]+)/i);
+                    const siteId = siteIdMatch ? siteIdMatch[1] : null;
+
+                    // Send init message with site context
                     this.websocket.send(JSON.stringify({
                         type: 'init',
-                        token: this.getAuthToken()
+                        token: this.getAuthToken(),
+                        site_id: siteId
                     }));
                 };
 
@@ -194,57 +212,64 @@ document.addEventListener('alpine:init', () => {
          * Execute voice command action
          */
         executeVoiceCommand(data) {
-            const { action, target, params } = data;
+            const { action, path, target, query } = data;
+            console.log(`Executing: ${action}`, { path, target, query });
 
             switch (action) {
                 case 'navigate':
-                    const routes = {
-                        'dashboard': '/',
-                        'sites': '/sites',
-                        'photos': '/photos',
-                        'giornale': '/giornale',
-                        'home': '/',
-                        'back': null
-                    };
-                    if (target === 'back') {
-                        window.history.back();
-                    } else if (routes[target]) {
-                        window.location.href = routes[target];
+                    // Direct path navigation
+                    if (path) {
+                        window.location.href = path;
                     }
                     break;
 
+                case 'go_back':
+                    window.history.back();
+                    break;
+
                 case 'create':
-                    if (target === 'giornale') {
-                        // Try multiple ways to open the modal
-                        this.$dispatch('open-new-giornale-modal');
-                        window.dispatchEvent(new CustomEvent('open-new-giornale-modal'));
-                        // Also try clicking the button if it exists
-                        const btn = document.querySelector('[data-action="new-giornale"]');
-                        if (btn) btn.click();
-                    } else if (target === 'site') {
-                        this.$dispatch('open-new-site-modal');
-                        window.dispatchEvent(new CustomEvent('open-new-site-modal'));
-                    } else if (target === 'photo') {
-                        this.$dispatch('open-photo-upload');
-                        window.dispatchEvent(new CustomEvent('open-photo-upload'));
+                    // Get current site_id
+                    const siteIdMatch = window.location.pathname.match(/\/view\/([a-f0-9-]+)/i);
+                    const currentSiteId = siteIdMatch ? siteIdMatch[1] : null;
+
+                    // Map targets to pages and events
+                    const createTargets = {
+                        'giornale': { page: '/giornale', event: 'open-new-giornale-modal' },
+                        'photo': { page: '/photos', event: 'open-photo-upload-modal' },
+                        'us': { page: null, event: 'open-new-us-modal' }
+                    };
+
+                    const targetConfig = createTargets[target];
+                    if (!targetConfig) break;
+
+                    // Check if we're already on the right page
+                    const onCorrectPage = !targetConfig.page || window.location.pathname.includes(targetConfig.page);
+
+                    if (onCorrectPage) {
+                        // Already on the page - just dispatch the event
+                        console.log(`Dispatching: ${targetConfig.event}`);
+                        window.dispatchEvent(new CustomEvent(targetConfig.event));
+                        this.$dispatch(targetConfig.event);
+                    } else if (currentSiteId && targetConfig.page) {
+                        // Navigate to the page with openModal param
+                        const targetUrl = `/view/${currentSiteId}${targetConfig.page}?openModal=true`;
+                        console.log(`Navigating to: ${targetUrl}`);
+                        window.location.href = targetUrl;
                     }
                     break;
 
                 case 'search':
-                    const query = params?.query || '';
-                    if (target === 'photos') {
-                        window.location.href = `/photos?search=${encodeURIComponent(query)}`;
-                    } else {
-                        this.$dispatch('global-search', { query });
+                    if (query) {
+                        // Navigate to photos with search query (most common)
+                        const siteMatch = window.location.pathname.match(/\/view\/([a-f0-9-]+)/i);
+                        if (siteMatch) {
+                            window.location.href = `/view/${siteMatch[1]}/photos?search=${encodeURIComponent(query)}`;
+                        }
                     }
                     break;
 
-                case 'confirm':
-                    this.$dispatch('voice-confirm');
-                    break;
-
-                case 'cancel':
-                    this.$dispatch('voice-cancel');
+                case 'help':
+                    // Help is displayed via response text, no action needed
                     break;
             }
         },
@@ -319,6 +344,25 @@ document.addEventListener('alpine:init', () => {
                 // Keep references to cleanup
                 this.mediaStream = stream;
 
+                // Setup MediaRecorder for download capability
+                try {
+                    this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                    this.recordingChunks = [];
+                    this.mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) {
+                            this.recordingChunks.push(e.data);
+                        }
+                    };
+                    this.mediaRecorder.onstop = () => {
+                        if (this.recordingChunks.length > 0) {
+                            this.hasRecording = true;
+                        }
+                    };
+                    this.mediaRecorder.start();
+                } catch (recErr) {
+                    console.warn('MediaRecorder not supported:', recErr);
+                }
+
                 this.isListening = true;
                 this.statusMessage = 'Sto ascoltando...';
 
@@ -339,6 +383,11 @@ document.addEventListener('alpine:init', () => {
          */
         stopListening() {
             if (this.isListening) {
+                // Stop MediaRecorder first
+                if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                    this.mediaRecorder.stop();
+                }
+
                 if (this.processor) {
                     this.processor.disconnect();
                     this.processor = null;
@@ -355,6 +404,37 @@ document.addEventListener('alpine:init', () => {
 
             this.isListening = false;
             this.statusMessage = this.isConnected ? 'Pronto' : 'Disconnesso';
+        },
+
+        /**
+         * Download the recorded audio
+         */
+        downloadRecording() {
+            if (this.recordingChunks.length === 0) {
+                console.warn('No recording available');
+                return;
+            }
+
+            const blob = new Blob(this.recordingChunks, { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            a.download = `voice_recording_${timestamp}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log('Recording downloaded');
+        },
+
+        /**
+         * Clear recording
+         */
+        clearRecording() {
+            this.recordingChunks = [];
+            this.hasRecording = false;
         },
 
         /**
