@@ -24,7 +24,7 @@ from app.core.domain_exceptions import (
 )
 
 # Import existing monitoring functions for backward compatibility
-from app.routes.api.database_monitoring import (
+from app.routes.api.v1.database_monitoring import (
     get_pool_status_api_database_pool_status_get,
     get_pool_health_api_database_pool_health_get,
     get_pool_trends_api_database_pool_trends_get,

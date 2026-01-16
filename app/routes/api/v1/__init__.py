@@ -31,10 +31,10 @@ from app.routes.api.v1.ocr_us_import import router as ocr_us_import_router
 from app.routes.api.v1.ocr_debug import router as ocr_debug_router
 from app.routes.api.v1.tus_uploads import router as tus_uploads_router
 
-# Migrated from v0
-from app.routes.api.us_word_export_api import router as us_word_export_router
-from app.routes.api.database_monitoring import router as database_monitoring_router
-from app.routes.api.archeologia_avanzata import router as archeologia_avanzata_router
+# Migrated from v0 (now in v1)
+from app.routes.api.v1.us_word_export_api import router as us_word_export_router
+from app.routes.api.v1.database_monitoring import router as database_monitoring_router
+from app.routes.api.v1.archeologia_avanzata import router as archeologia_avanzata_router
 
 # Router principale API v1
 api_v1_router = APIRouter(

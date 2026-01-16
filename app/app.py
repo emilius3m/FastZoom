@@ -337,7 +337,7 @@ app.include_router(
 )
 
 # 📈 INCLUSIONE ROUTER ANALYTICS
-from app.routes.api.analytics import router as analytics_router
+from app.routes.api.v1.analytics import router as analytics_router
 app.include_router(
     analytics_router,
     tags=["analytics"],
