@@ -1,4 +1,4 @@
-# app/routes/view_redirect.py - Route per gestire URL con prefisso /view/
+# app/routes/view/redirect.py - Route per gestire URL con prefisso /view/
 
 from fastapi import APIRouter, Request, HTTPException, status, Depends
 from fastapi.responses import HTMLResponse

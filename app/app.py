@@ -263,14 +263,15 @@ async def test_session(request: Request):
         "session_data": dict(session)
     }
 
-from app.routes.photo_metadata import router as photo_metadata_router
+# Commented out - module not found
+# from app.routes.photo_metadata import router as photo_metadata_router
 
 # Registra router
-app.include_router(
-    photo_metadata_router,
-    tags=["Photo Metadata"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]
-)
+# app.include_router(
+#     photo_metadata_router,
+#     tags=["Photo Metadata"],
+#     dependencies=[Depends(get_current_user_id_with_blacklist)]
+# )
 
 
 # 🏛️ INCLUSIONE ROUTER SITES - CONFIGURAZIONE PRINCIPALE
@@ -289,7 +290,7 @@ except ImportError:
 
 # Import view redirect router for backward compatibility
 try:
-    from app.routes.view_redirect import router as view_redirect_router
+    from app.routes.view.redirect import router as view_redirect_router
     VIEW_REDIRECT_EXISTS = True
 except ImportError:
     logger.warning("View redirect route not found")

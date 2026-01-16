@@ -334,76 +334,91 @@
         </a>
       </li>
 
-      <!-- Catalogazione -->
+      <!-- DATI ARCHEOLOGICI -->
       {% if user_type is not defined or user_type != 'superuser' %}
       <li>
         <button type="button"
           class="flex items-center w-full p-2 text-base text-gray-900 transition duration-75 rounded-lg group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
-          aria-controls="dropdown-catalog" data-collapse-toggle="dropdown-catalog">
+          aria-controls="dropdown-archeo" data-collapse-toggle="dropdown-archeo">
           <i
-            class="fas fa-archive w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-40 group-hover:text-gray-900 dark:group-hover:text-white"></i>
-          <span class="flex-1 ms-3 text-left rtl:text-right whitespace-nowrap font-medium">Catalogazione</span>
+            class="fas fa-layer-group w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-amber-600 dark:group-hover:text-amber-400"></i>
+          <span class="flex-1 ms-3 text-left rtl:text-right whitespace-nowrap font-medium">Dati Archeologici</span>
           <svg
             class="w-4 h-4 text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-transform duration-200"
             aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M9 5l7 7-7 7" />
           </svg>
-          <span
-            class="ml-1 px-1.5 py-0.5 text-xs font-medium text-blue-600 bg-blue-100 rounded-full dark:bg-blue-900 dark:text-blue-300 sidebar-menu-badge">7</span>
         </button>
-        <ul id="dropdown-catalog" class="hidden py-2 space-y-2">
-          <li><a href="{% if site and site.id %}/view/{{ site.id }}/photos{% else %}/catalog/photos/{% endif %}"
+        <ul id="dropdown-archeo" class="hidden py-2 space-y-2">
+          <li><a href="{% if site and site.id %}/view/{{ site.id }}/us{% else %}/catalog/us/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
-                class="fas fa-camera me-2 text-blue-600"></i>Fotografie</a></li>
-          <li><a href="{% if site and site.id %}/view/{{ site.id }}/documentation{% else %}/dashboard/{% endif %}"
-              class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
-                class="fas fa-scroll me-2 text-yellow-600"></i>Documenti</a></li>
+                class="fas fa-layer-group me-2 text-orange-600"></i>US/USM</a></li>
           <li><a href="{% if site and site.id %}/sites/{{ site.id }}/iccd/records{% else %}/catalog/iccd/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
                 class="fas fa-file-invoice me-2 text-red-600"></i>Schede ICCD</a></li>
           <li><a href="{% if site and site.id %}/sites/{{ site.id }}/iccd/hierarchy{% else %}/catalog/iccd/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
-                class="fas fa-file-invoice me-2 text-red-600"></i>Gerarchia ICCD</a></li>
-          <li><a href="{% if site and site.id %}/view/{{ site.id }}/us{% else %}/catalog/us/{% endif %}"
-              class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
-                class="fas fa-layer-group me-2 text-orange-600"></i>US/USM</a></li>
+                class="fas fa-sitemap me-2 text-red-500"></i>Gerarchia ICCD</a></li>
           <li><a
               href="{% if site and site.id %}/sites/{{ site.id }}/harris-matrix/editor{% else %}/catalog/harris-matrix/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
-                class="fas fa-project-diagram me-2 text-indigo-600"></i>Editor Matrix Harris</a></li>
+                class="fas fa-project-diagram me-2 text-indigo-600"></i>Matrix Harris</a></li>
+        </ul>
+      </li>
+
+      <!-- MEDIA & DOCUMENTI -->
+      <li>
+        <button type="button"
+          class="flex items-center w-full p-2 text-base text-gray-900 transition duration-75 rounded-lg group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
+          aria-controls="dropdown-media" data-collapse-toggle="dropdown-media">
+          <i
+            class="fas fa-photo-video w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
+          <span class="flex-1 ms-3 text-left rtl:text-right whitespace-nowrap font-medium">Media & Documenti</span>
+          <svg
+            class="w-4 h-4 text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-transform duration-200"
+            aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        <ul id="dropdown-media" class="hidden py-2 space-y-2">
+          <li><a href="{% if site and site.id %}/view/{{ site.id }}/photos{% else %}/catalog/photos/{% endif %}"
+              class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
+                class="fas fa-camera me-2 text-blue-600"></i>Fotografie</a></li>
+          <li><a href="{% if site and site.id %}/view/{{ site.id }}/documentation{% else %}/dashboard/{% endif %}"
+              class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
+                class="fas fa-file-pdf me-2 text-yellow-600"></i>Documenti</a></li>
+        </ul>
+      </li>
+
+      <!-- CARTOGRAFIA -->
+      <li>
+        <button type="button"
+          class="flex items-center w-full p-2 text-base text-gray-900 transition duration-75 rounded-lg group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
+          aria-controls="dropdown-maps" data-collapse-toggle="dropdown-maps">
+          <i
+            class="fas fa-map-marked-alt w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400"></i>
+          <span class="flex-1 ms-3 text-left rtl:text-right whitespace-nowrap font-medium">Cartografia</span>
+          <svg
+            class="w-4 h-4 text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-transform duration-200"
+            aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        <ul id="dropdown-maps" class="hidden py-2 space-y-2">
           <li><a
               href="{% if site and site.id %}/view/{{ site.id }}/geographic-map{% else %}/sites/geographic-map/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
-                class="fas fa-map me-2 text-purple-600"></i>geographic map</a></li>
+                class="fas fa-globe-europe me-2 text-green-600"></i>Mappa Geografica</a></li>
           <li><a
               href="{% if site and site.id %}/plans/view/{{ site.id }}/archaeological-plans{% else %}/plans/view/archaeological-plans/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
-                class="fas fa-map me-2 text-purple-600"></i>Piante Archeologiche</a></li>
+                class="fas fa-draw-polygon me-2 text-teal-600"></i>Piante Archeologiche</a></li>
         </ul>
       </li>
       {% endif %}
-      <!-- Theme Toggle (Mobile) -->
-      <li>
-        <button id="theme-toggle-sidebar" type="button"
-          class="flex items-center w-full p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
-          <!-- Sun icon (light mode) -->
-          <svg id="theme-toggle-sidebar-light-icon"
-            class="w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
-            aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd"
-              d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
-              clip-rule="evenodd" />
-          </svg>
-          <!-- Moon icon (dark mode) -->
-          <svg id="theme-toggle-sidebar-dark-icon"
-            class="hidden w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"
-            aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-          </svg>
-          <span class="ms-3">Cambia Tema</span>
-        </button>
-      </li>
 
       <!-- SEZIONE AMMINISTRAZIONE - Solo per superuser -->
       {% if user_type is defined and user_type == 'superuser' %}

@@ -1,20 +1,6 @@
 # app/routes/sites_router.py - DASHBOARD GESTIONE SITO ARCHEOLOGICO (REFACTORED)
 #
-# Main router for archaeological site management with optimized endpoints.
-# Features:
-# - Centralized context management for consistent template data
-# - Helper functions to reduce code duplication
-# - Comprehensive error handling with localized messages
-# - Optimized database queries with parallel execution where beneficial
-# - Full ICCD cataloging system integration
-#
-# Endpoints are organized by functionality:
-# - Dashboard: Main site overview with statistics and recent activity
-# - Photos: Photographic collection management with pagination
-# - Documentation: Site documentation and form schemas
-# - Team: Site team management (admin only)
-# - Archaeological Plans: Excavation grids and site mapping
-# - ICCD: Hierarchical archaeological cataloging system
+
 
 import asyncio
 from fastapi import APIRouter, Depends, Request, HTTPException
@@ -33,22 +19,14 @@ from app.routes.api.dependencies import get_site_access
 from app.routes.api.iccd_hierarchy import iccd_hierarchy_router
 from app.routes.api.v1.photos import router as photos_router
 from app.routes.api.sites_storage import storage_router
-# DEPRECATED: DeepZoom v0 router - replaced by v1/deepzoom.py
-# from app.routes.api.sites_deepzoom import deepzoom_router
 from app.routes.api.sites_team import team_router, get_site_team
 
 sites_router = APIRouter(prefix="/api", tags=["sites"])
 
 # Include hierarchical ICCD API endpoints
 sites_router.include_router(iccd_hierarchy_router, prefix="/{site_id}")
-
-# Include refactored API sub-routers
-# DEPRECATED: dashboard_router da sites_dashboard.py non più utilizzato
-# sites_router.include_router(dashboard_router, tags=["dashboard"])
 sites_router.include_router(photos_router, tags=["photos"])  # API v1 photos router
 sites_router.include_router(storage_router, tags=["storage"])
-# DEPRECATED: DeepZoom v0 router - replaced by v1/deepzoom.py
-# sites_router.include_router(deepzoom_router, tags=["deepzoom"])
 sites_router.include_router(team_router, tags=["team"])
 
 # === UTILITIES ===
