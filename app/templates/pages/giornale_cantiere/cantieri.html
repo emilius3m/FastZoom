@@ -278,7 +278,7 @@
                     </td>
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
-                            <a href="/cantieri/{{ cantiere_data.id }}" type="button" @click.stop
+                            <a href="/view/{{ cantiere_data.id }}/cantiere/" type="button" @click.stop
                                 class="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1"
                                 title="Visualizza">
                                 <i class="fas fa-eye"></i>
@@ -656,16 +656,17 @@
             loading: false,
 
             // Data
-            cantieri: {{ cantieri | tojson | safe }},
-            // Statistics
-            stats: {{ stats | tojson | safe }},
+            cantieri: {{ cantieri | tojson | safe }
+    },
+    // Statistics
+    stats: { { stats | tojson | safe } },
 
-            // Filters
-            filters: {
-                search: '',
-                stato: '',
+    // Filters
+    filters: {
+        search: '',
+            stato: '',
                 sortBy: 'nome'
-            },
+    },
 
     // Modal
     modal: {
@@ -688,7 +689,7 @@
         this.loadCantieri();
         this.loadStats();
         this.watchFilters();
-        
+
         // Check if we should auto-open the create modal (from voice command)
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('openModal') === 'true') {
@@ -887,7 +888,7 @@
 
     // View Cantiere
     viewCantiere(id) {
-        window.location.href = `/cantieri/${id}`;
+        window.location.href = `/view/${id}/cantiere/`;
     },
 
     // Helper Methods

@@ -45,7 +45,7 @@
             <li>
                 <div class="flex items-center">
                     <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                    <a href="/sites/{{ site.id }}/cantieri"
+                    <a href="/view/{{ site.id }}/cantieri"
                         class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
                         Cantieri
                     </a>
@@ -1153,7 +1153,7 @@
 
                 this.showAlert('success', 'Cantiere eliminato');
                 setTimeout(() => {
-                    window.location.href = '/sites/{{ site.id }}/cantieri';
+                    window.location.href = '/view/{{ site.id }}/cantieri';
                 }, 1500);
             },
 

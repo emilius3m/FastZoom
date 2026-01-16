@@ -56,7 +56,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     
     return site_info
 
-@router.get("/sites/{site_id}/cantieri", response_class=HTMLResponse, summary="Pagina gestione cantieri sito", tags=["Cantieri - Views"])
+@router.get("/view/{site_id}/cantieri", response_class=HTMLResponse, summary="Pagina gestione cantieri sito", tags=["Cantieri - Views"])
 async def v1_cantieri_sito_view(
     request: Request,
     site_id: UUID,
@@ -228,7 +228,7 @@ async def v1_cantieri_sito_view(
             detail="Errore nel caricamento della pagina cantieri"
         )
 
-@router.get("/cantieri/{cantiere_id}", response_class=HTMLResponse, summary="Pagina dettaglio cantiere", tags=["Cantieri - Views"])
+@router.get("/view/{cantiere_id}/cantiere/", response_class=HTMLResponse, summary="Pagina dettaglio cantiere", tags=["Cantieri - Views"])
 async def v1_cantiere_detail_view(
     request: Request,
     cantiere_id: UUID,
@@ -370,7 +370,7 @@ async def v1_cantiere_detail_view(
             detail="Errore nel caricamento della pagina dettaglio cantiere"
         )
 
-@router.get("/sites/{site_id}/cantieri/nuovo", response_class=HTMLResponse, summary="Pagina nuovo cantiere", tags=["Cantieri - Views"])
+@router.get("/view/{site_id}/cantieri/nuovo", response_class=HTMLResponse, summary="Pagina nuovo cantiere", tags=["Cantieri - Views"])
 async def v1_nuovo_cantiere_view(
     request: Request,
     site_id: UUID,
@@ -437,7 +437,7 @@ async def v1_nuovo_cantiere_view(
             detail="Errore nel caricamento della pagina nuovo cantiere"
         )
 
-@router.get("/cantieri/{cantiere_id}/modifica", response_class=HTMLResponse, summary="Pagina modifica cantiere", tags=["Cantieri - Views"])
+@router.get("/view/cantieri/{cantiere_id}/modifica", response_class=HTMLResponse, summary="Pagina modifica cantiere", tags=["Cantieri - Views"])
 async def v1_modifica_cantiere_view(
     request: Request,
     cantiere_id: UUID,
