@@ -17,7 +17,7 @@ from fastapi.responses import RedirectResponse
 from minio import Minio
 from minio.error import S3Error
 from app.core.minio_settings import settings
-from app.core.exceptions import (
+from app.core.domain_exceptions import (
     StorageError, StorageFullError, StorageTemporaryError,
     StorageConnectionError, StorageNotFoundError
 )

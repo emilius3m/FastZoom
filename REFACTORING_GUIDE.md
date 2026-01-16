@@ -1,383 +1,152 @@
-# FastZoom Priority Refactoring Implementation Guide
+# FastZoom Comprehensive Refactoring Guide
 
-## Summary of Changes
+## Overview
 
-This document outlines the P0 (Critical) refactoring changes implemented to improve the FastZoom codebase architecture.
+This guide provides comprehensive refactoring guidelines for the FastZoom archaeological documentation system. It covers architecture improvements, code organization, best practices, and migration strategies.
 
-## ✅ Completed Tasks
+## Current Architecture Status
 
-### 1. Domain Exception Hierarchy Created
+### ✅ Completed Refactoring
 
-**File:** `app/core/domain_exceptions.py`
+1. **Domain Exception Hierarchy** (`app/core/domain_exceptions.py`)
+   - Comprehensive exception classes replacing HTTPException usage
+   - Automatic HTTP status code mapping
+   - Structured error details with context
 
-Created a comprehensive exception hierarchy that replaces `HTTPException` usage in service layers:
+2. **Centralized Exception Handlers** (`app/core/exception_handlers.py`)
+   - API vs Web route detection
+   - JSON responses for API routes
+   - Redirects for web routes
+   - Comprehensive error logging
 
-- **Base Exception:** `DomainException` - all domain exceptions inherit from this
-- **Authentication Exceptions:** `AuthenticationError`, `InvalidCredentialsError`, `UserInactiveError`, `TokenExpiredError`, `TokenInvalidError`
-- **Authorization Exceptions:** `AuthorizationError`, `InsufficientPermissionsError`, `NoSiteAccessError`, `SiteAccessDeniedError`
-- **Resource Exceptions:** `ResourceNotFoundError`, `ResourceAlreadyExistsError`
-- **Validation Exceptions:** `ValidationError`, `InvalidInputError`, `MissingRequiredFieldError`
-- **Storage Exceptions:** `StorageError`, `StorageFullError`, `StorageConnectionError`, etc.
-- **Photo Service Exceptions:** `PhotoServiceError`, `ImageProcessingError`, `UnsupportedImageFormatError`
-- **Site Exceptions:** `SiteError`, `SiteNotFoundError`, `SiteAccessDeniedError`
-- **Harris Matrix Exceptions:** `HarrisMatrixException`, `UnitCodeConflict`, `InvalidStratigraphicRelation`, `CycleDetectionError`
+3. **Dependency Injection System** (`app/core/dependencies.py`)
+   - Service providers for all core services
+   - Database session management
+   - Service container for multiple services
 
-**Benefits:**
-- Services no longer depend on FastAPI's HTTPException
-- Clean separation between business logic and presentation layer
-- Testable exceptions with consistent structure
-- Automatic HTTP status code mapping
+4. **Service Layer Architecture**
+   - `AuthService`: Authentication and user management
+   - `SiteService`: Site CRUD and permissions
+   - `PhotoService`: Photo upload and metadata
+   - `PhotoMetadataService`: Metadata management
 
-### 2. Centralized Exception Handlers
+### 🚧 In Progress
 
-**File:** `app/core/exception_handlers.py`
+- Route refactoring to use dependency injection
+- Business logic migration from routes to services
 
-Created centralized exception handlers that convert domain exceptions to appropriate HTTP responses:
+### 📋 TODO
 
-- `domain_exception_handler`: Main handler for all domain exceptions
-- `validation_exception_handler`: Handles Pydantic validation errors
-- `generic_exception_handler`: Safety net for unexpected exceptions
-- `register_exception_handlers()`: Registers all handlers with FastAPI app
+- Complete Pydantic schema adoption
+- Move remaining business logic to services
+- Comprehensive test coverage
 
-**Features:**
-- Automatic API vs Web route detection
-- JSON responses for API routes
-- Redirects for web routes (e.g., 401 → /login)
-- Comprehensive error logging with context
-- Consistent error response format
+## Architecture Principles
 
-### 3. Services Converted to Use Domain Exceptions
+### Clean Architecture
 
-**Files Modified:**
-- `app/services/auth_service.py`
-- `app/services/photo_service.py`
-- `app/services/site_service.py`
-
-**Changes:**
-- Removed `from fastapi import HTTPException`
-- Replaced `raise HTTPException(...)` with domain exceptions
-- Services now raise domain-specific exceptions
-
-**Example:**
-
-```python
-# BEFORE
-raise HTTPException(
-    status_code=status.HTTP_403_FORBIDDEN,
-    detail="Utente non ha accesso a nessun sito archeologico"
-)
-
-# AFTER
-raise NoSiteAccessError(
-    "Utente non ha accesso a nessun sito archeologico",
-    details={
-        "user_id": str(user.id),
-        "user_email": user.email
-    }
-)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Presentation Layer                    │
+│  (Routes, View Templates, API Responses)         │
+├─────────────────────────────────────────────────────────────┤
+│                   Application Layer                    │
+│  (Services, Business Logic, Validation)            │
+├─────────────────────────────────────────────────────────────┤
+│                   Domain Layer                          │
+│  (Models, Domain Exceptions, Business Rules)         │
+├─────────────────────────────────────────────────────────────┤
+│                   Infrastructure Layer                   │
+│  (Database, Storage, External APIs)                 │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### 4. Dependency Injection Providers Created
+### Layer Responsibilities
 
-**File:** `app/core/dependencies.py`
+**Presentation Layer (`app/routes/`)**
+- Handle HTTP requests/responses
+- Input validation (Pydantic schemas)
+- Call services for business logic
+- Format responses (JSON/HTML)
+- **DO NOT**: Direct database access, business logic
 
-Created dependency injection providers for all core services:
+**Application Layer (`app/services/`)**
+- Implement business logic
+- Orchestrate domain operations
+- Handle transactions
+- Validate business rules
+- **DO NOT**: Handle HTTP, format responses
 
-- `get_database_session()`: Provides AsyncSession
-- `get_auth_service()`: Provides AuthService
-- `get_site_service()`: Provides SiteService
-- `get_photo_metadata_service()`: Provides PhotoMetadataService
-- `ServiceContainer`: Container for multiple services
-- `get_services()`: Provides all services at once
+**Domain Layer (`app/models/`, `app/core/domain_exceptions.py`)**
+- Define data structures
+- Domain-specific exceptions
+- Business rules validation
+- **DO NOT**: Know about HTTP, database
 
-**Usage Examples:**
+**Infrastructure Layer (`app/database/`, `app/core/`)**
+- Database operations
+- External API clients
+- Configuration management
+- Security utilities
 
+## Refactoring Guidelines
+
+### 1. Route Refactoring
+
+#### Before (Anti-Pattern)
 ```python
-# Individual service injection
+# ❌ BAD: Manual service instantiation
 @router.post("/login")
+async def login(credentials: LoginRequest, db: AsyncSession = Depends(get_db)):
+    # Service instantiated inside route
+    auth_service = AuthService()
+    user = await auth_service.authenticate_user(db, credentials.email, credentials.password)
+    
+    # Business logic in route
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Manual validation
+    if not credentials.email:
+        raise HTTPException(status_code=400, detail="Email required")
+    
+    return await auth_service.create_login_response(db, user)
+```
+
+#### After (Best Practice)
+```python
+# ✅ GOOD: Dependency injection + Pydantic validation
+@router.post("/api/v1/auth/login")
 async def login(
-    credentials: LoginRequest,
+    credentials: LoginRequest,  # Pydantic handles validation
     db: AsyncSession = Depends(get_database_session),
     auth_service: AuthService = Depends(get_auth_service)
 ):
+    # Route delegates to service
     user = await auth_service.authenticate_user(
         db, 
         credentials.email, 
         credentials.password
     )
     return await auth_service.create_login_response(db, user)
-
-# Service container injection
-@router.get("/dashboard")
-async def dashboard(
-    db: AsyncSession = Depends(get_database_session),
-    services: ServiceContainer = Depends(get_services),
-    user_id: str = Depends(get_current_user_id)
-):
-    sites = await services.site_service.get_user_sites(db, user_id)
-    return {"sites": sites}
 ```
 
-### 5. Exception Handlers Registered in App
+#### Route Refactoring Checklist
 
-**File:** `app/app.py`
+For each route file:
 
-- Imported `register_exception_handlers` from `app.core.exception_handlers`
-- Called `register_exception_handlers(app)` after FastAPI app creation
-- Legacy HTTPException handler kept for backward compatibility
-
-## 🚧 Next Steps (TODO)
-
-### Task 5: Update Routes to Use Depends()
-
-**What to do:** Update route functions to use dependency injection instead of manual service instantiation.
-
-**Example Route Refactoring:**
-
-```python
-# BEFORE - Manual instantiation
-@router.post("/api/v1/auth/login")
-async def login(credentials: LoginRequest, db: AsyncSession = Depends(get_db)):
-    # Service instantiated inside route
-    auth_service = AuthService()
-    user = await auth_service.authenticate_user(db, credentials.email, credentials.password)
-    return await auth_service.create_login_response(db, user)
-
-# AFTER - Dependency injection
-@router.post("/api/v1/auth/login")
-async def login(
-    credentials: LoginRequest,
-    db: AsyncSession = Depends(get_database_session),
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    # Service injected via Depends()
-    user = await auth_service.authenticate_user(db, credentials.email, credentials.password)
-    return await auth_service.create_login_response(db, user)
-```
-
-**Files to update:**
-- `app/routes/api/v1/auth.py`
-- `app/routes/api/v1/photos.py`
-- `app/routes/api/v1/sites.py`
-- `app/routes/api/v1/admin.py`
-- All other route files that instantiate services manually
-
-### Task 6: Remove Manual Service Instantiation
-
-**What to do:** Search for patterns like `service = SomeService()` in routes and replace with dependency injection.
-
-**Search patterns:**
-```python
-# Bad patterns to find and fix:
-AuthService()
-SiteService()
-PhotoService()
-UserService()
-```
-
-### Task 7: Move Business Logic from Routes to Services
-
-**Current issue:** Some routes in `app/routes/api/v1/auth.py` contain business logic that should be in `AuthService`.
-
-**Example refactoring:**
-
-```python
-# BEFORE - Logic in route
-@router.post("/register")
-async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
-    # All this logic should be in AuthService
-    existing_user = await db.execute(select(User).where(User.email == user_data.email))
-    if existing_user.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    hashed_password = hash_password(user_data.password)
-    new_user = User(email=user_data.email, hashed_password=hashed_password)
-    db.add(new_user)
-    await db.commit()
-    return {"user_id": new_user.id}
-
-# AFTER - Logic in service, thin route
-@router.post("/register")
-async def register(
-    user_data: UserCreate,
-    db: AsyncSession = Depends(get_database_session),
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    # Route delegates to service
-    user = await auth_service.register_user(db, user_data)
-    return {"user_id": user.id}
-
-# AuthService gains new method:
-async def register_user(
-    db: AsyncSession,
-    user_data: UserCreate
-) -> User:
-    """Register a new user."""
-    # Check if user exists
-    existing_user = await db.execute(
-        select(User).where(User.email == user_data.email)
-    )
-    if existing_user.scalar_one_or_none():
-        raise ResourceAlreadyExistsError(
-            "User",
-            user_data.email,
-            details={"email": user_data.email}
-        )
-    
-    # Create user
-    hashed_password = SecurityService.hash_password(user_data.password)
-    new_user = User(
-        email=user_data.email,
-        hashed_password=hashed_password
-    )
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
-    return new_user
-```
-
-### Task 8: Move Photo Upload Logic to Service Layer
-
-**Current issue:** Photo upload logic scattered across routes.
-
-**What to do:** Consolidate photo upload, thumbnail generation, and metadata extraction into `PhotoService`.
-
-### Task 9: Use Pydantic Schemas for Request Validation
-
-**What to do:** Ensure all API endpoints use Pydantic models for request validation instead of manual parsing.
-
-**Example:**
-
-```python
-# BEFORE - Manual form parsing
-@router.post("/update-user")
-async def update_user(
-    first_name: str = Form(None),
-    last_name: str = Form(None),
-    db: AsyncSession = Depends(get_db)
-):
-    # Manual validation
-    if not first_name:
-        raise HTTPException(status_code=400, detail="First name required")
-    # ...
-
-# AFTER - Pydantic schema
-class UserUpdateRequest(BaseModel):
-    first_name: str
-    last_name: Optional[str] = None
-    
-    @validator('first_name')
-    def validate_first_name(cls, v):
-        if not v or not v.strip():
-            raise ValueError('First name is required')
-        return v.strip()
-
-@router.post("/update-user")
-async def update_user(
-    request: UserUpdateRequest,
-    db: AsyncSession = Depends(get_database_session)
-):
-    # Pydantic handles validation automatically
-    # ...
-```
-
-### Task 10: Test the Refactored Code
-
-**What to test:**
-1. Exception handling - verify domain exceptions are caught and converted to proper HTTP responses
-2. Dependency injection - ensure services are properly injected
-3. API endpoints - test all refactored endpoints
-4. Error responses - verify consistent error format
-5. Logging - check that errors are logged with proper context
-
-**Test approach:**
-```bash
-# Run tests
-pytest app/tests/
-
-# Check specific areas
-pytest app/tests/test_auth.py
-pytest app/tests/test_exceptions.py
-pytest app/tests/test_services.py
-```
-
-## Migration Checklist
-
-### For Each Route File:
-
-- [ ] Add imports for dependencies:
-  ```python
-  from app.core.dependencies import (
-      get_database_session,
-      get_auth_service,
-      get_site_service,
-      get_photo_metadata_service,
-      get_services
-  )
-  ```
-
-- [ ] Replace manual service instantiation with `Depends()`:
-  ```python
-  # BEFORE
-  service = AuthService()
-  
-  # AFTER
-  auth_service: AuthService = Depends(get_auth_service)
-  ```
-
-- [ ] Move business logic to service layer
-
+- [ ] Import dependencies from `app.core.dependencies`
+- [ ] Remove manual service instantiation
 - [ ] Use Pydantic schemas for request validation
+- [ ] Remove `raise HTTPException` (use domain exceptions)
+- [ ] Remove business logic from routes
+- [ ] Keep routes thin (delegation only)
 
-- [ ] Remove HTTPException imports if no longer needed
+### 2. Service Layer Guidelines
 
-- [ ] Update exception handling to use domain exceptions
-
-- [ ] Test the endpoint
-
-### For Each Service File:
-
-- [ ] Import domain exceptions from `app.core.domain_exceptions`
-
-- [ ] Replace `HTTPException` with appropriate domain exception
-
-- [ ] Ensure methods accept `db: AsyncSession` as parameter (not `self.db`)
-
-- [ ] Add proper logging with structured context
-
-- [ ] Add type hints to all methods
-
-- [ ] Document exceptions in docstrings
-
-## Architecture Benefits
-
-### Before Refactoring:
-```
-Route → Creates Service → Service raises HTTPException → FastAPI handles
-```
-**Problems:**
-- Services depend on FastAPI (coupling)
-- Can't test services without FastAPI
-- Inconsistent error handling
-- Business logic in routes
-
-### After Refactoring:
-```
-Route (depends on Service) → Service raises DomainException → 
-Centralized Handler converts to HTTP → FastAPI returns response
-```
-**Benefits:**
-- Services are framework-agnostic
-- Easy to test services independently
-- Consistent error handling and logging
-- Thin routes, fat services
-- Clear separation of concerns
-
-## Code Style Guidelines
-
-### Services:
+#### Service Structure
 ```python
-# ✅ GOOD
+# ✅ GOOD: Framework-agnostic service
 class AuthService:
     @staticmethod
     async def authenticate_user(
@@ -389,61 +158,571 @@ class AuthService:
         try:
             # Business logic here
             ...
-        except SomeException as e:
+        except InvalidCredentials as e:
             logger.error("Auth failed", exc_info=True)
-            raise InvalidCredentialsError("Invalid email or password")
-
-# ❌ BAD
-class AuthService:
-    def __init__(self, db):
-        self.db = db  # ← Don't store db in self
-    
-    async def authenticate_user(self, email, password):
-        # Missing type hints, no docstring
-        raise HTTPException(...)  # ← Don't raise HTTPException
+            raise InvalidCredentialsError(
+                "Invalid email or password",
+                details={"email": email}
+            )
 ```
 
-### Routes:
+#### Service Checklist
+
+For each service file:
+
+- [ ] Import domain exceptions from `app.core.domain_exceptions`
+- [ ] Accept `db: AsyncSession` as parameter (don't store in `self`)
+- [ ] Use `@staticmethod` for stateless methods
+- [ ] Add comprehensive docstrings
+- [ ] Add type hints to all methods
+- [ ] Add structured logging with context
+- [ ] **DO NOT**: Import `fastapi.HTTPException`
+
+### 3. Exception Handling
+
+#### Domain Exception Hierarchy
+
 ```python
-# ✅ GOOD
-@router.post("/login")
-async def login(
-    credentials: LoginRequest,  # ← Pydantic schema
-    db: AsyncSession = Depends(get_database_session),
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    """Login endpoint."""
-    # Thin route - delegates to service
-    user = await auth_service.authenticate_user(
-        db, 
-        credentials.email, 
-        credentials.password
-    )
-    return await auth_service.create_login_response(db, user)
+# Base exception
+class DomainException(Exception):
+    """Base exception for all domain errors."""
+    def __init__(self, message: str, details: dict = None):
+        self.message = message
+        self.details = details or {}
+        super().__init__(self.message)
 
-# ❌ BAD
-@router.post("/login")
-async def login(email: str = Form(...), password: str = Form(...)):
-    # Missing dependency injection
-    # Manual form parsing instead of Pydantic
-    # Business logic in route
-    service = AuthService()  # ← Manual instantiation
-    if not email:
-        raise HTTPException(...)  # ← Manual validation
-    # ... more logic in route
+# Specific exceptions
+class AuthenticationError(DomainException):
+    """Authentication-related errors."""
+    pass
+
+class InvalidCredentialsError(AuthenticationError):
+    """Invalid credentials provided."""
+    http_status = 401
+
+class ResourceNotFoundError(DomainException):
+    """Resource not found."""
+    http_status = 404
+
+class ValidationError(DomainException):
+    """Validation errors."""
+    http_status = 400
 ```
+
+#### Exception Handler Pattern
+
+```python
+# Centralized handler
+async def domain_exception_handler(request: Request, exc: DomainException):
+    """Handle all domain exceptions."""
+    status_code = getattr(exc, 'http_status', 500)
+    
+    # API routes return JSON
+    if request.url.path.startswith('/api/'):
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "error": exc.__class__.__name__,
+                "message": exc.message,
+                "details": exc.details
+            }
+        )
+    
+    # Web routes redirect
+    else:
+        return RedirectResponse(url='/login', status_code=302)
+```
+
+### 4. Pydantic Schema Guidelines
+
+#### Request Schemas
+```python
+# ✅ GOOD: Pydantic with validation
+from pydantic import BaseModel, EmailStr, validator
+
+class LoginRequest(BaseModel):
+    """Login request schema."""
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    
+    @validator('email')
+    def email_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Email is required')
+        return v.strip()
+```
+
+#### Schema Checklist
+
+- [ ] All request data uses Pydantic schemas
+- [ ] Add validators for complex rules
+- [ ] Add field descriptions
+- [ ] Use appropriate types (EmailStr, HttpUrl, etc.)
+- [ ] Add `example` values for documentation
+- [ ] Remove manual validation from routes
+
+### 5. Database Operations
+
+#### Best Practices
+```python
+# ✅ GOOD: Proper session handling
+async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
+    """Get user by email with proper session handling."""
+    result = await db.execute(
+        select(User).where(User.email == email)
+    )
+    return result.scalar_one_or_none()
+
+# ❌ BAD: Session stored in service
+class BadService:
+    def __init__(self, db: AsyncSession):
+        self.db = db  # ← Don't do this
+```
+
+#### Database Checklist
+
+- [ ] Accept `db: AsyncSession` as parameter
+- [ ] Use `select()` with proper joins
+- [ ] Use `scalar_one_or_none()` for optional results
+- [ ] Handle transactions with `try/except/rollback`
+- [ ] Use `selectinload()` for eager loading
+- [ ] Add indexes for frequently queried fields
+
+### 6. API Design Patterns
+
+#### RESTful Conventions
+
+```
+GET    /api/v1/sites          - List all sites
+GET    /api/v1/sites/{id}     - Get specific site
+POST   /api/v1/sites          - Create new site
+PUT    /api/v1/sites/{id}     - Update site
+DELETE /api/v1/sites/{id}     - Delete site
+```
+
+#### Response Format
+```python
+# ✅ GOOD: Consistent response format
+{
+    "data": {...},        # Primary data
+    "message": "...",      # Optional message
+    "meta": {            # Metadata
+        "page": 1,
+        "total": 100,
+        "filters": {...}
+    }
+}
+```
+
+## Migration Strategy
+
+### Phase 1: Foundation (Completed)
+- ✅ Domain exceptions created
+- ✅ Exception handlers registered
+- ✅ Dependency injection system
+- ✅ Service layer structure
+
+### Phase 2: Routes (In Progress)
+- 🔄 Update authentication routes
+- 🔄 Update site routes
+- 🔄 Update photo routes
+- 🔄 Update user routes
+- 🔄 Update admin routes
+
+### Phase 3: Services (Pending)
+- ⏳ Move business logic from routes
+- ⏳ Add comprehensive logging
+- ⏳ Add transaction handling
+- ⏳ Add caching where appropriate
+
+### Phase 4: Testing (Pending)
+- ⏳ Unit tests for services
+- ⏳ Integration tests for routes
+- ⏳ Exception handler tests
+- ⏳ End-to-end API tests
+
+### Phase 5: Documentation (Pending)
+- ⏳ Update API documentation
+- ⏳ Add architecture diagrams
+- ⏳ Document migration process
+- ⏳ Create developer onboarding guide
+
+## Code Style Guidelines
+
+### Python Code Style
+
+#### Naming Conventions
+```python
+# Classes: PascalCase
+class AuthService:
+    pass
+
+# Functions/Methods: snake_case
+async def authenticate_user():
+    pass
+
+# Constants: UPPER_SNAKE_CASE
+MAX_LOGIN_ATTEMPTS = 5
+
+# Private members: _leading_underscore
+class Service:
+    def __init__(self):
+        self._internal_value = None
+```
+
+#### Docstring Format
+```python
+def get_user_by_id(db: AsyncSession, user_id: UUID) -> Optional[User]:
+    """
+    Get user by ID from database.
+    
+    Args:
+        db: Database session
+        user_id: User UUID to fetch
+        
+    Returns:
+        User object if found, None otherwise
+        
+    Raises:
+        ResourceNotFoundError: If user doesn't exist
+    """
+    result = await db.execute(
+        select(User).where(User.id == str(user_id))
+    )
+    return result.scalar_one_or_none()
+```
+
+### Logging Guidelines
+
+#### Structured Logging
+```python
+# ✅ GOOD: Structured logging
+logger.info(
+    "User authenticated successfully",
+    extra={
+        "user_id": str(user.id),
+        "email": user.email,
+        "ip_address": request.client.host,
+        "user_agent": request.headers.get("user-agent")
+    }
+)
+
+# ❌ BAD: Unstructured logging
+logger.info(f"User {user.email} logged in from {ip}")
+```
+
+#### Log Levels
+- **DEBUG**: Detailed diagnostic information
+- **INFO**: Normal operation flow
+- **WARNING**: Unexpected but recoverable situations
+- **ERROR**: Errors that don't stop execution
+- **CRITICAL**: Errors that require immediate attention
+
+## Performance Guidelines
+
+### Database Optimization
+
+#### Query Optimization
+```python
+# ✅ GOOD: Indexed queries
+async def get_user_sites(db: AsyncSession, user_id: UUID) -> List[Site]:
+    """Get user sites with indexed query."""
+    result = await db.execute(
+        select(Site)
+        .join(UserSitePermission)
+        .where(UserSitePermission.user_id == str(user_id))
+        .where(UserSitePermission.is_active == True)
+        .options(selectinload(Site.creator))  # Eager load
+    )
+    return result.scalars().all()
+
+# ❌ BAD: N+1 queries
+for permission in user.permissions:
+    site = await get_site_by_id(db, permission.site_id)  # ← N queries
+```
+
+#### Caching Strategy
+```python
+# Cache frequently accessed data
+@lru_cache(maxsize=100)
+async def get_site_config(site_id: UUID) -> dict:
+    """Get site configuration with caching."""
+    return await load_config_from_db(site_id)
+```
+
+### API Performance
+
+#### Pagination
+```python
+# ✅ GOOD: Pagination with limits
+@router.get("/api/v1/sites")
+async def list_sites(
+    page: int = 1,
+    per_page: int = 20,
+    db: AsyncSession = Depends(get_database_session)
+):
+    """List sites with pagination."""
+    offset = (page - 1) * per_page
+    result = await db.execute(
+        select(Site)
+        .offset(offset)
+        .limit(per_page)
+        .order_by(Site.created_at.desc())
+    )
+    sites = result.scalars().all()
+    
+    return {
+        "data": sites,
+        "meta": {
+            "page": page,
+            "per_page": per_page,
+            "total": len(sites)
+        }
+    }
+```
+
+## Security Guidelines
+
+### Input Validation
+```python
+# ✅ GOOD: Pydantic validation
+from pydantic import BaseModel, Field, validator
+
+class CreateSiteRequest(BaseModel):
+    """Create site request with validation."""
+    name: str = Field(..., min_length=1, max_length=200)
+    code: str = Field(..., min_length=1, max_length=50)
+    coordinates_lat: Optional[float] = Field(None, ge=-90, le=90)
+    coordinates_lng: Optional[float] = Field(None, ge=-180, le=180)
+    
+    @validator('code')
+    def code_must_be_alphanumeric(cls, v):
+        if not v.isalnum():
+            raise ValueError('Code must be alphanumeric')
+        return v.upper()
+```
+
+### Authorization
+```python
+# ✅ GOOD: Permission checks via dependency
+async def check_site_admin(
+    site_id: UUID,
+    user_id: UUID,
+    db: AsyncSession
+) -> bool:
+    """Check if user has admin access to site."""
+    permission = await db.execute(
+        select(UserSitePermission).where(
+            and_(
+                UserSitePermission.site_id == str(site_id),
+                UserSitePermission.user_id == str(user_id),
+                UserSitePermission.permission_level == "admin",
+                UserSitePermission.is_active == True
+            )
+        )
+    )
+    return permission.scalar_one_or_none() is not None
+
+# Usage in route
+@router.delete("/api/v1/sites/{site_id}")
+async def delete_site(
+    site_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """Delete site with permission check."""
+    if not await check_site_admin(site_id, user_id, db):
+        raise InsufficientPermissionsError(
+            "Admin access required",
+            details={"site_id": str(site_id)}
+        )
+    # ... deletion logic
+```
+
+## Testing Guidelines
+
+### Unit Tests
+```python
+# ✅ GOOD: Isolated unit test
+import pytest
+from app.services.auth_service import AuthService
+from app.core.domain_exceptions import InvalidCredentialsError
+
+@pytest.mark.asyncio
+async def test_authenticate_user_success(db_session):
+    """Test successful authentication."""
+    # Setup
+    user = await create_test_user(db_session, email="test@example.com", password="password123")
+    
+    # Execute
+    result = await AuthService.authenticate_user(
+        db_session, 
+        "test@example.com", 
+        "password123"
+    )
+    
+    # Assert
+    assert result is not None
+    assert result.email == "test@example.com"
+
+@pytest.mark.asyncio
+async def test_authenticate_user_invalid_password(db_session):
+    """Test authentication with invalid password."""
+    with pytest.raises(InvalidCredentialsError):
+        await AuthService.authenticate_user(
+            db_session, 
+            "test@example.com", 
+            "wrongpassword"
+        )
+```
+
+### Integration Tests
+```python
+# ✅ GOOD: API integration test
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+
+def test_login_success():
+    """Test login endpoint."""
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "test@example.com",
+            "password": "password123"
+        }
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert "user" in data
+```
+
+## Migration Checklist
+
+### For Each Route File
+
+- [ ] Import dependencies from `app.core.dependencies`
+- [ ] Remove manual service instantiation
+- [ ] Use Pydantic schemas for validation
+- [ ] Replace `HTTPException` with domain exceptions
+- [ ] Move business logic to services
+- [ ] Add type hints
+- [ ] Add docstrings
+- [ ] Add logging
+- [ ] Write unit tests
+
+### For Each Service File
+
+- [ ] Import domain exceptions
+- [ ] Accept `db` as parameter
+- [ ] Use `@staticmethod` where appropriate
+- [ ] Add comprehensive docstrings
+- [ ] Add type hints
+- [ ] Add structured logging
+- [ ] Handle transactions properly
+- [ ] Write unit tests
+
+## Common Anti-Patterns to Avoid
+
+### 1. Manual Service Instantiation
+```python
+# ❌ BAD
+@router.post("/create")
+async def create(db: AsyncSession = Depends(get_db)):
+    service = SomeService()  # ← New instance every request
+    return await service.create(db)
+```
+
+### 2. Business Logic in Routes
+```python
+# ❌ BAD
+@router.post("/create")
+async def create(data: CreateRequest, db: AsyncSession = Depends(get_db)):
+    # Business logic in route
+    if data.type == "special":
+        if not has_permission():
+            raise HTTPException(403, "No permission")
+    # More logic...
+    return await create_item(db, data)
+```
+
+### 3. HTTPException in Services
+```python
+# ❌ BAD
+class SomeService:
+    async def do_something(self, db):
+        if not item:
+            raise HTTPException(404, "Not found")  # ← Wrong layer
+```
+
+### 4. Direct Database Access in Routes
+```python
+# ❌ BAD
+@router.get("/items/{id}")
+async def get_item(id: str, db: AsyncSession = Depends(get_db)):
+    # Direct DB access in route
+    item = await db.execute(select(Item).where(Item.id == id))
+    return item.scalar_one_or_none()
+```
+
+### 5. Session Storage in Services
+```python
+# ❌ BAD
+class BadService:
+    def __init__(self, db: AsyncSession):
+        self.db = db  # ← Stores session in instance
+```
+
+## Best Practices Summary
+
+### ✅ DO
+
+- Use dependency injection for services
+- Use Pydantic for validation
+- Raise domain exceptions in services
+- Accept `db` as parameter in services
+- Use `@staticmethod` for stateless methods
+- Add comprehensive docstrings
+- Add type hints everywhere
+- Use structured logging
+- Write unit tests for all services
+- Follow RESTful conventions
+- Use proper HTTP status codes
+
+### ❌ DON'T
+
+- Don't instantiate services manually in routes
+- Don't put business logic in routes
+- Don't raise `HTTPException` in services
+- Don't store `db` in service instances
+- Don't use `raise HTTPException` directly
+- Don't skip validation
+- Don't ignore type hints
+- Don't use unstructured logging
+- Don't skip tests
+- Don't break RESTful conventions
 
 ## Additional Resources
 
-- FastAPI Dependency Injection: https://fastapi.tiangolo.com/tutorial/dependencies/
-- Pydantic Validation: https://docs.pydantic.dev/latest/
-- Clean Architecture: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html
+### Documentation
+- [FastAPI Best Practices](https://fastapi.tiangolo.com/tutorial/)
+- [Pydantic Documentation](https://docs.pydantic.dev/)
+- [SQLAlchemy Async](https://docs.sqlalchemy.org/en/14/orm/extensions/asyncio/)
+- [Python Type Hints](https://docs.python.org/3/library/typing.html)
+
+### Architecture Patterns
+- [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+- [Dependency Injection](https://fastapi.tiangolo.com/tutorial/dependencies/)
+- [Repository Pattern](https://martinfowler.com/eaaCatalog/repositoryPattern.html)
 
 ## Questions or Issues?
 
 If you encounter any issues during refactoring:
 
-1. Check the examples in this guide
+1. Check examples in this guide
 2. Look at already refactored files (`auth_service.py`, `site_service.py`)
 3. Verify exception mappings in `domain_exceptions.py`
 4. Check dependency providers in `dependencies.py`
@@ -451,14 +730,15 @@ If you encounter any issues during refactoring:
 
 ## Summary
 
-The P0 refactoring establishes a solid foundation for clean architecture:
+This refactoring guide establishes a solid foundation for clean, maintainable, and testable code:
 
-✅ **Domain exceptions** - Services are framework-agnostic
-✅ **Centralized handlers** - Consistent error handling
+✅ **Domain exceptions** - Framework-agnostic error handling
+✅ **Centralized handlers** - Consistent error responses
 ✅ **Dependency injection** - Testable, maintainable code
+✅ **Service layer** - Business logic separation
 🚧 **Route refactoring** - Next step: update all routes
-🚧 **Service layer** - Next step: move logic from routes
-🚧 **Validation** - Next step: use Pydantic everywhere
+⏳ **Testing** - Next step: comprehensive test coverage
+⏳ **Documentation** - Next step: update all docs
 
 This refactoring improves:
 - **Testability**: Services can be tested without FastAPI

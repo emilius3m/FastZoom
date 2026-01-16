@@ -41,7 +41,7 @@ except ImportError:
 try:
     from app.services.archaeological_minio_service import archaeological_minio_service
     from app.services.deep_zoom_minio_service import get_deep_zoom_minio_service
-    from app.core.exceptions import StorageFullError, StorageError
+    from app.core.domain_exceptions import StorageFullError, StorageError
     HAS_MINIO = True
 except ImportError:
     HAS_MINIO = False

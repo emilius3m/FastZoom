@@ -8,7 +8,7 @@ from fastapi import Depends
 from app.services.archaeological_minio_service import ArchaeologicalMinIOService
 from app.services.photos import PhotoProcessingService as PhotoService
 from app.services.deep_zoom_minio_service import DeepZoomMinIOService
-from app.core.exceptions import (
+from app.core.domain_exceptions import (
     StorageError, StorageFullError, StorageTemporaryError,
     StorageConnectionError, StorageNotFoundError, StorageValidationError
 )

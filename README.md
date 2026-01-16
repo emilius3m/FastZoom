@@ -6,7 +6,18 @@
 
 ## Overview
 
-FastZoom is a modern web application built with FastAPI, designed for managing archaeological sites and artifacts. It allows users to upload high-resolution photos, organize them by site, and view them with deep zoom capabilities using OpenSeadragon. The app supports user authentication, role-based permissions, team management, and secure file storage via MinIO. The frontend leverages HTMX for dynamic interactions, Jinja2 for templating, and Tailwind CSS with Flowbite for styling.
+FastZoom is a comprehensive web application built with FastAPI, designed for managing archaeological sites, artifacts, and documentation. It provides a complete digital platform for archaeological documentation, including:
+
+- **Multi-tenant Site Management**: Organize multiple archaeological sites with granular permissions
+- **Advanced Stratigraphy**: Full support for US (Unità Stratigrafiche) and USM (Unità Stratigrafiche Murarie) with Harris Matrix
+- **Artifact Cataloging**: Complete inventory system with archaeological metadata
+- **Scientific Samples**: C14 dating, pollen analysis, bone analysis, and more
+- **Photo Management**: High-resolution photo storage with Deep Zoom capabilities
+- **Construction Site Tracking**: Giornale di Cantiere with operator management
+- **ICCD Compliance**: Standardized cataloging following Italian standards
+- **Geographic Mapping**: Interactive GIS integration with layers and markers
+
+The application supports user authentication, role-based permissions, team management, and secure file storage via MinIO. The frontend leverages HTMX for dynamic interactions, Jinja2 for templating, and Tailwind CSS with Flowbite for styling.
 
 This project provides a robust backend for archaeological documentation, enabling collaborative workflows for teams to annotate, search, and share site photos and data.
 
@@ -24,53 +35,76 @@ This project provides a robust backend for archaeological documentation, enablin
 - [Passlib](https://passlib.readthedocs.io/) (^1.7.0): Password hashing.
 - [python-multipart](https://github.com/encode/python-multipart) (^0.0.9): Form data parsing for uploads.
 - [Pillow](https://pillow.readthedocs.io/) (^10.0.0): Image processing for thumbnails and tiles.
+- [Loguru](https://loguru.readthedocs.io/) (^0.7.2): Structured logging.
 
 Dependencies are managed via Poetry (`pyproject.toml` and `poetry.lock`).
 
 ## Features
 
+### Core Functionality
 - **User Management**: Registration, login, password updates, profiles, and admin controls.
 - **Role and Permissions**: Custom roles with granular permissions for sites and photos.
 - **Site Management**: Create, edit, and organize archaeological sites with teams and user assignments.
+- **Multi-tenant Architecture**: Each user can have access to multiple sites with different permission levels.
 - **Photo Upload and Storage**: Secure uploads to MinIO, automatic thumbnail generation, and deep zoom pyramid creation (DZI format).
 - **Deep Zoom Viewing**: Interactive photo viewer with zoom, pan, rotate, and annotation support using OpenSeadragon.
-- **Search and Filtering**: API endpoints for searching photos, sites, and artifacts.
+
+### Advanced Archaeological Features
+- **Stratigraphy (US/USM)**: Complete management of stratigraphic units with standard MiC 2021 compliance
+  - US (Unità Stratigrafiche): Positive and negative units with full documentation
+  - USM (Unità Stratigrafiche Murarie): Wall stratigraphic units with construction techniques
+  - File management: Drawings, photos, sections, and documents per unit
+  - Harris Matrix: Automatic generation and visualization of stratigraphic relationships
+  
+- **Artifact Inventory**: Complete cataloging system
+  - Full metadata: material, dimensions, dating, conservation status
+  - Provenience tracking: US, USM, or burial association
+  - Multiple classification systems: category, type, class, form
+  
+- **Burial Records**: Comprehensive tomb documentation
+  - Anthropological data: sex, age, stature, orientation
+  - Grave goods: artifact inventory per burial
+  - Conservation status and pathologies
+  
+- **Scientific Samples**: Sample management for analysis
+  - Sample types: C14, pollen, bone, ceramic, sediment, mortar, wood
+  - Laboratory tracking: analysis requests, results, and interpretations
+  - Dating calibration: C14 calibration data and sigma values
+  
+- **Construction Site Management**:
+  - Giornale di Cantiere: Daily site journals with weather and activities
+  - Operatori: Worker management with specializations
+  - Problem tracking and solutions documentation
+  
+- **ICCD Compliance**: Standardized cataloging following Italian Ministry standards
+  - Multiple record types: CA (Ceramics), MA (Materials), RA (Artifacts), SI (Sites)
+  - Schema validation and export capabilities
+  
+- **Geographic Maps**: Interactive GIS integration
+  - Map layers with GeoJSON support
+  - Markers with photo associations
+  - Coordinate systems and bounds management
+
+### UI/UX Features
 - **Admin Dashboard**: Manage users, sites, roles, and permissions via intuitive interfaces.
 - **Team Collaboration**: Invite users to sites, manage group permissions.
-- **Security**: CSRF protection, JWT authentication, rate limiting prepared.
+- **Security**: CSRF protection, JWT authentication with blacklist, rate limiting.
 - **Responsive UI**: Mobile-friendly design with themes and modals for uploads/edits.
-- **API Endpoints**: RESTful APIs for CRUD on users, sites, photos, etc.
+- **Dark Mode**: Full dark mode support throughout the application.
+- **API Endpoints**: RESTful APIs for CRUD on all entities.
+
+### Developer Tools
+- **API Documentation**: Auto-generated Swagger/OpenAPI docs at `/docs`
 - **Database Migrations**: Alembic for schema evolution.
-
-### 🆕 **New Advanced Features**
-
-- **🔍 OpenSeadragon Exclusive Viewing**: Advanced high-resolution image viewer with OpenSeadragon as the only viewing method, ensuring professional-grade archaeological photo examination with deep zoom capabilities, smooth navigation, and optimal performance for large scientific images.
-
-- **📋 Reusable Metadata Management**: Comprehensive modular component system for archaeological metadata with a single reusable form component supporting both upload and edit workflows, ensuring consistency across all metadata operations and reducing code duplication.
-
-- **🎨 Enhanced User Interface**:
-  - **Smart Information Sidebar**: Photo metadata panel with intelligent hover zones and button triggers for non-intrusive access to archaeological information
-  - **Integrated Action Bar**: Professional interface with info button relocated to top action bar alongside Download, Share, and Edit functions
-  - **Responsive Design**: Mobile-optimized interface adapting to different screen sizes with dark mode support
-
-- **⚡ Advanced Component Architecture**:
-  - **Event-Driven Communication**: Clean separation of concerns using Alpine.js events for seamless parent-child component interaction
-  - **Mode-Based Functionality**: Dynamic component behavior supporting 'upload' and 'edit' modes with automatic data loading
-  - **Professional Workflow**: Streamlined archaeological documentation process with specialized metadata fields and validation
-
-- **🏛️ Archaeological-Specific Features**:
-  - **Complete Metadata Support**: Comprehensive fields for inventory numbers, excavation areas, stratigraphic units, materials, object types, chronological periods, and conservation status
-  - **Professional Documentation**: Photographer credits, photo types, find dates, and detailed archaeological context
-  - **Data Consistency**: Unified metadata structure across upload and edit operations ensuring archaeological documentation standards
-
-
+- **Performance Monitoring**: Request tracking and performance metrics.
+- **Logging**: Structured logging with Loguru for debugging and monitoring.
 
 ## Admin Login Credentials
 
 - **Email**: superuser@admin.com
 - **Password**: password123
 
-Use these to access the admin dashboard after setup.
+Use these to access admin dashboard after setup.
 
 ## Quick Setup Using PowerShell Script
 
@@ -93,20 +127,20 @@ For Windows, use `setup.ps1` to automate setup.
 
 ### Usage
 
-1. Open PowerShell in the project directory:
-   ```
-   cd "C:\Users\E3M\OneDrive - beniculturali.it\Desktop\FastZoom"
-   ```
+1. Open PowerShell in project directory:
+   ```powershell
+    cd "C:\Users\E3M\OneDrive - beniculturali.it\Desktop\FastZoom"
+    ```
 
 2. Run a command, e.g.:
-   ```
-   .\setup.ps1 setup
-   ```
+   ```powershell
+    .\setup.ps1 setup
+    ```
 
    Or start the app:
-   ```
-   .\setup.ps1 run-dev
-   ```
+   ```powershell
+    .\setup.ps1 run-dev
+    ```
 
 ## Manual Setup
 
@@ -120,34 +154,34 @@ For Windows, use `setup.ps1` to automate setup.
 ### Steps
 
 1. **Clone/Navigate**:
-   ```
-   git clone <repo-url>
-   cd FastZoom
-   ```
+   ```bash
+    git clone <repo-url>
+    cd FastZoom
+    ```
 
 2. **Install Dependencies**:
-   ```
-   poetry install
+   ```bash
+    poetry install
    ```
    Or with pip:
-   ```
-   pip install -r requirements.txt
+   ```bash
+    pip install -r requirements.txt
    ```
 
-   **Note**: If you encounter the error "Schema poetry-schemas does not exist",
+   **Note**: If you encounter error "Schema poetry-schemas does not exist",
    this indicates Poetry is not properly installed or configured in your environment.
-   You can install the dependencies directly using pip instead of Poetry:
+   You can install dependencies directly using pip instead of Poetry:
 
-   **Option 1: Use the provided installer script**
-   ```
+   **Option 1: Use provided installer script**
+   ```bash
    .\install.bat  # Windows
    # or
    python install_dependencies.py  # Cross-platform
    ```
 
    **Option 2: Manual installation**
-
-   ```
+   
+   ```bash
    pip install python==3.13.7
    pip install fastapi==0.115.14
    pip install sqlalchemy==2.0.41
@@ -174,8 +208,8 @@ For Windows, use `setup.ps1` to automate setup.
 
 3. **Environment Configuration**:
 
-   Create `.env` in the root:
-   ```
+   Create `.env` in root:
+   ```env
    # Database
    DATABASE_URL=sqlite+aiosqlite:///./fastzoom.db
 
@@ -195,50 +229,33 @@ For Windows, use `setup.ps1` to automate setup.
    COOKIE_SECURE=false  # Set true for HTTPS
    ```
 
-   **MinIO Setup**: Run MinIO locally (`minio server /data`) and create the bucket.
+4. **MinIO Setup**: Run MinIO locally (`minio server /data`) and create bucket.
 
-4. **Database Migrations**:
-   ```
+5. **Database Migrations**:
+   ```bash
    alembic upgrade head
    ```
 
-5. **Run the Application**:
-   ```
+6. **Run Application**:
+   ```bash
    poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000
    ```
 
-6. **Access**: Open http://localhost:8000 in your browser.
-
-### Updating Models for Migrations
-
-When adding new models in `app/models/`:
-
-1. Import in `app/database/base.py` `init_models()`:
-   ```python
-   from ..models.new_model import NewModel  # noqa: F401
-   ```
-
-2. Generate migration:
-   ```
-   alembic revision --autogenerate -m "Add new model"
-   ```
-
-3. Review and apply:
-   ```
-   alembic upgrade head
-   ```
+7. **Access**: Open http://localhost:8000 in your browser.
 
 ## Project Structure
 
 ```
 FastZoom/
 ├── app/
-│   ├── core/              # Config, security, permissions
+│   ├── core/              # Config, security, permissions, middleware
 │   ├── database/          # DB session, base, migrations
-│   ├── models/            # SQLAlchemy models (users, sites, photos, etc.)
-│   ├── routes/            # API and view routes (admin, sites, photos)
+│   ├── models/            # SQLAlchemy models (30+ models)
+│   ├── routes/            # API and view routes
+│   │   ├── api/           # REST API endpoints (v1 structure)
+│   │   └── view/         # HTML view routes
 │   ├── schema/            # Pydantic schemas
-│   ├── services/          # Business logic (photo, site, MinIO, deep zoom)
+│   ├── services/          # Business logic layer
 │   ├── static/            # CSS, JS (OpenSeadragon, HTMX), images
 │   └── templates/         # Jinja2 HTML (sites, photos, admin, modals)
 ├── alembic/               # Migration versions
@@ -250,196 +267,37 @@ FastZoom/
 └── README.md
 ```
 
+## Recent Updates (2025-01-16)
+
+### Bug Fixes
+- ✅ Fixed JavaScript syntax error in `cantieri.html` template (line 659-662)
+- ✅ Commented out missing `photo_metadata` import in `app.py` (line 266)
+
+### Documentation
+- ✅ Generated complete Entity Relationship Diagram (ERD) with 30+ entities
+- ✅ Documented all API endpoints in `archeologia_avanzata.py` and their usage
+- ✅ Updated project architecture documentation
+
+### Architecture Status
+- **API v1**: RESTful API structure with `/api/v1` prefix
+- **Multi-tenant**: Full support for user permissions per site
+- **Domain Exceptions**: Comprehensive exception hierarchy implemented
+- **Dependency Injection**: Service layer with proper dependency injection
+- **Harris Matrix**: Complete implementation with visualization
+
 ## ER Diagram
 
-```mermaid
-erDiagram
-    USER {
-        UUID id PK
-        string email UK
-        string hashed_password
-        boolean is_active
-        boolean is_superuser
-        boolean is_verified
-        string first_name
-        string last_name
-        datetime created_at
-        datetime updated_at
-        datetime last_login
-        UUID role_id FK
-        UUID profile_id FK
-    }
-    USER_PROFILE {
-        UUID id PK
-        string first_name
-        string last_name
-        string gender
-        datetime date_of_birth
-        string phone
-        string city
-        string country
-        string address
-        string company
-        string specialization
-        string institution
-        string academic_title
-        text bio
-    }
-    ROLE {
-        UUID id PK
-        string role_name UK
-        string role_desc
-        boolean can_create_sites
-        boolean can_manage_users
-        boolean can_export_data
-        boolean can_access_admin
-    }
-    ARCHAEOLOGICAL_SITE {
-        UUID id PK
-        string name UK
-        string code UK
-        string location
-        string region
-        string province
-        text description
-        string historical_period
-        string site_type
-        string coordinates_lat
-        string coordinates_lng
-        string municipality
-        string research_status
-        boolean is_active
-        boolean is_public
-        datetime created_at
-        datetime updated_at
-    }
-    USER_SITE_PERMISSION {
-        UUID id PK
-        UUID user_id FK
-        UUID site_id FK
-        enum permission_level
-        UUID assigned_by FK
-        boolean is_active
-        text notes
-        datetime created_at
-        datetime updated_at
-        datetime expires_at
-    }
-    PHOTO {
-        UUID id PK
-        string filename
-        string original_filename
-        string file_path
-        int file_size
-        string mime_type
-        int width
-        int height
-        int dpi
-        string color_profile
-        string thumbnail_path
-        string title
-        text description
-        text keywords
-        enum photo_type
-        string photographer
-        datetime photo_date
-        string camera_model
-        string lens
-        string inventory_number
-        string old_inventory_number
-        string catalog_number
-        string excavation_area
-        string stratigraphic_unit
-        string grid_square
-        float depth_level
-        datetime find_date
-        string finder
-        string excavation_campaign
-        enum material
-        string material_details
-        string object_type
-        string object_function
-        float length_cm
-        float width_cm
-        float height_cm
-        float diameter_cm
-        float weight_grams
-        string chronology_period
-        string chronology_culture
-        int dating_from
-        int dating_to
-        text dating_notes
-        enum conservation_status
-        text conservation_notes
-        text restoration_history
-        text bibliography
-        text comparative_references
-        text external_links
-        text exif_data
-        text iptc_data
-        string copyright_holder
-        string license_type
-        text usage_rights
-        boolean is_published
-        boolean is_validated
-        text validation_notes
-        UUID validated_by FK
-        datetime validated_at
-        UUID site_id FK
-        UUID uploaded_by FK
-        boolean has_deep_zoom
-        string deep_zoom_status
-        int deep_zoom_levels
-        int deep_zoom_tile_count
-        datetime deep_zoom_processed_at
-    }
-    PHOTO_MODIFICATION {
-        UUID id PK
-        UUID photo_id FK
-        UUID modified_by FK
-        string modification_type
-        string field_changed
-        text old_value
-        text new_value
-        text notes
-    }
-    USER_ACTIVITY {
-        UUID id PK
-        UUID user_id FK
-        datetime activity_date
-        string activity_type
-        string activity_desc
-        UUID site_id FK
-        UUID photo_id
-        string ip_address
-        text user_agent
-        text extra_data
-    }
-    TOKEN_BLACKLIST {
-        UUID id PK
-        string token_jti UK
-        UUID user_id FK
-        datetime invalidated_at
-        string reason
-    }
+A complete Entity Relationship Diagram is available in [`ER_DIAGRAM_COMPLETE.md`](ER_DIAGRAM_COMPLETE.md).
 
-    USER ||--|| USER_PROFILE : "has (1:1)"
-    USER }o--|| ROLE : "assigned (N:1)"
-    USER ||--o{ USER_SITE_PERMISSION : "has (1:N)"
-    ARCHAEOLOGICAL_SITE ||--o{ USER_SITE_PERMISSION : "has (1:N)"
-    USER ||--o{ USER_SITE_PERMISSION : "assigned_by (N:1)"
-    ARCHAEOLOGICAL_SITE ||--o{ PHOTO : "contains (1:N)"
-    USER ||--o{ PHOTO : "uploads (1:N)"
-    USER ||--o{ PHOTO : "validates (1:N)"
-    PHOTO ||--o{ PHOTO_MODIFICATION : "has (1:N)"
-    USER ||--o{ PHOTO_MODIFICATION : "performs (1:N)"
-    USER ||--o{ USER_ACTIVITY : "performs (1:N)"
-    ARCHAEOLOGICAL_SITE ||--o{ USER_ACTIVITY : "on (1:N)"
-    PHOTO ||--o{ USER_ACTIVITY : "on (1:N)"
-    USER ||--o{ TOKEN_BLACKLIST : "has (1:N)"
-```
-
-The diagram illustrates relationships between Users, Profiles, Roles, Sites, Permissions, Photos, Modifications, Activities, and Token Blacklist. Key: PK=Primary Key, FK=Foreign Key, UK=Unique Key.
+The diagram includes 30+ entities covering:
+- User management and authentication
+- Archaeological sites and permissions
+- Stratigraphy (US/USM) with Harris Matrix
+- Archaeological records (tombs, artifacts, samples)
+- Photos and documentation
+- Geographic maps and markers
+- Construction site management
+- ICCD records and forms
 
 ## Troubleshooting
 
@@ -461,7 +319,7 @@ The diagram illustrates relationships between Users, Profiles, Roles, Sites, Per
   Or manually:
   ```bash
   # 1. Uninstall Poetry completely
-  curl -sSL https://install.python-poetry.org | python3 - --uninstall
+  curl -sSL https://install.python-poetry.org | python3 --uninstall
 
   # 2. Clean Poetry cache and config
   # Delete these folders if they exist:
@@ -475,7 +333,7 @@ The diagram illustrates relationships between Users, Profiles, Roles, Sites, Per
   poetry --version
   ```
 
-  **Option 3: Use the provided installation script (bypasses Poetry)**
+  **Option 3: Use provided installation script (bypasses Poetry)**
   ```bash
   .\install.bat  # Windows
   # or
@@ -486,7 +344,7 @@ The diagram illustrates relationships between Users, Profiles, Roles, Sites, Per
   ```bash
   pip install -r requirements.txt
   ```
-  Or install the dependencies individually as listed in the Manual Setup section.
+  Or install dependencies individually as listed in Manual Setup section.
 
 ### Photo Thumbnails and Deep Zoom
 
@@ -496,348 +354,37 @@ The diagram illustrates relationships between Users, Profiles, Roles, Sites, Per
   - Ensure MinIO is running and bucket accessible.
   - Run thumbnail regeneration if needed (custom script available in services).
   - Fallback images used for missing assets.
-- **Deep Zoom**: Tiles generated on upload; viewer in `photo_modal.html` uses OpenSeadragon.
+  - **Deep Zoom**: Tiles generated on upload; viewer in `photo_modal.html` uses OpenSeadragon.
 
 ### MinIO Integration
 
 - Verify credentials in `.env`.
 - Test bucket access: `mc mb myminio/fastzoom-bucket` (using MinIO client).
 
-## 🚀 Recent Enhancements (v2.0 Features)
+## API Documentation
 
-### OpenSeadragon Integration
-- **Exclusive Image Viewing**: Removed all standard image viewers to ensure OpenSeadragon is the only method for viewing archaeological photos
-- **Enhanced Navigation**: Thumbnail navigation fully integrated with OpenSeadragon for seamless browsing experience
-- **Professional Quality**: High-resolution image examination capabilities optimized for archaeological documentation
+### Main API Routes
 
-### Modular Component System
-- **Reusable Metadata Form**: Single component serving both upload and edit workflows (`_metadata_form.html`)
-- **Event-Based Architecture**: Clean component communication using Alpine.js events (`@metadata-form-submit`)
-- **Code Reduction**: Eliminated ~300 lines of duplicate code through component reusability
-- **Maintainable Structure**: Centralized metadata field definitions for easy maintenance and updates
+- **Authentication**: `/api/v1/auth/*` - Login, register, logout
+- **Sites**: `/api/v1/sites/*` - Site CRUD and management
+- **Photos**: `/api/v1/photos/*` - Photo upload, metadata, deep zoom
+- **Users**: `/api/v1/users/*` - User management and profiles
+- **Admin**: `/api/v1/admin/*` - System administration
+- **Archaeology**: `/api/v1/archeologia/*` - US, tombs, artifacts, samples
+- **Stratigraphy**: `/api/v1/us/*` - US/USM management
+- **Harris Matrix**: `/api/v1/harris-matrix/*` - Matrix visualization and editing
+- **Construction Sites**: `/api/v1/cantieri/*` - Giornale and operatori
+- **Geographic**: `/api/v1/geographic/*` - Maps and layers
+- **ICCD**: `/api/v1/iccd/*` - ICCD records and exports
 
-### User Experience Improvements
-- **Smart UI Elements**: Information sidebar with hover zones and button triggers
-- **Consistent Interface**: Integrated action buttons in top navigation bar
-- **Responsive Design**: Mobile-optimized interface with full dark mode support
-- **Professional Workflow**: Streamlined archaeological photo documentation process
+### View Routes
 
-### Technical Specifications
-- **Framework**: Alpine.js for reactive components
-- **Styling**: Tailwind CSS with dark mode compatibility
-- **Communication**: Event-driven and direct method access patterns
-- **Data Binding**: Seamless parent-child component integration
-- **Validation**: Extensible form validation structure
-- **Initialization**: Automatic mode detection and data loading
-
-## To-Do (Future Enhancements)
-
-- Add search enhancements for photos/artifacts.
-- Integrate Neon/PostgreSQL for production DB.
-- Rate limiting and advanced logging.
-- Mobile app optimizations.
-- More comprehensive tests.
-- Advanced annotation tools for archaeological features.
-
-## 🛠️ Form Builder Drag-and-Drop con Schema JSON
-
-FastZoom integra un potente sistema di form builder drag-and-drop con schema JSON, perfetto per il sistema archeologico modulare. Questa implementazione utilizza Alpine.js e si integra perfettamente con lo stack esistente.
-
-### Architettura del Form Builder
-
-Il sistema è basato su schema JSON per moduli archeologici specifici:
-
-```javascript
-// Esempio schemas per modulo "Ceramica"
-const ceramicModuleSchema = {
-  id: "ceramic_module",
-  name: "Rilevamento Ceramico",
-  icon: "🏺",
-  category: "artifact",
-  fields: [
-    {
-      id: "fabric_type",
-      type: "select",
-      label: "Tipo di Impasto",
-      required: true,
-      options: [
-        { value: "depurato", label: "Depurato" },
-        { value: "comune", label: "Comune" },
-        { value: "cucina", label: "Da cucina" }
-      ]
-    },
-    {
-      id: "decoration",
-      type: "multiselect",
-      label: "Decorazione",
-      options: [
-        { value: "dipinta", label: "Dipinta" },
-        { value: "incisa", label: "Incisa" },
-        { value: "impressa", label: "Impressa" }
-      ]
-    },
-    {
-      id: "dimensions",
-      type: "group",
-      label: "Dimensioni",
-      fields: [
-        { id: "diameter", type: "number", label: "Diametro (cm)", step: 0.1 },
-        { id: "height", type: "number", label: "Altezza (cm)", step: 0.1 }
-      ]
-    },
-    {
-      id: "photos",
-      type: "file",
-      label: "Fotografie",
-      multiple: true,
-      accept: "image/*"
-    }
-  ]
-};
-```
-
-### Form Builder Interface con Alpine.js
-
-Il component principale per il Form Builder:
-
-```javascript
-Alpine.data('formBuilder', () => ({
-    // Palette di componenti disponibili
-    availableComponents: [
-        { type: 'text', label: 'Testo', icon: '📝' },
-        { type: 'textarea', label: 'Area Testo', icon: '📄' },
-        { type: 'select', label: 'Menu a Tendina', icon: '📋' },
-        { type: 'multiselect', label: 'Selezione Multipla', icon: '☑️' },
-        { type: 'number', label: 'Numero', icon: '🔢' },
-        { type: 'date', label: 'Data', icon: '📅' },
-        { type: 'file', label: 'File Upload', icon: '📎' },
-        { type: 'radio', label: 'Radio Button', icon: '◉' },
-        { type: 'checkbox', label: 'Checkbox', icon: '✅' },
-        { type: 'group', label: 'Gruppo Campi', icon: '📦' }
-    ],
-    
-    // Form in costruzione
-    formSchema: {
-        id: '',
-        name: '',
-        category: 'artifact',
-        fields: []
-    },
-    
-    selectedField: null,
-    draggedComponent: null,
-    
-    // Drag & Drop Handlers
-    startDrag(component, event) {
-        this.draggedComponent = component;
-        event.dataTransfer.effectAllowed = 'copy';
-    },
-    
-    allowDrop(event) {
-        event.preventDefault();
-    },
-    
-    dropComponent(event) {
-        event.preventDefault();
-        if (this.draggedComponent) {
-            const newField = this.createFieldFromComponent(this.draggedComponent);
-            this.formSchema.fields.push(newField);
-            this.draggedComponent = null;
-        }
-    },
-    
-    createFieldFromComponent(component) {
-        const fieldId = 'field_' + Date.now();
-        const baseField = {
-            id: fieldId,
-            type: component.type,
-            label: component.label,
-            required: false
-        };
-        
-        // Configurazioni specifiche per tipo
-        switch (component.type) {
-            case 'select':
-            case 'multiselect':
-                baseField.options = [
-                    { value: 'option1', label: 'Opzione 1' }
-                ];
-                break;
-            case 'number':
-                baseField.min = 0;
-                baseField.step = 1;
-                break;
-            case 'file':
-                baseField.accept = '*/*';
-                baseField.multiple = false;
-                break;
-            case 'group':
-                baseField.fields = [];
-                break;
-        }
-        
-        return baseField;
-    },
-    
-    // Field Management
-    selectField(field) {
-        this.selectedField = field;
-    },
-    
-    removeField(index) {
-        this.formSchema.fields.splice(index, 1);
-        this.selectedField = null;
-    },
-    
-    moveFieldUp(index) {
-        if (index > 0) {
-            const field = this.formSchema.fields.splice(index, 1)[0];
-            this.formSchema.fields.splice(index - 1, 0, field);
-        }
-    },
-    
-    moveFieldDown(index) {
-        if (index < this.formSchema.fields.length - 1) {
-            const field = this.formSchema.fields.splice(index, 1)[0];
-            this.formSchema.fields.splice(index + 1, 0, field);
-        }
-    },
-    
-    // Add option to select/multiselect
-    addOption(field) {
-        if (!field.options) field.options = [];
-        field.options.push({
-            value: 'new_option',
-            label: 'Nuova Opzione'
-        });
-    },
-    
-    removeOption(field, index) {
-        field.options.splice(index, 1);
-    },
-    
-    // Save Form Schema
-    async saveFormSchema() {
-        try {
-            const response = await fetch('/api/form-schemas', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(this.formSchema)
-            });
-            
-            if (response.ok) {
-                this.showSuccessMessage('Schema salvato con successo!');
-            }
-        } catch (error) {
-            console.error('Error saving schemas:', error);
-        }
-    },
-    
-    // Preview Form
-    previewForm() {
-        this.$dispatch('preview-form', { schema: this.formSchema });
-    }
-}));
-```
-
-### Dynamic Form Renderer
-
-Component per renderizzare i form dai schema JSON:
-
-```javascript
-// Component per renderizzare i form dai schemas JSON
-Alpine.data('dynamicFormRenderer', (schema) => ({
-    schema: schema,
-    formData: {},
-    
-    init() {
-        // Inizializza formData con valori default
-        this.initializeFormData();
-    },
-    
-    initializeFormData() {
-        this.schema.fields.forEach(field => {
-            this.formData[field.id] = this.getDefaultValue(field);
-        });
-    },
-    
-    getDefaultValue(field) {
-        switch (field.type) {
-            case 'multiselect':
-                return [];
-            case 'number':
-                return field.min || 0;
-            case 'checkbox':
-                return false;
-            case 'file':
-                return field.multiple ? [] : null;
-            default:
-                return '';
-        }
-    },
-    
-    async submitForm() {
-        try {
-            const response = await fetch(`/api/sites/${siteId}/data`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    module_id: this.schema.id,
-                    coordinates: this.coordinates,
-                    data: this.formData
-                })
-            });
-            
-            if (response.ok) {
-                this.$dispatch('form-submitted', { data: this.formData });
-            }
-        } catch (error) {
-            console.error('Form submission error:', error);
-        }
-    }
-}));
-```
-
-### Caratteristiche del Sistema
-
-✅ **Creazione moduli drag-and-drop** per tutti i tipi di rilevamenti archeologici
-✅ **Salvataggio schemi JSON** riutilizzabili
-✅ **Renderizzazione form dinamica** sulla mappa
-✅ **Integrazione perfetta** con il sistema FastAPI esistente
-✅ **Personalizzazione campi** con proprietà specifiche archeologiche
-
-### Tipi di Campo Supportati
-
-- **Testo**: Input di testo semplice
-- **Area Testo**: Textarea per descrizioni lunghe
-- **Select**: Menu a tendina con opzioni predefinite
-- **Multiselect**: Selezione multipla
-- **Numero**: Input numerici con min/max/step
-- **Data**: Selettore data
-- **File**: Upload files (singolo o multiplo)
-- **Radio**: Bottoni radio per scelte esclusive
-- **Checkbox**: Caselle di controllo
-- **Gruppo**: Raggruppamento di campi correlati
-
-### Integrazione con FastAPI
-
-Il form builder si integra con gli endpoint API esistenti:
-
-```python
-# Endpoint per salvare schemas form
-@router.post("/api/form-schemas")
-async def save_form_schema(schema: FormSchema):
-    # Salva schemas in database
-    pass
-
-# Endpoint per recuperare dati form
-@router.post("/api/sites/{site_id}/data")
-async def save_form_data(site_id: UUID, data: FormData):
-    # Salva dati raccolti
-    pass
-```
-
-Questo sistema fornisce un'interfaccia completa per la creazione e gestione di moduli archeologici personalizzati, garantendo flessibilità e riutilizzabilità dei componenti.
+- **Dashboard**: `/dashboard` - Main dashboard
+- **Sites**: `/sites/*` - Site management pages
+- **Photos**: `/photos/*` - Photo gallery and viewer
+- **Archaeology**: `/archeologia/*` - Advanced archaeology features
+- **Construction**: `/cantieri/*` - Construction site management
+- **Admin**: `/admin/*` - Administration pages
 
 ## Contributing
 
