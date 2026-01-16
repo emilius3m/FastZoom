@@ -420,3 +420,116 @@ class LocalOllamaLLM:
                 return response.text
             full_response += response.text
         return full_response
+    
+    async def chat_with_functions(
+        self, 
+        user_message: str, 
+        functions: list,
+        system_prompt: str = None
+    ) -> dict:
+        """
+        Chat with function calling support.
+        
+        Sends user message with available functions to LLM.
+        LLM decides whether to call a function or respond directly.
+        
+        Args:
+            user_message: User's natural language query
+            functions: List of function definitions (JSON schema)
+            system_prompt: Optional system prompt
+            
+        Returns:
+            Dict with either 'function_call' or 'response' key
+        """
+        if not self._client:
+            return {"response": "Errore: Ollama non disponibile"}
+        
+        # Build the prompt with function descriptions
+        function_list = "\n".join([
+            f"- {f['name']}: {f['description']}"
+            for f in functions
+        ])
+        
+        enhanced_system = f"""{system_prompt or 'Sei un assistente per FastZoom, un sistema di gestione archeologica.'}
+
+STRUMENTI DISPONIBILI:
+{function_list}
+
+REGOLE IMPORTANTI:
+1. Il contesto è UN SITO ARCHEOLOGICO.
+2. "Giornale" significa SEMPRE "Giornale di Cantiere" (registro lavori), MAI "quotidiano" o "notizie".
+3. Se la richiesta riguarda dati del sito (foto, giornali, scavi), DEVI usare una funzione.
+4. Per usare una funzione, rispondi ESCLUSIVAMENTE con il formato:
+   FUNCTION_CALL: nome_funzione(parametro="valore")
+5. NON scrivere altro testo se stai chiamando una funzione.
+
+Esempi:
+User: "Quali sono gli ultimi giornali?"
+Assistant: FUNCTION_CALL: get_recent_giornali()
+
+User: "Quante foto ci sono?"
+Assistant: FUNCTION_CALL: get_photos_count(period="all")
+
+User: "Statistiche del sito"
+Assistant: FUNCTION_CALL: get_site_stats()
+
+User: "Ciao come stai?"
+Assistant: Sto bene, grazie! Come posso aiutarti con il tuo scavo archeologico?
+"""
+
+        messages = [
+            {"role": "system", "content": enhanced_system},
+            {"role": "user", "content": user_message}
+        ]
+        
+        try:
+            loop = asyncio.get_running_loop()
+            
+            def run_chat():
+                return self._client.chat(
+                    model=self._model,
+                    messages=messages,
+                    stream=False
+                )
+            
+            result = await loop.run_in_executor(None, run_chat)
+            
+            response_text = result.get("message", {}).get("content", "")
+            logger.info(f"LLM Raw Response: {response_text}")  # DEBUG LOG
+            
+            # Check if LLM wants to call a function
+            if "FUNCTION_CALL:" in response_text:
+                # Parse function call
+                import re
+                match = re.search(r'FUNCTION_CALL:\s*(\w+)\((.*?)\)', response_text, re.DOTALL)
+                if match:
+                    func_name = match.group(1)
+                    params_str = match.group(2)
+                    
+                    # Parse parameters
+                    params = {}
+                    if params_str.strip():
+                        # Support both quoted strings and unquoted values (numbers, booleans)
+                        # Finds: key="value" OR key='value' OR key=value
+                        import re
+                        param_matches = re.finditer(r'(\w+)\s*=\s*(?:["\'](.*?)["\']|([^,\s)]+))', params_str)
+                        for pm in param_matches:
+                            key = pm.group(1)
+                            # group(2) is quoted value, group(3) is unquoted
+                            value = pm.group(2) if pm.group(2) is not None else pm.group(3)
+                            params[key] = value
+                    
+                    logger.info(f"Detected Function Call: {func_name} with params {params}")
+                    return {
+                        "function_call": {
+                            "name": func_name,
+                            "parameters": params
+                        }
+                    }
+            
+            # No function call, return regular response
+            return {"response": response_text}
+            
+        except Exception as e:
+            logger.error(f"Function calling error: {e}")
+            return {"response": f"Errore: {str(e)}"}

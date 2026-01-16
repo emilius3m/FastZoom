@@ -109,11 +109,24 @@ document.addEventListener('alpine:init', () => {
                     const siteId = siteIdMatch ? siteIdMatch[1] : null;
 
                     // Send init message with site context
-                    this.websocket.send(JSON.stringify({
-                        type: 'init',
-                        token: this.getAuthToken(),
-                        site_id: siteId
-                    }));
+                    if (this.websocket.readyState === WebSocket.OPEN) {
+                        this.websocket.send(JSON.stringify({
+                            type: 'init',
+                            token: this.getAuthToken(),
+                            site_id: siteId
+                        }));
+                    } else {
+                        console.warn('WebSocket open but not ready, retrying in 100ms');
+                        setTimeout(() => {
+                            if (this.websocket.readyState === WebSocket.OPEN) {
+                                this.websocket.send(JSON.stringify({
+                                    type: 'init',
+                                    token: this.getAuthToken(),
+                                    site_id: siteId
+                                }));
+                            }
+                        }, 100);
+                    }
                 };
 
                 this.websocket.onmessage = (event) => {

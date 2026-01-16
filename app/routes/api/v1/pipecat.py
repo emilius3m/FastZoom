@@ -17,7 +17,10 @@ from app.core.pipecat_settings import pipecat_settings
 from app.services.pipecat_service import pipecat_service, PIPECAT_AVAILABLE
 from app.services.pipecat_functions import register_all_handlers
 from app.database.security import get_current_active_user
+from app.database.db import get_async_session
 from app.models.users import User
+from app.services.voice_db_functions import VOICE_FUNCTIONS, execute_voice_db_function
+from app.services.voice_commands import parse_voice_command
 
 
 router = APIRouter(prefix="/pipecat", tags=["Voice Assistant"])
@@ -147,7 +150,7 @@ async def voice_stream(
         
         # Initialize services - medium model for quality/speed balance
         stt = LocalWhisperSTT(model="medium", device="auto", language="it")
-        llm = LocalOllamaLLM(model="llama3.2:3b")
+        llm = LocalOllamaLLM(model="qwen2.5:7b")  # Good for function calling + Italian
         
         # Load model asynchronously (singleton, non-blocking)
         model_ready = await stt.ensure_model_loaded()
@@ -202,7 +205,7 @@ async def voice_stream(
                             })
                             
                             # Check for voice commands first (with site context)
-                            from app.services.voice_commands import parse_voice_command
+                            # parse_voice_command is imported at module level
                             cmd = parse_voice_command(result.text, current_site_id)
                             
                             if cmd["is_command"]:
@@ -220,10 +223,35 @@ async def voice_stream(
                                     "text": cmd["response"]
                                 })
                             else:
-                                # Not a command - use LLM
+                                # Not a command - use LLM with function calling
                                 messages_history.append({"role": "user", "content": result.text})
                                 await websocket.send_json({"type": "status", "text": "Elaborazione..."})
-                                response_text = await llm.simple_chat(messages_history)
+                                
+                                # Try function calling first if we have site context
+                                if current_site_id:
+                                    llm_result = await llm.chat_with_functions(
+                                        result.text, 
+                                        VOICE_FUNCTIONS
+                                    )
+                                    
+                                    if "function_call" in llm_result:
+                                        # Execute the function
+                                        func_call = llm_result["function_call"]
+                                        async for db in get_async_session():
+                                            func_result = await execute_voice_db_function(
+                                                function_name=func_call["name"],
+                                                parameters=func_call["parameters"],
+                                                db=db,
+                                                site_id=UUID(current_site_id)
+                                            )
+                                            response_text = func_result.get("message", "Nessun risultato")
+                                            break
+                                    else:
+                                        response_text = llm_result.get("response", "")
+                                else:
+                                    # No site context, regular chat
+                                    response_text = await llm.simple_chat(messages_history)
+                                
                                 messages_history.append({"role": "assistant", "content": response_text})
                                 await websocket.send_json({
                                     "type": "response",
@@ -238,16 +266,62 @@ async def voice_stream(
                     if msg_type == "close":
                         break
                     elif msg_type == "text":
-                        # Direct text input (for testing)
+                        # Direct text input - Process exactly like voice
                         text = data.get("text", "")
                         if text:
-                            messages_history.append({"role": "user", "content": text})
-                            response_text = await llm.simple_chat(messages_history)
-                            messages_history.append({"role": "assistant", "content": response_text})
-                            await websocket.send_json({
-                                "type": "response",
-                                "text": response_text
-                            })
+                            # 1. Try specific voice commands
+                            cmd = parse_voice_command(text, current_site_id)
+                            
+                            if cmd.get("is_command"):
+                                # Execute command
+                                logger.info(f"Executing text command: {cmd}")
+                                await websocket.send_json({
+                                    "type": "command",
+                                    "action": cmd["action"],
+                                    "path": cmd.get("path"),
+                                    "target": cmd.get("target"),
+                                    "query": cmd.get("query")
+                                })
+                                # Send response text
+                                await websocket.send_json({
+                                    "type": "response",
+                                    "text": cmd["response"]
+                                })
+                            else:
+                                # 2. Use LLM with function calling
+                                messages_history.append({"role": "user", "content": text})
+                                await websocket.send_json({"type": "status", "text": "Elaborazione..."})
+                                
+                                # Try function calling first if we have site context
+                                if current_site_id:
+                                    llm_result = await llm.chat_with_functions(
+                                        text, 
+                                        VOICE_FUNCTIONS
+                                    )
+                                    
+                                    if "function_call" in llm_result:
+                                        # Execute the function
+                                        func_call = llm_result["function_call"]
+                                        async for db in get_async_session():
+                                            func_result = await execute_voice_db_function(
+                                                function_name=func_call["name"],
+                                                parameters=func_call["parameters"],
+                                                db=db,
+                                                site_id=UUID(current_site_id)
+                                            )
+                                            response_text = func_result.get("message", "Nessun risultato")
+                                            break
+                                    else:
+                                        response_text = llm_result.get("response", "")
+                                else:
+                                    # No site context, regular chat
+                                    response_text = await llm.simple_chat(messages_history)
+                                
+                                messages_history.append({"role": "assistant", "content": response_text})
+                                await websocket.send_json({
+                                    "type": "response",
+                                    "text": response_text
+                                })
                         
             except WebSocketDisconnect:
                 break
