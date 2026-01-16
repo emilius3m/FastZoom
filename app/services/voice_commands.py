@@ -57,7 +57,7 @@ NAVIGATION_ROUTES = [
     NavigationRoute(
         name="Giornale di Cantiere",
         keywords=["giornale", "cantieri", "cantiere", "giornali"],
-        path_template="/view/{site_id}/giornale",
+        path_template="/view/{site_id}/cantieri",
         requires_site=True,
         section="main"
     ),

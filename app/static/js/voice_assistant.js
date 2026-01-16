@@ -104,8 +104,8 @@ document.addEventListener('alpine:init', () => {
                 this.websocket = new WebSocket(this.wsUrl);
 
                 this.websocket.onopen = () => {
-                    // Extract site_id from current URL (e.g., /view/{site_id}/...)
-                    const siteIdMatch = window.location.pathname.match(/\/view\/([a-f0-9-]+)/i);
+                    // Extract site_id from current URL (supports /view/ and /sites/)
+                    const siteIdMatch = window.location.pathname.match(/\/(?:view|sites)\/([a-f0-9-]+)/i);
                     const siteId = siteIdMatch ? siteIdMatch[1] : null;
 
                     // Send init message with site context

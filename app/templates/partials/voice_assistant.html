@@ -33,7 +33,7 @@
         </button>
 
         <!-- Expand/Collapse Button -->
-        <button @click="isOpen = !isOpen" x-show="messages.length > 0 || response"
+        <button @click="isOpen = !isOpen"
             class="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded transition-colors"
             title="Mostra cronologia">
             <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': isOpen }" fill="none"
