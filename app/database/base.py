@@ -122,14 +122,7 @@ def init_models():
     MatrixHarris = doc_grafica_module.MatrixHarris  # noqa: F401
     ElencoConsegna = doc_grafica_module.ElencoConsegna  # noqa: F401
     
-    # Import archeologia avanzata
-    archeologia_module = importlib.import_module('app.models.archeologia_avanzata')
-    UnitaStratigrafica = archeologia_module.UnitaStratigraficaCompleta  # noqa: F401
-    SchedaTomba = archeologia_module.SchedaTomba  # noqa: F401
-    InventarioReperto = archeologia_module.InventarioReperto  # noqa: F401
-    MaterialeArcheologico = archeologia_module.MaterialeArcheologico  # noqa: F401
-    CampioneScientifico = archeologia_module.CampioneScientifico  # noqa: F401
-    
+   
     # Import report finale
     report_module = importlib.import_module('app.models.report_finale')
     RelazioneFinaleScavo = report_module.RelazioneFinaleScavo  # noqa: F401

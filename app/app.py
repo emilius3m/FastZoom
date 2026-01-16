@@ -116,6 +116,8 @@ except ImportError:
     logger.warning("Harris Matrix view route not found")
     HARRIS_MATRIX_ROUTE_EXISTS = False
 
+
+
 # Configurazione
 settings = get_settings()
 
@@ -262,17 +264,6 @@ async def test_session(request: Request):
         "has_session": True,
         "session_data": dict(session)
     }
-
-# Commented out - module not found
-# from app.routes.photo_metadata import router as photo_metadata_router
-
-# Registra router
-# app.include_router(
-#     photo_metadata_router,
-#     tags=["Photo Metadata"],
-#     dependencies=[Depends(get_current_user_id_with_blacklist)]
-# )
-
 
 # 🏛️ INCLUSIONE ROUTER SITES - CONFIGURAZIONE PRINCIPALE
 app.include_router(
@@ -423,6 +414,8 @@ if HARRIS_MATRIX_ROUTE_EXISTS:
         tags=["Pages", "Harris Matrix"],
         dependencies=[Depends(get_current_user_id_with_blacklist)]
     )
+
+
 
 # Route principali
 @app.get("/")

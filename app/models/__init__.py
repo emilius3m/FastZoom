@@ -37,12 +37,12 @@ from app.models.base import (
 # ===== IMPORT ARCHAEOLOGICAL ENUMS =====
 from app.models.archaeological_enums import (
     # Photo and Documentation
-    PhotoType,  # RIPRISTINATO!
+    PhotoType,   
     DocumentType,
     
     # Materials and Conservation  
-    MaterialType,  # RIPRISTINATO!
-    ConservationStatus,  # RIPRISTINATO!
+    MaterialType,  
+    ConservationStatus,   
     
     # Archaeological Context
     ContextType,
@@ -156,31 +156,8 @@ from app.models.stratigraphy import (
     TecnicaCostruttiva
 )
 
-# ===== IMPORT ARCHEOLOGIA AVANZATA =====
-from app.models.archeologia_avanzata import (
-    UnitaStratigraficaCompleta,
-    MaterialeArcheologico,
-    matrix_harris_relations,
-    reperti_materiali_association,
-    TipoUS,
-    TipoTomba,
-    RitoSepolcrale,
-    TipoMateriale,
-    TipoCampione,
-    StatoConservazione
-)
 
-# ===== IMPORT RECORD ARCHEOLOGICI =====
-from app.models.archaeological_records import (
-    SchedaTomba,
-    InventarioReperto,
-    CampioneScientifico,
-    TipoTombaEnum,
-    OrientamentoEnum,
-    ConservazioneEnum,
-    TipoCampioneEnum,
-    MaterialeEnum
-)
+
 
 # ===== IMPORT DOCUMENTAZIONE E CANTIERE =====
 from app.models.documentation_and_field import (
@@ -326,28 +303,7 @@ __all__ = [
     'AffidabilitaEnum',
     'TecnicaCostruttiva',
     
-    # Archeologia Avanzata
-    'UnitaStratigraficaCompleta',
-    'MaterialeArcheologico',
-    'matrix_harris_relations',
-    'reperti_materiali_association',
-    'TipoUS',
-    'TipoTomba',
-    'RitoSepolcrale',
-    'TipoMateriale',
-    'TipoCampione',
-    'StatoConservazione',
-    
-    # Archaeological Records
-    'SchedaTomba',
-    'InventarioReperto',
-    'CampioneScientifico',
-    'TipoTombaEnum',
-    'OrientamentoEnum',
-    'ConservazioneEnum',
-    'TipoCampioneEnum',
-    'MaterialeEnum',
-    
+
     # Documentation & Field
     'Document',
     'Photo',
@@ -580,7 +536,6 @@ is_valid = await TokenBlacklist.is_token_blacklisted(db, token_jti)
 # Enum archeologici
 from app.models import PhotoType, MaterialType, ConservationStatus
 photo = Photo(photo_type=PhotoType.DETAIL.value)
-reperto = InventarioReperto(materiale=MaterialType.CERAMIC.value)
 stato = ConservationStatus.GOOD.value
         """,
         'complete_workflow': """

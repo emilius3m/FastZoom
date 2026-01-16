@@ -26,10 +26,7 @@ class TipoTavola(str, PyEnum):
     SEZIONE_GENERALE = "sezione_generale"
     SEZIONE_DETTAGLIO = "sezione_dettaglio"
     PROSPETTO = "prospetto"
-    RILIEVO_TOMBA = "rilievo_tomba"
-    RILIEVO_STRUTTURA = "rilievo_struttura"
-    MATRIX_HARRIS = "matrix_harris"
-    PLANIMETRIA_REPERTI = "planimetria_reperti"
+
 
 
 class ScalaTavola(str, PyEnum):
@@ -52,14 +49,8 @@ class TipoFoto(str, PyEnum):
     GENERALE_AREA = "generale_area"
     DETTAGLIO_US = "dettaglio_us"
     SEZIONE_US = "sezione_us"
-    TOMBA_GENERALE = "tomba_generale"
-    TOMBA_DETTAGLIO = "tomba_dettaglio"
-    SCHELETRO = "scheletro"
-    CORREDO = "corredo"
-    REPERTO = "reperto"
     STRUTTURA = "struttura"
     PARTICOLARE = "particolare"
-    CAMPIONE = "campione"
     WORKING = "working"  # foto di lavoro
 
 
@@ -114,7 +105,7 @@ class TavolaGrafica(Base):
     # Contenuto
     area_rappresentata = Column(String(200), nullable=True)
     us_rappresentate = Column(Text, nullable=True)  # lista US separate da virgola
-    tombe_rappresentate = Column(Text, nullable=True)  # lista tombe separate da virgola
+
     
     # Coordinate e georeferenziazione
     coordinate_note = Column(Text, nullable=True)
@@ -202,8 +193,7 @@ class FotografiaArcheologica(Base):
     # Contesto archeologico - riferimenti a modelli esistenti
     # Nota: questi campi sono opzionali fino all'implementazione dei modelli correlati
     us_fotografata_id = Column(String(36), nullable=True)  # Riferimento a US quando disponibile
-    tomba_fotografata_id = Column(String(36), nullable=True)  # Riferimento a tomba quando disponibile
-    reperto_fotografato_id = Column(String(36), nullable=True)  # Riferimento a reperto quando disponibile
+
     
     # Tecnica fotografica
     direzione_scatto = Column(String(20), nullable=True)  # N, S, E, W, NE, etc.

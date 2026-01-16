@@ -196,8 +196,7 @@ class PhotoQueryService:
                 # Localization
                 "us_reference": None,
                 "usm_reference": None,
-                "tomba_reference": None,
-                "reperto_reference": None,
+
                 "gps_lat": None,
                 "gps_lng": None,
                 "gps_altitude": None,

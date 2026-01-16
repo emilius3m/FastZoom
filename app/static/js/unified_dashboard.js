@@ -46,17 +46,17 @@ document.addEventListener("alpine:init", () => {
             }
         },
         error: null,
-        
+
         // Store methods
         setError(error) {
             this.error = error;
             console.error('Dashboard error:', error);
         },
-        
+
         clearError() {
             this.error = null;
         },
-        
+
         updateData(key, value) {
             this[key] = value;
         }
@@ -75,7 +75,7 @@ document.addEventListener("alpine:init", () => {
             moreActivities: false,
             analytics: false
         },
-        
+
         // Data storage
         sitesData: [],
         giornaleSites: [],
@@ -126,7 +126,7 @@ document.addEventListener("alpine:init", () => {
                 icon: 'fa-check-circle'
             }
         },
-        
+
         // Error handling
         error: null,
         retryCount: {
@@ -137,7 +137,7 @@ document.addEventListener("alpine:init", () => {
             system: 0
         },
         maxRetries: 3,
-        
+
         // Activity filters
         activityFilters: [
             { value: 'all', label: 'Tutto' },
@@ -147,10 +147,10 @@ document.addEventListener("alpine:init", () => {
             { value: 'photos', label: 'Fotografie' },
             { value: 'users', label: 'Utenti' }
         ],
-        
+
         // Tab management
         tabs: ['overview', 'giornale', 'analytics'],
-        
+
         // Initialize
         async init() {
             try {
@@ -161,12 +161,12 @@ document.addEventListener("alpine:init", () => {
                 this.handleError(error, 'initialization');
             }
         },
-        
+
         // Load initial data
         async loadInitialData() {
             this.loading.global = true;
             this.clearError();
-            
+
             try {
                 // Load data for all tabs in parallel
                 await Promise.all([
@@ -182,32 +182,32 @@ document.addEventListener("alpine:init", () => {
                 this.loading.global = false;
             }
         },
-        
+
         // Tab switching
         switchTab(tabName) {
             if (!this.tabs.includes(tabName)) return;
-            
+
             this.activeTab = tabName;
             this.persistTab(tabName);
-            
+
             // Hide all tab contents
             document.querySelectorAll('.unified-tab-content').forEach(content => {
                 content.classList.remove('active');
             });
-            
+
             // Show selected tab content
             const selectedContent = document.getElementById(`${tabName}-content`);
             if (selectedContent) {
                 selectedContent.classList.add('active');
             }
-            
+
             // Load tab-specific data if needed
             this.loadTabSpecificData(tabName);
         },
-        
+
         // Load tab-specific data
         async loadTabSpecificData(tabName) {
-            switch(tabName) {
+            switch (tabName) {
                 case 'overview':
                     await this.refreshOverviewData();
                     break;
@@ -219,12 +219,12 @@ document.addEventListener("alpine:init", () => {
                     break;
             }
         },
-        
+
         // Overview data loading
         async loadOverviewData() {
             this.loading.sites = true;
             this.clearError();
-            
+
             try {
                 // Load sites data with retry mechanism
                 const sitesResponse = await this.apiCallWithRetry(
@@ -237,7 +237,7 @@ document.addEventListener("alpine:init", () => {
                     },
                     'sites'
                 );
-                
+
                 if (sitesResponse) {
                     const sitesData = await sitesResponse.json();
                     this.sitesData = sitesData.sites || [];
@@ -245,31 +245,31 @@ document.addEventListener("alpine:init", () => {
                     // Update store data
                     Alpine.store('unifiedDashboard').updateData('sitesData', this.sitesData);
                 }
-                
+
                 // Load overview statistics
                 await this.loadOverviewStats();
-                
+
             } catch (error) {
                 this.handleError(error, 'overview_data_load');
             } finally {
                 this.loading.sites = false;
             }
         },
-        
+
         async loadOverviewStats() {
             try {
                 // Get stats from the page context if available
                 const sitesCount = this.sitesData.length;
                 const photosCount = document.querySelector('[data-photos-count]')?.dataset.photosCount || 0;
                 const usersCount = document.querySelector('[data-users-count]')?.dataset.usersCount || 0;
-                
+
                 this.overviewStats = {
                     sites_count: sitesCount,
                     photos_count: parseInt(photosCount),
                     us_usm_count: 0, // Will be loaded from API
                     users_count: parseInt(usersCount)
                 };
-                
+
                 // Load US/USM count with retry mechanism
                 const usResponse = await this.apiCallWithRetry(
                     '/api/v1/unified/dashboard/stats/overview',
@@ -281,26 +281,26 @@ document.addEventListener("alpine:init", () => {
                     },
                     'us_usm'
                 );
-                
+
                 if (usResponse) {
                     const usData = await usResponse.json();
                     this.overviewStats.us_usm_count = usData.us_usm_count || 0;
                 }
-                
+
             } catch (error) {
                 this.handleError(error, 'overview_stats_load');
             }
         },
-        
+
         async refreshOverviewData() {
             await this.loadOverviewData();
             await this.loadActivities();
         },
-        
+
         // Giornale data loading
         async loadGiornaleData() {
             this.loading.giornaleSites = true;
-            
+
             try {
                 // Load giornale statistics with retry mechanism
                 const statsResponse = await this.apiCallWithRetry(
@@ -313,24 +313,24 @@ document.addEventListener("alpine:init", () => {
                     },
                     'giornale'
                 );
-                
+
                 if (statsResponse) {
                     this.giornaleStats = await statsResponse.json();
                 }
-                
+
                 // Load sites for giornale
                 this.giornaleSites = [...this.sitesData];
-                
+
                 // Load site-specific giornale stats
                 await this.loadGiornaleSiteStats();
-                
+
             } catch (error) {
                 this.handleError(error, 'giornale_data_load');
             } finally {
                 this.loading.giornaleSites = false;
             }
         },
-        
+
         async loadGiornaleSiteStats() {
             try {
                 for (const site of this.giornaleSites) {
@@ -344,7 +344,7 @@ document.addEventListener("alpine:init", () => {
                                 }
                             }
                         );
-                        
+
                         if (response && response.ok) {
                             const siteData = await response.json();
                             this.giornaleSiteStats[site.site_id] = {
@@ -361,15 +361,15 @@ document.addEventListener("alpine:init", () => {
                 this.handleError(error, 'giornale_site_stats_load');
             }
         },
-        
+
         async refreshGiornaleData() {
             await this.loadGiornaleData();
         },
-        
+
         // Analytics data loading
         async loadAnalyticsData() {
             this.loading.analytics = true;
-            
+
             try {
                 const response = await this.apiCallWithRetry(
                     '/api/v1/analytics/overview',
@@ -381,7 +381,7 @@ document.addEventListener("alpine:init", () => {
                     },
                     'analytics'
                 );
-                
+
                 if (response && response.ok) {
                     const data = await response.json();
                     this.analyticsStats = {
@@ -404,11 +404,11 @@ document.addEventListener("alpine:init", () => {
                 this.loading.analytics = false;
             }
         },
-        
+
         // Activities management
         async loadActivities() {
             this.loading.activities = true;
-            
+
             try {
                 const response = await this.apiCallWithRetry(
                     '/api/v1/unified/dashboard/activities/recent',
@@ -420,7 +420,7 @@ document.addEventListener("alpine:init", () => {
                     },
                     'activities'
                 );
-                
+
                 if (response) {
                     const data = await response.json();
                     this.activities = data.activities || [];
@@ -456,7 +456,7 @@ document.addEventListener("alpine:init", () => {
                     },
                     'system'
                 );
-                
+
                 if (response) {
                     const statusData = await response.json();
                     this.systemStatus = statusData;
@@ -492,32 +492,32 @@ document.addEventListener("alpine:init", () => {
         async refreshSystemStatus() {
             await this.loadSystemStatus();
         },
-        
+
         async refreshActivities() {
             await this.loadActivities();
         },
-        
+
         async loadMoreActivities() {
             this.loading.moreActivities = true;
-            
+
             try {
                 // Implementation for loading more activities
                 // This would typically include pagination parameters
                 console.log('Loading more activities...');
-                
+
                 // Simulate loading delay
                 await new Promise(resolve => setTimeout(resolve, 1000));
-                
+
                 // Update hasMoreActivities flag
                 this.hasMoreActivities = false;
-                
+
             } catch (error) {
                 console.error('Error loading more activities:', error);
             } finally {
                 this.loading.moreActivities = false;
             }
         },
-        
+
         // Activity filtering
         get filteredActivities() {
             if (this.activityFilter === 'all') {
@@ -525,11 +525,11 @@ document.addEventListener("alpine:init", () => {
             }
             return this.activities.filter(activity => activity.type === this.activityFilter);
         },
-        
+
         setActivityFilter(filter) {
             this.activityFilter = filter;
         },
-        
+
         // Navigation methods
         navigateToSite(siteId) {
             console.log('Navigating to site:', siteId);
@@ -541,7 +541,7 @@ document.addEventListener("alpine:init", () => {
             // Force navigation with full page reload
             window.location.assign(`/view/${siteId}/dashboard/`);
         },
-        
+
         navigateToGiornaleSite(siteId) {
             console.log('Navigating to giornale site:', siteId);
             // Ensure we have a valid site ID
@@ -550,22 +550,22 @@ document.addEventListener("alpine:init", () => {
                 return;
             }
             // Force navigation with full page reload
-            window.location.assign(`/sites/${siteId}/cantieri/`);
+            window.location.assign(`/view/${siteId}/cantieri`);
         },
-        
+
         navigateToNewSite() {
             window.location.href = '/sites/create';
         },
-        
+
         navigateToNewGiornale() {
             // Navigate to first available site for giornale creation
             if (this.giornaleSites.length > 0) {
-                window.location.href = `/giornale-cantiere/site/${this.giornaleSites[0].site_id}`;
+                window.location.href = `/view/${this.giornaleSites[0].site_id}/cantieri`;
             } else {
                 this.showError('Nessun sito disponibile per creare un giornale');
             }
         },
-        
+
         navigateToUpload() {
             // Navigate to first available site for upload
             if (this.sitesData.length > 0) {
@@ -574,11 +574,11 @@ document.addEventListener("alpine:init", () => {
                 this.showError('Nessun sito disponibile per caricare documenti');
             }
         },
-        
+
         navigateToSitesList() {
             window.location.href = '/sites';
         },
-        
+
         navigateToDocuments() {
             if (this.sitesData.length > 0) {
                 window.location.href = `/view/${this.sitesData[0].site_id}/documentation/`;
@@ -586,26 +586,26 @@ document.addEventListener("alpine:init", () => {
                 this.showError('Nessun sito disponibile');
             }
         },
-        
+
         navigateToGiornaleOperators() {
             window.location.href = '/giornale-cantiere/operatori';
         },
-        
+
         navigateToGiornaleReports() {
             window.location.href = '/giornale-cantiere/reports';
         },
-        
+
         // Analytics methods
         generateReport(type) {
             console.log(`Generating ${type} report...`);
             // Implementation for report generation
         },
-        
+
         exportAnalytics() {
             console.log('Exporting analytics data...');
             // Implementation for data export
         },
-        
+
         // Utility methods
         formatNumber(num) {
             if (num >= 1000000) {
@@ -615,7 +615,7 @@ document.addEventListener("alpine:init", () => {
             }
             return num.toString();
         },
-        
+
         formatTime(timestamp) {
             const date = new Date(timestamp);
             const now = new Date();
@@ -623,15 +623,15 @@ document.addEventListener("alpine:init", () => {
             const diffMins = Math.floor(diffMs / 60000);
             const diffHours = Math.floor(diffMs / 3600000);
             const diffDays = Math.floor(diffMs / 86400000);
-            
+
             if (diffMins < 1) return 'Proprio ora';
             if (diffMins < 60) return `${diffMins} min fa`;
             if (diffHours < 24) return `${diffHours} ore fa`;
             if (diffDays < 7) return `${diffDays} giorni fa`;
-            
+
             return date.toLocaleDateString('it-IT');
         },
-        
+
         getTabLabel(tab) {
             const labels = {
                 'overview': 'Panoramica',
@@ -640,23 +640,23 @@ document.addEventListener("alpine:init", () => {
             };
             return labels[tab] || tab;
         },
-        
+
         getPreviousTab() {
             const currentIndex = this.tabs.indexOf(this.activeTab);
             const prevIndex = currentIndex > 0 ? currentIndex - 1 : this.tabs.length - 1;
             return this.tabs[prevIndex];
         },
-        
+
         getNextTab() {
             const currentIndex = this.tabs.indexOf(this.activeTab);
             const nextIndex = currentIndex < this.tabs.length - 1 ? currentIndex + 1 : 0;
             return this.tabs[nextIndex];
         },
-        
+
         getCSRFToken() {
             return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
         },
-        
+
         // API call with retry mechanism
         async apiCall(url, options = {}) {
             try {
@@ -666,28 +666,28 @@ document.addEventListener("alpine:init", () => {
                     credentials: 'include'
                 };
                 const response = await fetch(url, fetchOptions);
-                
+
                 // Handle authentication errors
                 if (response.status === 401) {
                     this.handleAuthError();
                     return null;
                 }
-                
+
                 return response;
             } catch (error) {
                 console.error(`API call failed for ${url}:`, error);
                 throw error;
             }
         },
-        
+
         // API call with retry mechanism
         async apiCallWithRetry(url, options = {}, callType = 'default') {
             let lastError;
-            
+
             for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
                 try {
                     const response = await this.apiCall(url, options);
-                    
+
                     if (response && response.ok) {
                         // Reset retry count on success
                         this.retryCount[callType] = 0;
@@ -696,27 +696,27 @@ document.addEventListener("alpine:init", () => {
                         // Don't retry client errors (4xx)
                         return response;
                     }
-                    
+
                     lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
                 } catch (error) {
                     lastError = error;
-                    
+
                     // Don't retry authentication errors
                     if (error.message.includes('401')) {
                         throw error;
                     }
                 }
-                
+
                 // If not the last attempt, wait before retrying
                 if (attempt < this.maxRetries) {
                     await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
                     this.retryCount[callType] = attempt;
                 }
             }
-            
+
             throw lastError;
         },
-        
+
         // Handle authentication errors
         handleAuthError() {
             this.showError('Sessione scaduta. Reindirizzamento al login...');
@@ -724,13 +724,13 @@ document.addEventListener("alpine:init", () => {
                 window.location.href = '/login';
             }, 2000);
         },
-        
+
         // Error handling
         handleError(error, context = 'unknown') {
             console.error(`Error in ${context}:`, error);
-            
+
             let userMessage = 'Si è verificato un errore imprevisto.';
-            
+
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 userMessage = 'Errore di connessione. Verifica la tua rete e riprova.';
             } else if (error.message.includes('401')) {
@@ -741,21 +741,21 @@ document.addEventListener("alpine:init", () => {
             } else if (error.message.includes('timeout')) {
                 userMessage = 'Timeout del server. Riprova più tardi.';
             }
-            
+
             this.setError(userMessage);
             Alpine.store('unifiedDashboard').setError(userMessage);
         },
-        
+
         // Error display methods
         setError(message) {
             this.error = message;
         },
-        
+
         clearError() {
             this.error = null;
             Alpine.store('unifiedDashboard').clearError();
         },
-        
+
         showError(message) {
             this.setError(message);
             // Show toast notification if available
@@ -763,7 +763,7 @@ document.addEventListener("alpine:init", () => {
                 window.showToast(message, 'error');
             }
         },
-        
+
         showSuccess(message) {
             this.clearError();
             // Show toast notification if available
@@ -771,19 +771,19 @@ document.addEventListener("alpine:init", () => {
                 window.showToast(message, 'success');
             }
         },
-        
+
         // Tab persistence
         persistTab(tabName) {
             localStorage.setItem('unifiedDashboard_activeTab', tabName);
         },
-        
+
         setupTabPersistence() {
             const savedTab = localStorage.getItem('unifiedDashboard_activeTab');
             if (savedTab && this.tabs.includes(savedTab)) {
                 this.switchTab(savedTab);
             }
         },
-        
+
         // Keyboard navigation
         setupKeyboardNavigation() {
             document.addEventListener('keydown', (e) => {
@@ -795,7 +795,7 @@ document.addEventListener("alpine:init", () => {
                         this.switchTab(this.tabs[tabIndex]);
                     }
                 }
-                
+
                 // Arrow keys for tab navigation
                 if (e.altKey) {
                     if (e.key === 'ArrowLeft') {
@@ -808,7 +808,7 @@ document.addEventListener("alpine:init", () => {
                 }
             });
         },
-        
+
         // Mock data for development
         getMockActivities() {
             return [
@@ -859,7 +859,7 @@ document.addEventListener("alpine:init", () => {
             ];
         }
     }));
-    
+
     // Site Selector Component
     Alpine.data("siteSelector", () => ({
         searchQuery: '',
@@ -868,11 +868,11 @@ document.addEventListener("alpine:init", () => {
         sites: [],
         filteredSites: [],
         context: 'overview', // 'overview', 'giornale', 'analytics'
-        
+
         async init() {
             await this.loadSites();
         },
-        
+
         async loadSites() {
             this.loading = true;
             try {
@@ -891,7 +891,7 @@ document.addEventListener("alpine:init", () => {
                 this.loading = false;
             }
         },
-        
+
         filterSites() {
             if (!this.searchQuery) {
                 this.filteredSites = [...this.sites];
@@ -904,17 +904,17 @@ document.addEventListener("alpine:init", () => {
                 );
             }
         },
-        
+
         selectSite(site) {
             console.log('Selecting site:', site, 'with context:', this.context);
-            
+
             // Ensure we have a valid site object and ID
             if (!site || !site.site_id) {
                 console.error('Invalid site object provided to selectSite');
                 return;
             }
-            
-            switch(this.context) {
+
+            switch (this.context) {
                 case 'overview':
                     console.log('Navigating to site dashboard:', site.site_id);
                     window.location.assign(`/view/${site.site_id}/dashboard/`);
@@ -928,7 +928,7 @@ document.addEventListener("alpine:init", () => {
                     window.location.assign(`/view/${site.site_id}/dashboard/`);
             }
         },
-        
+
         getSelectorTitle() {
             const titles = {
                 'overview': 'Siti Archeologici',
@@ -937,7 +937,7 @@ document.addEventListener("alpine:init", () => {
             };
             return titles[this.context] || 'Siti';
         },
-        
+
         getActionLabel() {
             const labels = {
                 'overview': 'Apri Sito',
@@ -946,7 +946,7 @@ document.addEventListener("alpine:init", () => {
             };
             return labels[this.context] || 'Apri';
         },
-        
+
         getStatLabel(statType) {
             const labels = {
                 'overview': {
@@ -964,19 +964,19 @@ document.addEventListener("alpine:init", () => {
             };
             return labels[this.context]?.[statType] || 'Dati';
         },
-        
+
         getSiteStat(site, statType) {
             // Get stats from parent component or calculate
             const parentData = Alpine.store('unifiedDashboard');
-            
+
             if (this.context === 'giornale') {
                 return parentData?.giornaleSiteStats[site.site_id]?.[statType] || 0;
             }
-            
+
             // Default stats for overview
             return Math.floor(Math.random() * 100); // Mock data
         },
-        
+
         getPermissionBadgeClass(permission) {
             const classes = {
                 'admin': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
@@ -986,7 +986,7 @@ document.addEventListener("alpine:init", () => {
             return classes[permission] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
         }
     }));
-    
+
     // Activity Feed Component
     Alpine.data("activityFeed", () => ({
         loading: false,
@@ -994,7 +994,7 @@ document.addEventListener("alpine:init", () => {
         filteredActivities: [],
         activityFilter: 'all',
         hasMoreActivities: false,
-        
+
         activityFilters: [
             { value: 'all', label: 'Tutto' },
             { value: 'sites', label: 'Siti' },
@@ -1003,11 +1003,11 @@ document.addEventListener("alpine:init", () => {
             { value: 'photos', label: 'Fotografie' },
             { value: 'users', label: 'Utenti' }
         ],
-        
+
         async init() {
             await this.loadActivities();
         },
-        
+
         async loadActivities() {
             this.loading = true;
             try {
@@ -1026,7 +1026,7 @@ document.addEventListener("alpine:init", () => {
                 this.loading = false;
             }
         },
-        
+
         updateFilteredActivities() {
             if (this.activityFilter === 'all') {
                 this.filteredActivities = this.activities;
@@ -1034,16 +1034,16 @@ document.addEventListener("alpine:init", () => {
                 this.filteredActivities = this.activities.filter(activity => activity.type === this.activityFilter);
             }
         },
-        
+
         setActivityFilter(filter) {
             this.activityFilter = filter;
             this.updateFilteredActivities();
         },
-        
+
         async refreshActivities() {
             await this.loadActivities();
         },
-        
+
         getActivityIcon(type) {
             const icons = {
                 'sites': 'fa-map-marker-alt',
@@ -1054,7 +1054,7 @@ document.addEventListener("alpine:init", () => {
             };
             return icons[type] || 'fa-circle';
         },
-        
+
         getActivityIconClass(type) {
             const classes = {
                 'sites': 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300',
@@ -1065,7 +1065,7 @@ document.addEventListener("alpine:init", () => {
             };
             return classes[type] || 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300';
         },
-        
+
         getActivityTypeLabel(type) {
             const labels = {
                 'sites': 'Sito',
@@ -1076,7 +1076,7 @@ document.addEventListener("alpine:init", () => {
             };
             return labels[type] || type;
         },
-        
+
         getActivityTypeClass(type) {
             const classes = {
                 'sites': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
@@ -1087,7 +1087,7 @@ document.addEventListener("alpine:init", () => {
             };
             return classes[type] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
         },
-        
+
         formatTime(timestamp) {
             const date = new Date(timestamp);
             const now = new Date();
@@ -1095,21 +1095,21 @@ document.addEventListener("alpine:init", () => {
             const diffMins = Math.floor(diffMs / 60000);
             const diffHours = Math.floor(diffMs / 3600000);
             const diffDays = Math.floor(diffMs / 86400000);
-            
+
             if (diffMins < 1) return 'Proprio ora';
             if (diffMins < 60) return `${diffMins} min fa`;
             if (diffHours < 24) return `${diffHours} ore fa`;
             if (diffDays < 7) return `${diffDays} giorni fa`;
-            
+
             return date.toLocaleDateString('it-IT');
         },
-        
+
         executeActivityAction(action, activity) {
             console.log('Executing action:', action, 'on activity:', activity);
             // Implementation for activity actions
         }
     }));
-    
+
     // Context Actions Component
     Alpine.data("contextActions", () => ({
         activeTab: 'overview',
@@ -1117,7 +1117,7 @@ document.addEventListener("alpine:init", () => {
         confirmModalTitle: '',
         confirmModalMessage: '',
         pendingAction: null,
-        
+
         init() {
             try {
                 // Get active tab from parent component
@@ -1128,7 +1128,7 @@ document.addEventListener("alpine:init", () => {
                 this.activeTab = 'overview'; // Fallback
             }
         },
-        
+
         getContextTitle() {
             const titles = {
                 'overview': 'Dashboard Panoramica',
@@ -1137,7 +1137,7 @@ document.addEventListener("alpine:init", () => {
             };
             return titles[this.activeTab] || 'Dashboard';
         },
-        
+
         getContextDescription() {
             const descriptions = {
                 'overview': 'Gestione completa dei siti archeologici e attività',
@@ -1146,7 +1146,7 @@ document.addEventListener("alpine:init", () => {
             };
             return descriptions[this.activeTab] || '';
         },
-        
+
         getContextActions() {
             const actions = {
                 'overview': [
@@ -1214,13 +1214,13 @@ document.addEventListener("alpine:init", () => {
             };
             return actions[this.activeTab] || [];
         },
-        
+
         getActionButtonClass(action) {
             return action.class || 'bg-gray-600 text-white hover:bg-gray-700';
         },
-        
+
         executeContextAction(action) {
-            switch(action.id) {
+            switch (action.id) {
                 case 'refresh':
                     this.refreshCurrentTab();
                     break;
@@ -1249,18 +1249,18 @@ document.addEventListener("alpine:init", () => {
                     console.log('Unknown action:', action);
             }
         },
-        
+
         refreshCurrentTab() {
             const parentData = Alpine.store('unifiedDashboard');
             if (parentData) {
                 parentData.refreshOverviewData();
             }
         },
-        
+
         navigateToNewSite() {
             window.location.href = '/sites/create';
         },
-        
+
         navigateToNewGiornale() {
             const parentData = Alpine.store('unifiedDashboard');
             if (parentData?.giornaleSites?.length > 0) {
@@ -1269,15 +1269,15 @@ document.addEventListener("alpine:init", () => {
                 this.showError('Nessun sito disponibile per creare un giornale');
             }
         },
-        
+
         navigateToOperators() {
             window.location.href = '/giornale-cantiere/operatori';
         },
-        
+
         navigateToReports() {
             window.location.href = '/giornale-cantiere/reports';
         },
-        
+
         navigateToUpload() {
             const parentData = Alpine.store('unifiedDashboard');
             if (parentData?.sitesData?.length > 0) {
@@ -1286,42 +1286,42 @@ document.addEventListener("alpine:init", () => {
                 this.showError('Nessun sito disponibile per caricare documenti');
             }
         },
-        
+
         showGenerateReportModal() {
             this.confirmModalTitle = 'Genera Report';
             this.confirmModalMessage = 'Sei sicuro di voler generare un report dettagliato? Questa operazione potrebbe richiedere alcuni minuti.';
             this.pendingAction = 'generate-report';
             this.showConfirmModal = true;
         },
-        
+
         exportData() {
             this.confirmModalTitle = 'Esporta Dati';
             this.confirmModalMessage = 'Sei sicuro di voler esportare tutti i dati del sistema? Verrà scaricato un file CSV con tutte le informazioni.';
             this.pendingAction = 'export-data';
             this.showConfirmModal = true;
         },
-        
+
         confirmAction() {
             if (this.pendingAction === 'generate-report') {
                 this.generateReport();
             } else if (this.pendingAction === 'export-data') {
                 this.performDataExport();
             }
-            
+
             this.showConfirmModal = false;
             this.pendingAction = null;
         },
-        
+
         generateReport() {
             console.log('Generating report...');
             // Implementation for report generation
         },
-        
+
         performDataExport() {
             console.log('Exporting data...');
             // Implementation for data export
         },
-        
+
         showError(message) {
             console.error(message);
             // Use parent component's error handling if available

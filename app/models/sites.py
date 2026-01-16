@@ -142,16 +142,8 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
     unita_stratigrafiche = relationship("UnitaStratigrafica", back_populates="site", cascade="all, delete-orphan")
     unita_stratigrafiche_murarie = relationship("UnitaStratigraficaMuraria", back_populates="site",
                                                 cascade="all, delete-orphan")
-    unita_stratigrafiche_complete = relationship("UnitaStratigraficaCompleta", back_populates="site", cascade="all, delete-orphan")
 
-    # Tombe e sepolture
-    schede_tombe = relationship("SchedaTomba", back_populates="site", cascade="all, delete-orphan")
 
-    # Inventario reperti
-    inventario_reperti = relationship("InventarioReperto", back_populates="site", cascade="all, delete-orphan")
-
-    # Campioni scientifici
-    campioni_scientifici = relationship("CampioneScientifico", back_populates="site", cascade="all, delete-orphan")
 
     # === DOCUMENTAZIONE ===
     # File e foto
@@ -289,9 +281,7 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
             'location': self.display_location,
             'period': self.historical_period,
             'us_count': self.get_total_us_count(),
-            'tomb_count': len(self.schede_tombe),
-            'artifact_count': len(self.inventario_reperti),
-            'photo_count': len(self.photos),
+
             'storage_usage_pct': self.get_storage_usage_percentage(),
             'has_coordinates': self.has_coordinates(),
             'created_at': self.created_at,

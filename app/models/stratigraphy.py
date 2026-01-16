@@ -301,8 +301,7 @@ class UnitaStratigrafica(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     )
     
     # Campioni e reperti associati
-    campioni = relationship("CampioneScientifico", back_populates="unita_stratigrafica")
-    reperti = relationship("InventarioReperto", back_populates="unita_stratigrafica") 
+ 
     
     # Indici per performance e integrità
     __table_args__ = (
@@ -502,7 +501,7 @@ class UnitaStratigraficaMuraria(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     )
     
     # Campioni associati
-    campioni = relationship("CampioneScientifico", back_populates="unita_stratigrafica_muraria")
+
     
     # Indici
     __table_args__ = (

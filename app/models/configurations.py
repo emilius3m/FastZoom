@@ -55,9 +55,7 @@ class TipoElencoEnum(str, PyEnum):
     TAVOLE = "tavole"
     FOTO = "foto"
     US = "us"
-    TOMBE = "tombe"
-    REPERTI = "reperti" 
-    CAMPIONI = "campioni"
+
     CASSE = "casse"
     DOCUMENTI = "documenti"
 
@@ -84,9 +82,7 @@ class ConfigurazioneExport(Base, SiteMixin, UserMixin):
     # Cosa includere nell'export
     includi_us = Column(Boolean, default=True)
     includi_usm = Column(Boolean, default=True)
-    includi_tombe = Column(Boolean, default=True)
-    includi_reperti = Column(Boolean, default=True)
-    includi_campioni = Column(Boolean, default=True)
+
     includi_foto = Column(Boolean, default=True)
     includi_documenti = Column(Boolean, default=True)
     includi_tavole = Column(Boolean, default=True)
@@ -108,7 +104,7 @@ class ConfigurazioneExport(Base, SiteMixin, UserMixin):
     
     # Configurazioni specifiche campi
     campi_us = Column(JSON, default=dict)                          # Campi US da includere
-    campi_reperti = Column(JSON, default=dict)                     # Campi reperti da includere
+
     campi_personalizzati = Column(JSON, default=dict)              # Mapping campi custom
     
     # ===== METADATI CONSEGNA =====
@@ -144,7 +140,7 @@ class ConfigurazioneExport(Base, SiteMixin, UserMixin):
         """Restituisce mapping campi inclusi per tipo"""
         return {
             'us': list(self.campi_us.keys()) if self.campi_us else [],
-            'reperti': list(self.campi_reperti.keys()) if self.campi_reperti else [],
+
             'personalizzati': list(self.campi_personalizzati.keys()) if self.campi_personalizzati else []
         }
 
@@ -200,9 +196,7 @@ class RelazioneFinaleScavo(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     # ===== ALLEGATI =====
     # Riferimenti agli allegati (ID di altri record)
     elenco_us = Column(JSON, default=list)                         # ID US incluse
-    elenco_tombe = Column(JSON, default=list)                      # ID Tombe incluse
-    elenco_reperti = Column(JSON, default=list)                    # ID Reperti inclusi
-    elenco_campioni = Column(JSON, default=list)                   # ID Campioni inclusi
+
     elenco_foto = Column(JSON, default=list)                       # ID Foto incluse
     elenco_tavole = Column(JSON, default=list)                     # ID Tavole incluse
     
@@ -266,9 +260,7 @@ class RelazioneFinaleScavo(Base, SiteMixin, UserMixin, SoftDeleteMixin):
         """Conteggi allegati per tipo"""
         return {
             'us': len(self.elenco_us) if self.elenco_us else 0,
-            'tombe': len(self.elenco_tombe) if self.elenco_tombe else 0,
-            'reperti': len(self.elenco_reperti) if self.elenco_reperti else 0,
-            'campioni': len(self.elenco_campioni) if self.elenco_campioni else 0,
+
             'foto': len(self.elenco_foto) if self.elenco_foto else 0,
             'tavole': len(self.elenco_tavole) if self.elenco_tavole else 0
         }
@@ -301,21 +293,7 @@ TEMPLATE_ELENCHI = {
         'campi': ['us_code', 'definizione', 'datazione', 'periodo', 'stato_conservazione', 'interpretazione'],
         'descrizione': 'Elenco completo delle US documentate'
     },
-    'tombe': {
-        'nome': 'Elenco Sepolture',
-        'campi': ['numero_tomba', 'tipo_tomba', 'orientamento', 'sesso', 'eta', 'corredo', 'datazione'],
-        'descrizione': 'Catalogo delle sepolture indagate'
-    },
-    'reperti': {
-        'nome': 'Inventario Reperti',
-        'campi': ['numero_inventario', 'categoria', 'materiale', 'descrizione', 'provenienza', 'datazione', 'stato_conservazione'],
-        'descrizione': 'Inventario completo dei materiali archeologici'
-    },
-    'campioni': {
-        'nome': 'Elenco Campioni Scientifici',
-        'campi': ['numero_campione', 'tipo_campione', 'provenienza', 'data_prelievo', 'laboratorio', 'risultati'],
-        'descrizione': 'Registro dei campioni per analisi scientifiche'
-    }
+
 }
 
 
@@ -421,8 +399,7 @@ def valida_configurazione_export(config: ConfigurazioneExport) -> Dict[str, Any]
     
     # Valida che almeno un tipo contenuto sia selezionato
     contenuti_selezionati = [
-        config.includi_us, config.includi_usm, config.includi_tombe,
-        config.includi_reperti, config.includi_campioni, config.includi_foto,
+        config.includi_foto,
         config.includi_documenti, config.includi_tavole
     ]
     

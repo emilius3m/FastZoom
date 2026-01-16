@@ -31,9 +31,8 @@ from app.models import User, UserSitePermission, Photo, Document, UserActivity
 from app.models.sites import ArchaeologicalSite
 from app.models.user_profiles import UserProfile
 from app.models.giornale_cantiere import GiornaleCantiere
-from app.models.archeologia_avanzata import UnitaStratigraficaCompleta
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
-from app.models.archaeological_records import SchedaTomba, InventarioReperto, CampioneScientifico
+
 from app.models.form_schemas import FormSchema
 
 
