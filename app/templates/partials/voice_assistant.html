@@ -1,172 +1,139 @@
-<!-- Voice Assistant Panel Component -->
-<!-- Include this partial in auth_navigation.html or a main layout -->
+<!-- Voice Assistant Compact Navbar Component -->
+<!-- Integrated in navbar, non-intrusive, expandable dropdown -->
 
-<div x-data="voiceAssistant()" x-cloak class="relative">
+<div x-data="voiceAssistant()" x-cloak class="relative" x-init="init()">
 
-    <!-- Toggle Button (for navbar) -->
-    <button @click="toggle()" type="button"
-        class="p-2 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 transition-colors"
-        :class="{ 'text-blue-600 dark:text-blue-400': isOpen || isListening }" title="Assistente Vocale (Ctrl+Shift+V)">
-        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-            <path fill-rule="evenodd"
-                d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"
-                clip-rule="evenodd"></path>
-        </svg>
-        <!-- Status indicator -->
-        <span x-show="isListening"
-            class="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-800 animate-pulse"></span>
-    </button>
+    <!-- Compact Navbar Widget -->
+    <div class="flex items-center gap-2">
 
-    <!-- Voice Assistant Panel (slide-out) -->
+        <!-- Mic Button with Status -->
+        <button @click="toggleListening(); if(!isConnected) connect()" :class="{
+                    'bg-red-500 hover:bg-red-600 text-white': isListening,
+                    'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300': !isListening && isConnected,
+                    'bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-400': !isListening && !isConnected
+                }" class="relative flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all"
+            title="Assistente Vocale (Ctrl+Shift+V)">
+
+            <!-- Mic Icon -->
+            <svg class="w-4 h-4" :class="{ 'animate-pulse': isListening }" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                    d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"
+                    clip-rule="evenodd"></path>
+            </svg>
+
+            <!-- Status Text (compact) -->
+            <span x-show="isListening || transcript" class="max-w-32 truncate text-xs"
+                x-text="isListening ? (transcript || 'Ascoltando...') : ''"></span>
+
+            <!-- Recording indicator -->
+            <span x-show="isListening" class="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+        </button>
+
+        <!-- Expand/Collapse Button -->
+        <button @click="isOpen = !isOpen" x-show="messages.length > 0 || response"
+            class="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded transition-colors"
+            title="Mostra cronologia">
+            <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': isOpen }" fill="none"
+                stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Last Response Preview (inline, non-blocking) -->
+    <div x-show="response && !isOpen" x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+        class="absolute top-full right-0 mt-2 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-w-xs z-50">
+        <p class="text-xs text-gray-600 dark:text-gray-300 truncate" x-text="response"></p>
+    </div>
+
+    <!-- Expandable Dropdown Panel -->
     <div x-show="isOpen" x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0 translate-x-full" x-transition:enter-end="opacity-100 translate-x-0"
-        x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-x-0"
-        x-transition:leave-end="opacity-0 translate-x-full"
-        class="fixed inset-y-0 right-0 z-50 w-96 max-w-full bg-white dark:bg-gray-800 shadow-xl border-l border-gray-200 dark:border-gray-700 flex flex-col"
-        @keydown.escape.window="close()">
+        x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+        x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+        x-transition:leave-end="opacity-0 scale-95 -translate-y-2" @click.outside="isOpen = false"
+        @keydown.escape.window="isOpen = false"
+        class="absolute top-full right-0 mt-2 w-80 max-h-96 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 flex flex-col overflow-hidden">
 
         <!-- Header -->
         <div
-            class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-indigo-600">
-            <div class="flex items-center gap-3">
-                <span class="text-2xl" x-text="statusIcon"></span>
-                <div>
-                    <h3 class="text-lg font-semibold text-white">Assistente Vocale</h3>
-                    <p class="text-xs text-blue-100" x-text="statusMessage"></p>
-                </div>
+            class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+            <div class="flex items-center gap-2">
+                <span class="text-lg" x-text="statusIcon"></span>
+                <span class="text-xs text-gray-500 dark:text-gray-400" x-text="statusMessage"></span>
             </div>
-            <button @click="close()"
-                class="p-1 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
-                    </path>
-                </svg>
-            </button>
-        </div>
-
-        <!-- Messages Container -->
-        <div x-ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4">
-
-            <!-- Empty State -->
-            <template x-if="messages.length === 0">
-                <div
-                    class="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400 space-y-4">
-                    <svg class="w-16 h-16 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                            d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z">
-                        </path>
-                    </svg>
-                    <div>
-                        <p class="font-medium">Parla con me!</p>
-                        <p class="text-sm mt-1">Premi il pulsante microfono<br>o scrivi un messaggio</p>
-                    </div>
-                    <div class="text-xs space-y-1">
-                        <p>🔍 "Cerca foto del sito..."</p>
-                        <p>📊 "Quante foto questa settimana?"</p>
-                        <p>📝 "Crea nuovo giornale"</p>
-                    </div>
-                </div>
-            </template>
-
-            <!-- Messages -->
-            <template x-for="msg in messages" :key="msg.id">
-                <div :class="{
-                    'flex justify-end': msg.role === 'user',
-                    'flex justify-start': msg.role !== 'user'
-                }">
-                    <div :class="{
-                        'bg-blue-600 text-white': msg.role === 'user',
-                        'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white': msg.role === 'assistant',
-                        'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300': msg.type === 'error'
-                    }" class="max-w-[80%] px-4 py-2 rounded-2xl">
-                        <p class="text-sm" x-text="msg.text"></p>
-                        <p class="text-xs opacity-60 mt-1" x-text="msg.timestamp"></p>
-                    </div>
-                </div>
-            </template>
-
-            <!-- Processing indicator -->
-            <div x-show="isProcessing" class="flex justify-start">
-                <div class="bg-gray-100 dark:bg-gray-700 px-4 py-2 rounded-2xl">
-                    <div class="flex space-x-1">
-                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
-                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms">
-                        </div>
-                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Input Area -->
-        <div class="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900">
-            <!-- Text Input -->
-            <div class="flex items-center gap-2 mb-3">
-                <input type="text" x-model="transcript" @keydown.enter="sendText(transcript); transcript = ''"
-                    placeholder="Scrivi un messaggio..."
-                    class="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white">
-                <button @click="sendText(transcript); transcript = ''" :disabled="!isConnected || !transcript.trim()"
-                    class="p-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                    </svg>
-                </button>
-            </div>
-
-            <!-- Voice Controls -->
-            <div class="flex items-center justify-center gap-4">
-                <button @click="toggleListening()" :class="{
-                            'bg-red-500 hover:bg-red-600 scale-110': isListening,
-                            'bg-blue-600 hover:bg-blue-700': !isListening
-                        }" class="p-4 text-white rounded-full shadow-lg transition-all transform hover:scale-105">
-                    <svg x-show="!isListening" class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd"
-                            d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"
-                            clip-rule="evenodd"></path>
-                    </svg>
-                    <svg x-show="isListening" class="w-6 h-6 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 002 0V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 002 0V8a1 1 0 00-1-1z"
-                            clip-rule="evenodd"></path>
-                    </svg>
-                </button>
-
-                <!-- Download Recording -->
+            <div class="flex items-center gap-1">
+                <!-- Download -->
                 <button @click="downloadRecording()" x-show="hasRecording"
-                    class="p-2 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 transition-colors"
+                    class="p-1 text-green-600 hover:text-green-700 dark:text-green-400 rounded"
                     title="Scarica registrazione">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                     </svg>
                 </button>
-
-                <button @click="clearMessages(); clearRecording()" :disabled="messages.length === 0 && !hasRecording"
-                    class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    title="Cancella cronologia">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- Clear -->
+                <button @click="clearMessages(); clearRecording()" :disabled="messages.length === 0"
+                    class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 disabled:opacity-50 rounded"
+                    title="Cancella">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
                         </path>
                     </svg>
                 </button>
             </div>
-
-            <!-- Keyboard shortcut hint -->
-            <p class="text-xs text-center text-gray-400 dark:text-gray-500 mt-3">
-                <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Ctrl</kbd> +
-                <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Shift</kbd> +
-                <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">V</kbd>
-            </p>
         </div>
-    </div>
 
-    <!-- Backdrop -->
-    <div x-show="isOpen" x-transition:enter="transition-opacity ease-out duration-200"
-        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-50"
-        x-transition:leave="transition-opacity ease-in duration-150" x-transition:leave-start="opacity-50"
-        x-transition:leave-end="opacity-0" @click="close()" class="fixed inset-0 z-40 bg-black/50 lg:hidden">
+        <!-- Messages -->
+        <div x-ref="messagesContainer" class="flex-1 overflow-y-auto p-3 space-y-2 max-h-60">
+            <!-- Empty State -->
+            <template x-if="messages.length === 0">
+                <div class="text-center text-gray-400 dark:text-gray-500 py-4">
+                    <p class="text-xs">Premi il microfono e parla</p>
+                    <p class="text-xs mt-1">Es: "Vai alle foto", "Nuovo giornale"</p>
+                </div>
+            </template>
+
+            <!-- Message list -->
+            <template x-for="msg in messages" :key="msg.id">
+                <div :class="{ 'text-right': msg.role === 'user' }">
+                    <div :class="{
+                            'bg-blue-600 text-white': msg.role === 'user',
+                            'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white': msg.role === 'assistant'
+                        }" class="inline-block px-3 py-1.5 rounded-xl text-xs max-w-[85%]">
+                        <span x-text="msg.text"></span>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Processing -->
+            <div x-show="isProcessing" class="flex gap-1 px-2">
+                <div class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                <div class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                <div class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="border-t border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-900">
+            <div class="flex items-center gap-2">
+                <input type="text" x-model="transcript" @keydown.enter="sendText(transcript); transcript = ''"
+                    placeholder="Scrivi un comando..."
+                    class="flex-1 px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 dark:text-white">
+                <button @click="sendText(transcript); transcript = ''" :disabled="!isConnected || !transcript.trim()"
+                    class="p-1.5 text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
     </div>
 </div>

@@ -657,17 +657,15 @@
 
             // Data
             cantieri: {{ cantieri | tojson | safe }},
+            // Statistics
+            stats: {{ stats | tojson | safe }},
 
-
-    // Statistics
-    stats: {{ stats | tojson | safe }},
-
-    // Filters
-    filters: {
-            search: '',
-            stato: '',
-            sortBy: 'nome'
-    },
+            // Filters
+            filters: {
+                search: '',
+                stato: '',
+                sortBy: 'nome'
+            },
 
     // Modal
     modal: {

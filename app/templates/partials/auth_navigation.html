@@ -26,6 +26,9 @@
 
     <!-- Right side: Site selector + Notifications + User menu -->
     <div class="flex items-center lg:order-2">
+      <!-- Voice Assistant (compatto navbar) -->
+      {% include 'partials/voice_assistant.html' %}
+
       <!-- Site selector (sempre visibile se c'è almeno un sito) -->
       {% if sites_count is defined and sites_count > 0 %}
       <div class="me-8 hidden sm:block">
@@ -70,9 +73,6 @@
           <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
         </svg>
       </button>
-
-      <!-- Voice Assistant -->
-      {% include 'partials/voice_assistant.html' %}
 
       <!-- Notifications -->
       <button type="button" data-dropdown-toggle="notification-dropdown"
