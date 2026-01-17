@@ -223,8 +223,8 @@ def _extract_error_detail(response: httpx.Response) -> str:
 # URL mappings for navigation tools
 NAVIGATION_URL_MAP: Dict[str, str] = {
     "nav_goto_sites": "/",
-    "nav_goto_giornale": "/giornale",
-    "nav_goto_cantieri": "/cantieri",
+    # "nav_goto_giornale" handled dynamically
+    # "nav_goto_cantieri" handled dynamically
     "nav_goto_analisi": "/analisi",
     "nav_refresh": "/_refresh",
     "nav_go_back": "/_back",
@@ -255,6 +255,22 @@ def _handle_navigation_tool(
                 ),
             ]
         )
+    
+    # Dynamic navigation (Global or Site-specific)
+    if operation_id in ("nav_goto_giornale", "nav_goto_cantieri"):
+        nav_site_id = args.get("site_id") or (str(site_id) if site_id else None)
+        if nav_site_id:
+            return VoiceCommandResult(
+                success=True,
+                message="Navigazione ai cantieri del sito",
+                ui_actions=[UIAction(action=UIActionType.NAVIGATE, url=f"/view/{nav_site_id}/cantieri")]
+            )
+        else:
+             return VoiceCommandResult(
+                success=True,
+                message="Navigazione ai report dei giornali",
+                ui_actions=[UIAction(action=UIActionType.NAVIGATE, url="/giornale-cantiere/reports")]
+            )
     
     # Site-scoped navigation (photos, us, harris, documents, dashboard)
     if operation_id in ("nav_goto_photos", "nav_goto_us", "nav_goto_harris", 

@@ -27,6 +27,7 @@ class UIActionType(str, Enum):
     TOAST = "toast"             # Show a toast notification
     OPEN_MODAL = "open_modal"   # Open a modal by name
     CLOSE_MODAL = "close_modal" # Close current modal
+    SEARCH_NAVIGATE = "search_navigate" # Search and navigate to site
 
 
 class ToastLevel(str, Enum):

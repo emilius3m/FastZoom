@@ -140,8 +140,18 @@ def _build_voice_system_prompt(tool_descriptions: list, site_id: Optional[str]) 
     nav_tools = [t for t in tool_descriptions if t['name'].startswith('nav_')]
     api_tools = [t for t in tool_descriptions if not t['name'].startswith('nav_')][:20]
     
-    nav_list = "\n".join([f"  - {t['name']}: {t['description']}" for t in nav_tools])
-    api_list = "\n".join([f"  - {t['name']}: {t['description']}" for t in api_tools])
+    # Helper to format tool string
+    def fmt(t):
+        base = f"  - {t['name']}: {t['description']}"
+        params = t.get('parameters', {})
+        if params:
+            # Flatten params for concise prompt
+            p_list = [f"{k}" for k, v in params.items()]
+            base += f" (richiede: {', '.join(p_list)})"
+        return base
+
+    nav_list = "\n".join([fmt(t) for t in nav_tools])
+    api_list = "\n".join([fmt(t) for t in api_tools])
     
     return f"""Sei un INTERPRETE DI COMANDI per FastZoom. Traduci comandi vocali in JSON strutturato.
 

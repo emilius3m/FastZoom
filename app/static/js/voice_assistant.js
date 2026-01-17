@@ -324,13 +324,14 @@ document.addEventListener('alpine:init', () => {
                                     if (data.sites && data.sites.length > 0) {
                                         // Filter client-side since API doesn't support search param
                                         const site = data.sites.find(s =>
-                                            s.name.toLowerCase().includes(siteName.toLowerCase()) ||
-                                            s.description?.toLowerCase().includes(siteName.toLowerCase())
+                                            (s.name && s.name.toLowerCase().includes(siteName.toLowerCase())) ||
+                                            (s.description && s.description.toLowerCase().includes(siteName.toLowerCase()) ||
+                                                (s.site_name && s.site_name.toLowerCase().includes(siteName.toLowerCase())))
                                         );
 
                                         if (site) {
-                                            console.log(`✅ Found site via API, navigating to: /view/${site.site_id}/dashboard`);
-                                            window.location.href = `/view/${site.site_id}/dashboard`;
+                                            console.log(`✅ Found site via API, navigating to: /view/${site.site_id}/dashboard/`);
+                                            window.location.href = `/view/${site.site_id}/dashboard/`;
                                         } else {
                                             this.addMessage('system', `Sito "${siteName}" non trovato`, 'error');
                                         }
