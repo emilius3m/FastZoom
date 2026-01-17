@@ -293,7 +293,6 @@ async def execute_planned_command(
 @router.get("/tools")
 async def list_voice_tools(
     category: Optional[str] = None,
-    current_user: User = Depends(get_current_active_user),
 ):
     """
     List available voice command tools.
@@ -346,32 +345,60 @@ def _extract_auth_token(request: Request) -> str:
 def _build_planning_system_prompt(tool_descriptions: list, context: dict) -> str:
     """Build system prompt for command planning."""
     
-    # Format tool list
-    tool_list = "\n".join([
+    # Format tool list - include navigation tools prominently
+    nav_tools = [t for t in tool_descriptions if t['name'].startswith('nav_')]
+    api_tools = [t for t in tool_descriptions if not t['name'].startswith('nav_')][:25]
+    
+    nav_tool_list = "\n".join([
         f"- {t['name']}: {t['description']}"
-        for t in tool_descriptions[:30]  # Limit to avoid token overflow
+        for t in nav_tools
     ])
     
-    site_context = f"Site ID: {context.get('site_id', 'nessuno')}"
-    page_context = f"Current page: {context.get('current_page', 'unknown')}"
+    api_tool_list = "\n".join([
+        f"- {t['name']}: {t['description']}"
+        for t in api_tools
+    ])
     
-    return f"""Sei un interprete di comandi vocali per FastZoom, un sistema di documentazione archeologica.
+    site_context = context.get('site_id', None)
+    page_context = context.get('current_page', 'unknown')
+    
+    return f"""Sei un INTERPRETE DI COMANDI per FastZoom. Il tuo UNICO compito è tradurre comandi vocali in function calls.
 
-CONTESTO:
-{site_context}
-{page_context}
+⚠️ REGOLE ASSOLUTE:
+1. NON rispondere MAI con testo libero
+2. NON usare MAI la tua conoscenza - USA SOLO I TOOLS ELENCATI
+3. OGNI risposta DEVE essere una function call
+4. Se l'utente chiede dati, USA IL TOOL API appropriato
 
-STRUMENTI DISPONIBILI:
-{tool_list}
+CONTESTO ATTUALE:
+- Sito selezionato: {site_context or 'NESSUNO (dashboard globale)'}
+- Pagina corrente: {page_context}
 
-ISTRUZIONI:
-1. Interpreta il comando dell'utente in italiano
-2. Se l'utente vuole navigare, usa intent="ui_action"
-3. Se l'utente vuole dati, usa intent="api_call" con il tool appropriato
-4. Se non capisci, usa intent="clarify"
-5. Rispondi SOLO con la function call, non con testo
+═══════════════════════════════════════════
+COMANDI DI NAVIGAZIONE (usa intent="ui_action"):
+═══════════════════════════════════════════
+{nav_tool_list}
 
-IMPORTANTE: Il campo 'explain' deve essere una breve descrizione in italiano di cosa farai."""
+═══════════════════════════════════════════
+COMANDI API (usa intent="api_call"):
+═══════════════════════════════════════════
+{api_tool_list}
+
+═══════════════════════════════════════════
+MAPPATURA COMANDI COMUNI:
+═══════════════════════════════════════════
+"vai ai siti" → nav_goto_sites
+"mostrami i siti" → v1_get_sites_list
+"quali sono i miei siti" → v1_get_sites_list
+"vai alle foto" → nav_goto_photos (se site_id presente)
+"mostra le foto" → get_site_photos (se site_id presente)
+"vai al giornale" → nav_goto_giornale
+"aggiorna" → nav_refresh
+"torna indietro" → nav_go_back
+
+RISPOSTA OBBLIGATORIA:
+Usa SOLO la function execute_voice_command con i parametri appropriati.
+Il campo 'explain' deve essere una BREVE descrizione dell'azione (max 50 caratteri)."""
 
 
 def _parse_llm_to_command(llm_result: dict, site_id: Optional[str]) -> Optional[VoiceCommand]:

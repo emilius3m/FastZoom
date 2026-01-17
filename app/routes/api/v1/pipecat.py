@@ -19,15 +19,15 @@ from app.services.pipecat_functions import register_all_handlers
 from app.database.security import get_current_active_user
 from app.database.db import get_async_session
 from app.models.users import User
-from app.services.voice_db_functions import VOICE_FUNCTIONS, execute_voice_db_function
-from app.services.voice_commands import parse_voice_command
-# New structured voice command imports
+# Structured voice command system
 from app.services.voice_tools_registry import (
     get_tool_descriptions_for_llm,
     is_tool_whitelisted,
     get_tool,
     validate_tool_args,
     log_voice_execution,
+    NAVIGATION_TOOLS,
+    ToolCategory,
 )
 from app.schemas.voice_commands import (
     VoiceCommand,
@@ -37,6 +37,7 @@ from app.schemas.voice_commands import (
     UIAction,
     UIActionType,
 )
+from app.services.voice_execute import execute_voice_command, _handle_navigation_tool
 
 
 router = APIRouter(prefix="/pipecat", tags=["Voice Assistant"])
@@ -130,6 +131,173 @@ async def execute_function(
     )
 
 
+def _build_voice_system_prompt(tool_descriptions: list, site_id: Optional[str]) -> str:
+    """
+    Build the system prompt for voice command interpretation.
+    Forces the LLM to use tools instead of responding with text.
+    """
+    # Separate navigation and API tools
+    nav_tools = [t for t in tool_descriptions if t['name'].startswith('nav_')]
+    api_tools = [t for t in tool_descriptions if not t['name'].startswith('nav_')][:20]
+    
+    nav_list = "\n".join([f"  - {t['name']}: {t['description']}" for t in nav_tools])
+    api_list = "\n".join([f"  - {t['name']}: {t['description']}" for t in api_tools])
+    
+    return f"""Sei un INTERPRETE DI COMANDI per FastZoom. Traduci comandi vocali in JSON strutturato.
+
+⚠️ REGOLE:
+1. NON rispondere MAI con testo libero o con la tua conoscenza
+2. OGNI risposta DEVE essere un JSON strutturato
+3. Se l'utente chiede dati dell'app, USA il tool appropriato
+
+CONTESTO: Sito ID = {site_id or 'NESSUNO'}
+
+NAVIGAZIONE (action_type: "navigate"):
+{nav_list}
+
+API (action_type: "api_call"):
+{api_list}
+
+MAPPATURA COMANDI:
+"vai ai siti" / "mostrami i siti" → {{"action_type": "navigate", "tool": "nav_goto_sites"}}
+"vai alle foto" → {{"action_type": "navigate", "tool": "nav_goto_photos"}}
+"vai al giornale" → {{"action_type": "navigate", "tool": "nav_goto_giornale"}}
+"lista siti" / "quali siti ci sono" → {{"action_type": "api_call", "tool": "v1_get_sites_list"}}
+"aggiorna" → {{"action_type": "navigate", "tool": "nav_refresh"}}
+"torna indietro" → {{"action_type": "navigate", "tool": "nav_go_back"}}
+
+FORMATO RISPOSTA (obbligatorio):
+{{"action_type": "navigate"|"api_call", "tool": "tool_name", "args": {{}}, "explain": "breve descrizione"}}"""
+
+
+async def _process_voice_input(
+    websocket: WebSocket,
+    llm,
+    messages_history: list,
+    text: str,
+    site_id: Optional[str]
+) -> None:
+    """
+    Process voice/text input using the structured command system.
+    
+    1. Send input to LLM with structured system prompt
+    2. Parse JSON response to get tool/action
+    3. Execute navigation or API call
+    4. Send result back to frontend
+    """
+    import re
+    
+    messages_history.append({"role": "user", "content": text})
+    await websocket.send_json({"type": "status", "text": "Elaborazione..."})
+    
+    try:
+        # Get LLM response (should be JSON)
+        response_text = await llm.simple_chat(messages_history)
+        
+        # Try to parse JSON from response
+        command = _parse_llm_json_response(response_text)
+        
+        if command:
+            action_type = command.get("action_type")
+            tool_name = command.get("tool")
+            args = command.get("args", {})
+            explain = command.get("explain", "Comando eseguito")
+            
+            # Add site_id to args if needed
+            if site_id and "site_id" not in args:
+                args["site_id"] = site_id
+            
+            if action_type == "navigate" and tool_name:
+                # Handle navigation
+                tool = get_tool(tool_name)
+                if tool and tool.category == ToolCategory.NAVIGATION:
+                    result = _handle_navigation_tool(tool, args, UUID(site_id) if site_id else None)
+                    
+                    # Send UI action to frontend
+                    if result.ui_actions:
+                        for ui_action in result.ui_actions:
+                            await websocket.send_json({
+                                "type": "command",
+                                "action": ui_action.action.value,
+                                "url": ui_action.url,
+                                "message": ui_action.message
+                            })
+                    
+                    await websocket.send_json({
+                        "type": "response",
+                        "text": result.message or explain
+                    })
+                else:
+                    await websocket.send_json({
+                        "type": "response", 
+                        "text": f"Navigazione: {explain}"
+                    })
+            
+            elif action_type == "api_call" and tool_name:
+                # Handle API call via execute_voice_command
+                if is_tool_whitelisted(tool_name):
+                    voice_cmd = VoiceCommand(
+                        intent=CommandIntent.API_CALL,
+                        tool=tool_name,
+                        args=args,
+                        explain=explain
+                    )
+                    
+                    # Note: For now, just describe what we would do
+                    # Full execution requires auth token which we don't have in WS
+                    await websocket.send_json({
+                        "type": "response",
+                        "text": f"Comando: {explain} (usa HTTP /voice/execute per eseguire)"
+                    })
+                else:
+                    await websocket.send_json({
+                        "type": "response",
+                        "text": f"Tool non disponibile: {tool_name}"
+                    })
+            else:
+                # Unknown action, send explanation
+                await websocket.send_json({
+                    "type": "response",
+                    "text": explain or response_text[:200]
+                })
+        else:
+            # Could not parse JSON, send raw response
+            messages_history.append({"role": "assistant", "content": response_text})
+            await websocket.send_json({
+                "type": "response",
+                "text": response_text
+            })
+            
+    except Exception as e:
+        logger.error(f"Voice input processing error: {e}")
+        await websocket.send_json({
+            "type": "response",
+            "text": f"Errore: {str(e)}"
+        })
+
+
+def _parse_llm_json_response(response: str) -> Optional[dict]:
+    """Try to extract JSON from LLM response."""
+    import re
+    import json as json_lib
+    
+    # Try direct JSON parse
+    try:
+        return json_lib.loads(response.strip())
+    except:
+        pass
+    
+    # Try to find JSON in response
+    json_match = re.search(r'\{[^{}]*\}', response)
+    if json_match:
+        try:
+            return json_lib.loads(json_match.group())
+        except:
+            pass
+    
+    return None
+
+
 @router.websocket("/stream")
 async def voice_stream(
     websocket: WebSocket,
@@ -194,8 +362,9 @@ async def voice_stream(
             "message": "Assistente Locale Pronto (Whisper/Ollama)"
         })
         
-        # Message history for LLM context
-        messages_history = [{"role": "system", "content": "Sei un assistente utile per FastZoom, un sistema di documentazione archeologica. Rispondi in italiano in modo conciso."}]
+        # Build structured system prompt for function calling
+        tool_descriptions = get_tool_descriptions_for_llm()
+        messages_history = [{"role": "system", "content": _build_voice_system_prompt(tool_descriptions, current_site_id)}]
         
         while True:
             try:
@@ -220,59 +389,11 @@ async def voice_stream(
                                 "is_final": True
                             })
                             
-                            # Check for voice commands first (with site context)
-                            # parse_voice_command is imported at module level
-                            cmd = parse_voice_command(result.text, current_site_id)
-                            
-                            if cmd["is_command"]:
-                                # Send command to frontend
-                                await websocket.send_json({
-                                    "type": "command",
-                                    "action": cmd["action"],
-                                    "path": cmd.get("path"),
-                                    "target": cmd.get("target"),
-                                    "query": cmd.get("query")
-                                })
-                                # Send response text
-                                await websocket.send_json({
-                                    "type": "response",
-                                    "text": cmd["response"]
-                                })
-                            else:
-                                # Not a command - use LLM with function calling
-                                messages_history.append({"role": "user", "content": result.text})
-                                await websocket.send_json({"type": "status", "text": "Elaborazione..."})
-                                
-                                # Try function calling first if we have site context
-                                if current_site_id:
-                                    llm_result = await llm.chat_with_functions(
-                                        result.text, 
-                                        VOICE_FUNCTIONS
-                                    )
-                                    
-                                    if "function_call" in llm_result:
-                                        # Execute the function
-                                        func_call = llm_result["function_call"]
-                                        async for db in get_async_session():
-                                            func_result = await execute_voice_db_function(
-                                                function_name=func_call["name"],
-                                                parameters=func_call["parameters"],
-                                                db=db,
-                                                site_id=UUID(current_site_id)
-                                            )
-                                            response_text = func_result.get("message", "Nessun risultato")
-                                            break
-                                    else:
-                                        response_text = llm_result.get("response", "")
-                                else:
-                                    # No site context, regular chat
-                                    response_text = await llm.simple_chat(messages_history)
-                                
-                                messages_history.append({"role": "assistant", "content": response_text})
-                                await websocket.send_json({
-                                    "type": "response",
-                                    "text": response_text
-                                })
+                            # Process with new structured command system
+                            await _process_voice_input(
+                                websocket, llm, messages_history, 
+                                result.text, current_site_id
+                            )
                             
                 elif "text" in message:
                     # Handle text commands
@@ -282,62 +403,13 @@ async def voice_stream(
                     if msg_type == "close":
                         break
                     elif msg_type == "text":
-                        # Direct text input - Process exactly like voice
+                        # Direct text input - process with structured commands
                         text = data.get("text", "")
                         if text:
-                            # 1. Try specific voice commands
-                            cmd = parse_voice_command(text, current_site_id)
-                            
-                            if cmd.get("is_command"):
-                                # Execute command
-                                logger.info(f"Executing text command: {cmd}")
-                                await websocket.send_json({
-                                    "type": "command",
-                                    "action": cmd["action"],
-                                    "path": cmd.get("path"),
-                                    "target": cmd.get("target"),
-                                    "query": cmd.get("query")
-                                })
-                                # Send response text
-                                await websocket.send_json({
-                                    "type": "response",
-                                    "text": cmd["response"]
-                                })
-                            else:
-                                # 2. Use LLM with function calling
-                                messages_history.append({"role": "user", "content": text})
-                                await websocket.send_json({"type": "status", "text": "Elaborazione..."})
-                                
-                                # Try function calling first if we have site context
-                                if current_site_id:
-                                    llm_result = await llm.chat_with_functions(
-                                        text, 
-                                        VOICE_FUNCTIONS
-                                    )
-                                    
-                                    if "function_call" in llm_result:
-                                        # Execute the function
-                                        func_call = llm_result["function_call"]
-                                        async for db in get_async_session():
-                                            func_result = await execute_voice_db_function(
-                                                function_name=func_call["name"],
-                                                parameters=func_call["parameters"],
-                                                db=db,
-                                                site_id=UUID(current_site_id)
-                                            )
-                                            response_text = func_result.get("message", "Nessun risultato")
-                                            break
-                                    else:
-                                        response_text = llm_result.get("response", "")
-                                else:
-                                    # No site context, regular chat
-                                    response_text = await llm.simple_chat(messages_history)
-                                
-                                messages_history.append({"role": "assistant", "content": response_text})
-                                await websocket.send_json({
-                                    "type": "response",
-                                    "text": response_text
-                                })
+                            await _process_voice_input(
+                                websocket, llm, messages_history,
+                                text, current_site_id
+                            )
                         
             except WebSocketDisconnect:
                 break
