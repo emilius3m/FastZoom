@@ -216,9 +216,11 @@ async def _process_voice_input(
                     # Send UI action to frontend
                     if result.ui_actions:
                         for ui_action in result.ui_actions:
+                            # Note: action is already a string (use_enum_values=True)
+                            action_str = ui_action.action if isinstance(ui_action.action, str) else ui_action.action.value
                             await websocket.send_json({
                                 "type": "command",
-                                "action": ui_action.action.value,
+                                "action": action_str,
                                 "url": ui_action.url,
                                 "message": ui_action.message
                             })

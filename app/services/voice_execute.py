@@ -241,15 +241,18 @@ def _handle_navigation_tool(
     """
     operation_id = tool.operation_id
     
-    # Special handling for site-specific navigation
+    # Special handling for site-specific navigation (search by name)
     if operation_id == "nav_goto_site":
         site_name = args.get("site_name", "")
         return VoiceCommandResult(
             success=True,
-            message=f"Navigazione al sito: {site_name}",
+            message=f"Cercando e navigando al sito: {site_name}",
+            # Return a custom action that frontend handles
             ui_actions=[
-                UIAction(action=UIActionType.TOAST, message=f"Cercando sito: {site_name}", level="info"),
-                # Frontend will search and navigate
+                UIAction(
+                    action="search_navigate",  # Special action for frontend
+                    message=site_name,  # Site name to search
+                ),
             ]
         )
     

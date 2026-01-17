@@ -263,19 +263,87 @@ document.addEventListener('alpine:init', () => {
          * Execute voice command action
          */
         executeVoiceCommand(data) {
-            const { action, path, target, query } = data;
-            console.log(`Executing: ${action}`, { path, target, query });
+            // Support both 'path' (old) and 'url' (new) formats
+            const action = data.action;
+            const url = data.url || data.path;
+            const target = data.target;
+            const query = data.query;
+            const message = data.message;
+
+            console.log(`🎤 Executing: ${action}`, { url, target, query, message });
 
             switch (action) {
                 case 'navigate':
-                    // Direct path navigation
-                    if (path) {
-                        window.location.href = path;
+                    // Navigation to URL/path
+                    if (url) {
+                        console.log(`🧭 Navigating to: ${url}`);
+                        window.location.href = url;
+                    } else {
+                        console.warn('Navigate action without URL');
                     }
+                    break;
+
+                case 'refresh':
+                    // Refresh current page
+                    console.log('🔄 Refreshing page');
+                    window.location.reload();
                     break;
 
                 case 'go_back':
                     window.history.back();
+                    break;
+
+                case 'search_navigate':
+                    // Search for site by name and navigate
+                    const siteName = message || target;
+                    if (siteName) {
+                        console.log(`🔍 Searching for site: ${siteName}`);
+                        // Find matching site card on page
+                        const siteCards = document.querySelectorAll('.site-card, [data-site-name], h2, h3');
+                        let found = false;
+                        for (const card of siteCards) {
+                            const text = card.textContent?.toLowerCase() || '';
+                            if (text.includes(siteName.toLowerCase())) {
+                                // Found! Try to click or get the link
+                                const link = card.closest('a') || card.querySelector('a') || card.parentElement?.querySelector('a');
+                                if (link?.href) {
+                                    console.log(`✅ Found site, navigating to: ${link.href}`);
+                                    window.location.href = link.href;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!found) {
+                            // Fallback: search via API
+                            console.log('Site not found on page, trying API...');
+                            // API endpoint for sites list is /api/v1/unified/dashboard/sites/list
+                            fetch('/api/v1/unified/dashboard/sites/list')
+                                .then(r => r.json())
+                                .then(data => {
+                                    if (data.sites && data.sites.length > 0) {
+                                        // Filter client-side since API doesn't support search param
+                                        const site = data.sites.find(s =>
+                                            s.name.toLowerCase().includes(siteName.toLowerCase()) ||
+                                            s.description?.toLowerCase().includes(siteName.toLowerCase())
+                                        );
+
+                                        if (site) {
+                                            console.log(`✅ Found site via API, navigating to: /view/${site.site_id}/dashboard`);
+                                            window.location.href = `/view/${site.site_id}/dashboard`;
+                                        } else {
+                                            this.addMessage('system', `Sito "${siteName}" non trovato`, 'error');
+                                        }
+                                    } else {
+                                        this.addMessage('system', `Sito "${siteName}" non trovato`, 'error');
+                                    }
+                                })
+                                .catch(err => {
+                                    console.error('Site search error:', err);
+                                    this.addMessage('system', `Errore ricerca sito: ${err}`, 'error');
+                                });
+                        }
+                    }
                     break;
 
                 case 'create':
