@@ -33,6 +33,14 @@ document.addEventListener('alpine:init', () => {
         response: '',
         messages: [],
 
+        // Confirmation flow (new)
+        pendingCommand: null,
+        showConfirmation: false,
+        confirmationQuestion: '',
+
+        // Commands help modal
+        showCommandsHelp: false,
+
         // Config
         wsUrl: `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/v1/pipecat/stream`,
 
@@ -209,6 +217,36 @@ document.addEventListener('alpine:init', () => {
 
                 case 'function':
                     this.handleFunctionResult(data);
+                    break;
+
+                // New structured voice command message types
+                case 'command_plan':
+                    // Structured command plan from backend
+                    console.log('🎤 Command plan:', data.plan);
+                    this.handleCommandPlan(data.plan);
+                    break;
+
+                case 'ask_confirmation':
+                    // Confirmation required for write operation
+                    console.log('🎤 Confirmation requested:', data);
+                    this.showConfirmationDialog(data.command, data.question);
+                    break;
+
+                case 'command_result':
+                    // Execution result with UI actions
+                    console.log('🎤 Command result:', data.result);
+                    this.handleCommandResult(data.result);
+                    break;
+
+                case 'partial_transcript':
+                    // Streaming partial transcript
+                    this.transcript = data.text;
+                    break;
+
+                case 'final_transcript':
+                    // Final transcript
+                    this.transcript = data.text;
+                    this.addMessage('user', data.text);
                     break;
 
                 case 'audio_received':
@@ -570,6 +608,186 @@ document.addEventListener('alpine:init', () => {
             if (this.isListening) return 'text-red-500';
             if (this.isConnected) return 'text-green-500';
             return 'text-gray-500';
+        },
+
+        // =====================================================================
+        // NEW: Structured Voice Command Handlers
+        // =====================================================================
+
+        /**
+         * Handle structured command plan from backend
+         */
+        handleCommandPlan(plan) {
+            if (!plan || !plan.command) return;
+
+            const command = plan.command;
+
+            // Check if confirmation required
+            if (command.requires_confirmation) {
+                this.showConfirmationDialog(command, command.explain);
+            } else {
+                // Execute immediately
+                this.executeStructuredCommand(command, false);
+            }
+        },
+
+        /**
+         * Show confirmation dialog for write operations
+         */
+        showConfirmationDialog(command, question) {
+            this.pendingCommand = command;
+            this.confirmationQuestion = question || command.explain || 'Confermare questa operazione?';
+            this.showConfirmation = true;
+            this.addMessage('assistant', `⚠️ ${this.confirmationQuestion}`, 'confirmation');
+        },
+
+        /**
+         * Confirm pending command
+         */
+        confirmCommand() {
+            if (this.pendingCommand) {
+                this.executeStructuredCommand(this.pendingCommand, true);
+            }
+            this.cancelConfirmation();
+        },
+
+        /**
+         * Cancel pending confirmation
+         */
+        cancelConfirmation() {
+            this.pendingCommand = null;
+            this.showConfirmation = false;
+            this.confirmationQuestion = '';
+        },
+
+        /**
+         * Execute structured command via backend
+         */
+        async executeStructuredCommand(command, confirmed) {
+            this.isProcessing = true;
+
+            try {
+                const response = await fetch('/api/v1/voice/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        command: command,
+                        site_id: this.getCurrentSiteId(),
+                        confirmed: confirmed
+                    })
+                });
+
+                const result = await response.json();
+                this.handleCommandResult(result);
+
+            } catch (error) {
+                console.error('Voice command execution error:', error);
+                this.addMessage('system', `Errore: ${error.message}`, 'error');
+            }
+
+            this.isProcessing = false;
+        },
+
+        /**
+         * Handle command execution result with UI actions
+         */
+        handleCommandResult(result) {
+            if (!result) return;
+
+            // Show result message
+            if (result.message) {
+                this.addMessage('assistant', result.message, result.success ? 'success' : 'error');
+            }
+
+            if (result.error) {
+                this.addMessage('system', `❌ ${result.error}`, 'error');
+            }
+
+            // Execute UI actions
+            if (result.ui_actions && Array.isArray(result.ui_actions)) {
+                result.ui_actions.forEach(action => this.executeUIAction(action));
+            }
+
+            this.isProcessing = false;
+        },
+
+        /**
+         * Execute a single UI action
+         */
+        executeUIAction(action) {
+            if (!action || !action.action) return;
+
+            console.log('🎤 Executing UI action:', action);
+
+            switch (action.action) {
+                case 'navigate':
+                    if (action.url) {
+                        window.location.href = action.url;
+                    }
+                    break;
+
+                case 'focus':
+                    if (action.selector) {
+                        const element = document.querySelector(action.selector);
+                        if (element) {
+                            element.focus();
+                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }
+                    break;
+
+                case 'set_field':
+                    if (action.selector && action.value !== undefined) {
+                        const element = document.querySelector(action.selector);
+                        if (element) {
+                            element.value = action.value;
+                            // Trigger input event for x-model sync
+                            element.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    }
+                    break;
+
+                case 'toast':
+                    this.showToast(action.message, action.level || 'info');
+                    break;
+
+                case 'open_modal':
+                    if (action.modal_name) {
+                        window.dispatchEvent(new CustomEvent(`open-${action.modal_name}-modal`, {
+                            detail: action.modal_data
+                        }));
+                    }
+                    break;
+
+                case 'close_modal':
+                    window.dispatchEvent(new CustomEvent('close-modal'));
+                    break;
+            }
+        },
+
+        /**
+         * Show toast notification
+         */
+        showToast(message, level = 'info') {
+            // Use Alpine's toast system if available
+            if (window.Alpine && window.dispatchEvent) {
+                window.dispatchEvent(new CustomEvent('toast', {
+                    detail: { message, level }
+                }));
+            }
+
+            // Fallback: add to messages
+            this.addMessage('system', message, level);
+        },
+
+        /**
+         * Get current site ID from URL
+         */
+        getCurrentSiteId() {
+            const match = window.location.pathname.match(/\/(?:view|sites)\/([a-f0-9-]+)/i);
+            return match ? match[1] : null;
         }
     }));
 });

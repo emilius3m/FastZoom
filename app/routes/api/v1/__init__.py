@@ -89,7 +89,9 @@ api_v1_router.include_router(database_monitoring_router, prefix="/database", tag
 
 # Voice Assistant
 from app.routes.api.v1.pipecat import router as pipecat_router
+from app.routes.api.v1.voice import router as voice_router
 api_v1_router.include_router(pipecat_router, tags=["Voice Assistant"])
+api_v1_router.include_router(voice_router, tags=["Voice Control"])
 
 # Esporta il router principale
 __all__ = ["api_v1_router"]

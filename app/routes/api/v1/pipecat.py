@@ -21,6 +21,22 @@ from app.database.db import get_async_session
 from app.models.users import User
 from app.services.voice_db_functions import VOICE_FUNCTIONS, execute_voice_db_function
 from app.services.voice_commands import parse_voice_command
+# New structured voice command imports
+from app.services.voice_tools_registry import (
+    get_tool_descriptions_for_llm,
+    is_tool_whitelisted,
+    get_tool,
+    validate_tool_args,
+    log_voice_execution,
+)
+from app.schemas.voice_commands import (
+    VoiceCommand,
+    VoiceCommandPlan,
+    VoiceCommandResult,
+    CommandIntent,
+    UIAction,
+    UIActionType,
+)
 
 
 router = APIRouter(prefix="/pipecat", tags=["Voice Assistant"])
