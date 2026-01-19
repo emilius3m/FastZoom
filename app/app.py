@@ -149,6 +149,28 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
+# Startup event for background model loading
+@app.on_event("startup")
+async def startup_event():
+    """Run startup tasks."""
+    try:
+        from app.core.pipecat_settings import pipecat_settings
+        
+        # Pre-load Whisper model in background if enabled and using local whisper
+        if pipecat_settings.pipecat_enabled and pipecat_settings.pipecat_stt_provider == "whisper":
+            from app.services.pipecat_local_services import get_whisper_model
+            
+            logger.info(f"🚀 Triggering background Whisper model loading ({pipecat_settings.whisper_model})...")
+            # Run in background without awaiting so app startup isn't blocked
+            asyncio.create_task(
+                get_whisper_model(
+                    model_name=pipecat_settings.whisper_model, 
+                    device="auto"
+                )
+            )
+    except Exception as e:
+        logger.warning(f"Failed to trigger background model loading: {e}")
+
 # Register centralized exception handlers for domain exceptions
 register_exception_handlers(app)
 

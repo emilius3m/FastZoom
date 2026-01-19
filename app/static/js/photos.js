@@ -206,6 +206,36 @@ function photosManager() {
             // Make this instance globally accessible
             window.photosManagerInstance = this;
 
+            // Voice Command Event Listeners
+            window.addEventListener('photos-select-all', () => this.selectAllPhotos());
+            window.addEventListener('photos-deselect-all', () => this.deselectAllPhotos());
+            window.addEventListener('photos-filter', (e) => {
+                if (e.detail) {
+                    console.log('Voice filter applying:', e.detail);
+                    // Update filters
+                    Object.keys(e.detail).forEach(key => {
+                        if (key in this.filters) {
+                            this.filters[key] = e.detail[key];
+                        }
+                    });
+                    this.applyFilters();
+                }
+            });
+            window.addEventListener('open-photo-upload-modal', () => {
+                // Open upload modal if function exists
+                if (typeof this.openUploadModal === 'function') {
+                    this.openUploadModal();
+                } else {
+                    // Fallback: set flag directly
+                    this.showUploadModal = true;
+                }
+            });
+            window.addEventListener('photos-delete-selected', () => {
+                if (window.confirm('Sei sicuro di voler eliminare le foto selezionate?')) {
+                    this.confirmBulkDelete();
+                }
+            });
+
             // Ensure viewMode is set to grid by default
             this.viewMode = 'grid';
 

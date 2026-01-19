@@ -137,8 +137,8 @@ def _build_voice_system_prompt(tool_descriptions: list, site_id: Optional[str]) 
     Forces the LLM to use tools instead of responding with text.
     """
     # Separate navigation and API tools
-    nav_tools = [t for t in tool_descriptions if t['name'].startswith('nav_')]
-    api_tools = [t for t in tool_descriptions if not t['name'].startswith('nav_')][:20]
+    nav_tools = [t for t in tool_descriptions if t.get('category') == 'navigation']
+    api_tools = [t for t in tool_descriptions if t.get('category') != 'navigation'][:20]
     
     # Helper to format tool string
     def fmt(t):
@@ -175,6 +175,9 @@ MAPPATURA COMANDI:
 "lista siti" / "quali siti ci sono" → {{"action_type": "api_call", "tool": "v1_get_sites_list"}}
 "aggiorna" → {{"action_type": "navigate", "tool": "nav_refresh"}}
 "torna indietro" → {{"action_type": "navigate", "tool": "nav_go_back"}}
+"seleziona tutto" → {{"action_type": "navigate", "tool": "ui_select_all"}}
+"carica foto" → {{"action_type": "navigate", "tool": "nav_create_element", "args": {{"element_type": "photo"}} }}
+"elimina selezionati" → {{"action_type": "navigate", "tool": "ui_delete_selected"}}
 
 FORMATO RISPOSTA (obbligatorio):
 {{"action_type": "navigate"|"api_call", "tool": "tool_name", "args": {{}}, "explain": "breve descrizione"}}"""
@@ -223,17 +226,11 @@ async def _process_voice_input(
                 if tool and tool.category == ToolCategory.NAVIGATION:
                     result = _handle_navigation_tool(tool, args, UUID(site_id) if site_id else None)
                     
-                    # Send UI action to frontend
-                    if result.ui_actions:
-                        for ui_action in result.ui_actions:
-                            # Note: action is already a string (use_enum_values=True)
-                            action_str = ui_action.action if isinstance(ui_action.action, str) else ui_action.action.value
-                            await websocket.send_json({
-                                "type": "command",
-                                "action": action_str,
-                                "url": ui_action.url,
-                                "message": ui_action.message
-                            })
+                    # Send full result to frontend (handled by handleCommandResult -> executeUIAction)
+                    await websocket.send_json({
+                        "type": "command_result",
+                        "result": result.model_dump()
+                    })
                     
                     await websocket.send_json({
                         "type": "response",

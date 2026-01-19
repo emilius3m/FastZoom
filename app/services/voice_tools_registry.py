@@ -451,6 +451,48 @@ NAVIGATION_TOOLS: Dict[str, VoiceTool] = {
         category=ToolCategory.NAVIGATION,
         site_scoped=False,
     ),
+    "nav_create_element": VoiceTool(
+        operation_id="nav_create_element",
+        http_method="GET",
+        path_template="/_nav/create/{element_type}",
+        description="Crea un nuovo elemento (foto, giornale, us)",
+        category=ToolCategory.NAVIGATION,
+        path_params=["element_type"],
+        site_scoped=False,
+    ),
+    "ui_select_all": VoiceTool(
+        operation_id="ui_select_all",
+        http_method="GET",
+        path_template="/_ui/select/all",
+        description="Seleziona tutti gli elementi nella pagina",
+        category=ToolCategory.NAVIGATION,
+        site_scoped=False,
+    ),
+    "ui_deselect_all": VoiceTool(
+        operation_id="ui_deselect_all",
+        http_method="GET",
+        path_template="/_ui/select/none",
+        description="Deseleziona tutti gli elementi",
+        category=ToolCategory.NAVIGATION,
+        site_scoped=False,
+    ),
+    "ui_set_filter": VoiceTool(
+        operation_id="ui_set_filter",
+        http_method="GET",
+        path_template="/_ui/filter",
+        description="Imposta un filtro nella pagina corrente",
+        category=ToolCategory.NAVIGATION,
+        site_scoped=False,
+        query_params=["filter_key", "filter_value"],
+    ),
+    "ui_delete_selected": VoiceTool(
+        operation_id="ui_delete_selected",
+        http_method="GET",
+        path_template="/_ui/delete/selected",
+        description="Elimina gli elementi selezionati",
+        category=ToolCategory.NAVIGATION,
+        site_scoped=False,
+    ),
 }
 
 

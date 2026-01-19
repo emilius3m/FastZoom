@@ -28,6 +28,11 @@ class UIActionType(str, Enum):
     OPEN_MODAL = "open_modal"   # Open a modal by name
     CLOSE_MODAL = "close_modal" # Close current modal
     SEARCH_NAVIGATE = "search_navigate" # Search and navigate to site
+    CREATE = "create"           # Create new item (open modal)
+    SELECT_ALL = "select_all"   # Select all items in list
+    DESELECT_ALL = "deselect_all" # Deselect all items
+    FILTER = "filter"           # Apply filter
+    DELETE_SELECTED = "delete_selected" # Delete selected items
 
 
 class ToastLevel(str, Enum):
@@ -52,6 +57,7 @@ class UIAction(BaseModel):
     
     # For SET_FIELD
     value: Optional[str] = None
+    key: Optional[str] = None # For FILTER
     
     # For TOAST
     message: Optional[str] = None

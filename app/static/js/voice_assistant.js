@@ -54,6 +54,20 @@ document.addEventListener('alpine:init', () => {
                 this.statusMessage = 'Microfono non supportato';
             }
 
+            // Restore messages from localStorage
+            try {
+                const storedMessages = localStorage.getItem('voiceAssistantMessages');
+                if (storedMessages) {
+                    this.messages = JSON.parse(storedMessages);
+                    // Scroll to bottom after restore
+                    this.$nextTick(() => {
+                        this.scrollToBottom();
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to restore voice messages', e);
+            }
+
             // Listen for keyboard shortcut (Ctrl+Shift+V)
             document.addEventListener('keydown', (e) => {
                 if (e.ctrlKey && e.shiftKey && e.key === 'V') {
@@ -69,6 +83,16 @@ document.addEventListener('alpine:init', () => {
                 setTimeout(() => this.open(), 500);
             }
         },
+
+        // Helper for scrolling
+        scrollToBottom() {
+            const container = this.$refs.messagesContainer;
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        },
+
+
 
         /**
          * Toggle the voice assistant panel
@@ -627,6 +651,9 @@ document.addEventListener('alpine:init', () => {
                 timestamp: new Date().toLocaleTimeString()
             });
 
+            // Save to localStorage
+            this.saveMessages();
+
             // Scroll to bottom
             this.$nextTick(() => {
                 const container = this.$refs.messagesContainer;
@@ -637,10 +664,24 @@ document.addEventListener('alpine:init', () => {
         },
 
         /**
+         * Save messages to localStorage
+         */
+        saveMessages() {
+            try {
+                // Limit history to last 50 messages to prevent storage issues
+                const historyToSave = this.messages.slice(-50);
+                localStorage.setItem('voiceAssistantMessages', JSON.stringify(historyToSave));
+            } catch (e) {
+                console.warn('Failed to save voice messages', e);
+            }
+        },
+
+        /**
          * Clear conversation history
          */
         clearMessages() {
             this.messages = [];
+            localStorage.removeItem('voiceAssistantMessages');
         },
 
         /**
@@ -794,6 +835,38 @@ document.addEventListener('alpine:init', () => {
                 case 'navigate':
                     if (action.url) {
                         window.location.href = action.url;
+                    }
+                    break;
+
+                case 'create':
+                    if (action.modal_name) {
+                        if (action.modal_name === 'photo') {
+                            window.dispatchEvent(new CustomEvent('open-photo-upload-modal'));
+                        } else {
+                            window.dispatchEvent(new CustomEvent(`open-${action.modal_name}-modal`, {
+                                detail: action.modal_data
+                            }));
+                        }
+                    }
+                    break;
+
+                case 'select_all':
+                    window.dispatchEvent(new CustomEvent('photos-select-all'));
+                    break;
+
+                case 'deselect_all':
+                    window.dispatchEvent(new CustomEvent('photos-deselect-all'));
+                    break;
+
+                case 'delete_selected':
+                    window.dispatchEvent(new CustomEvent('photos-delete-selected'));
+                    break;
+
+                case 'filter':
+                    if (action.key) {
+                        const detail = {};
+                        detail[action.key] = action.value;
+                        window.dispatchEvent(new CustomEvent('photos-filter', { detail }));
                     }
                     break;
 

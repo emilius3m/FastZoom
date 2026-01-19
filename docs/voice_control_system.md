@@ -34,14 +34,14 @@ FastZoom include un sistema di controllo vocale basato su AI **completamente on-
 
 ### Tecnologie Utilizzate
 
-| Componente | Tecnologia | Versione | Descrizione |
-|------------|------------|----------|-------------|
-| **STT** | Whisper (OpenAI) | latest | Trascrizione audio → testo |
-| **LLM** | Ollama | v0.1.x | Interprete comandi |
-| **Modello LLM** | qwen2.5:7b | - | Modello per function calling |
-| **WebSocket** | FastAPI | 0.100+ | Comunicazione real-time |
-| **HTTP Client** | httpx | 0.24+ | ASGI transport per API calls |
-| **Frontend** | Alpine.js | 3.x | Componente UI reattivo |
+| Componente      | Tecnologia       | Versione | Descrizione                  |
+| --------------- | ---------------- | -------- | ---------------------------- |
+| **STT**         | Whisper (OpenAI) | latest   | Trascrizione audio → testo   |
+| **LLM**         | Ollama           | v0.1.x   | Interprete comandi           |
+| **Modello LLM** | qwen2.5:7b       | -        | Modello per function calling |
+| **WebSocket**   | FastAPI          | 0.100+   | Comunicazione real-time      |
+| **HTTP Client** | httpx            | 0.24+    | ASGI transport per API calls |
+| **Frontend**    | Alpine.js        | 3.x      | Componente UI reattivo       |
 
 ---
 
@@ -247,11 +247,11 @@ Frontend                          Backend
 // voice_assistant.js
 async connect() {
     this.websocket = new WebSocket(this.wsUrl);
-    
+
     this.websocket.onopen = async () => {
         // Aspetta che sia veramente aperto
         await this.waitForConnection();
-        
+
         // Invia messaggio init con contesto sito
         this.websocket.send(JSON.stringify({
             type: 'init',
@@ -268,7 +268,7 @@ async connect() {
 async startRecording() {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-    
+
     this.mediaRecorder.ondataavailable = (event) => {
         if (this.websocket.readyState === WebSocket.OPEN) {
             this.websocket.send(event.data);  // Binary audio
@@ -318,13 +318,13 @@ response = await llm.simple_chat(messages_history)
 def _parse_llm_json_response(response: str) -> Optional[dict]:
     import json
     import re
-    
+
     # Try direct parse
     try:
         return json.loads(response.strip())
     except:
         pass
-    
+
     # Try to find JSON in response
     json_match = re.search(r'\{[^{}]*\}', response)
     if json_match:
@@ -332,7 +332,7 @@ def _parse_llm_json_response(response: str) -> Optional[dict]:
             return json.loads(json_match.group())
         except:
             pass
-    
+
     return None
 ```
 
@@ -344,7 +344,7 @@ if action_type == "navigate" and tool_name:
     tool = get_tool(tool_name)
     if tool and tool.category == ToolCategory.NAVIGATION:
         result = _handle_navigation_tool(tool, args, site_id)
-        
+
         # Invia UI action
         await websocket.send_json({
             "type": "command",
@@ -494,20 +494,20 @@ Servizi AI locali (Whisper STT + Ollama LLM).
 ```python
 class LocalWhisperSTT:
     """Speech-to-Text using faster-whisper."""
-    
+
     def __init__(self, model="medium", device="auto", language="it"):
         self.model_name = model
         self.device = device
         self.language = language
-    
+
     async def ensure_model_loaded(self) -> bool:
         """Carica modello Whisper (lazy loading)."""
         ...
-    
+
     def add_audio(self, audio_bytes: bytes) -> bool:
         """Aggiunge audio al buffer. Ritorna True se pronto."""
         ...
-    
+
     async def transcribe(self) -> TranscriptionResult:
         """Trascrive audio bufferizzato."""
         ...
@@ -515,14 +515,14 @@ class LocalWhisperSTT:
 
 class LocalOllamaLLM:
     """LLM using Ollama."""
-    
+
     def __init__(self, model="qwen2.5:7b"):
         self.model = model
-    
+
     async def simple_chat(self, messages: list) -> str:
         """Chat semplice, ritorna testo."""
         ...
-    
+
     async def chat_with_functions(self, text: str, functions: list) -> dict:
         """Chat con function calling."""
         ...
@@ -583,19 +583,19 @@ Alpine.data('voiceAssistant', () => ({
     isListening: false,
     isProcessing: false,
     showCommandsHelp: false,
-    
+
     // WebSocket
     websocket: null,
     wsUrl: `${protocol}//${host}/api/v1/pipecat/stream`,
-    
+
     // Audio
     mediaRecorder: null,
     audioChunks: [],
-    
+
     // UI
     messages: [],
     transcript: '',
-    
+
     // Methods
     init() { ... },
     connect() { ... },
@@ -618,16 +618,16 @@ Template HTML del componente.
 <div x-data="voiceAssistant()" x-cloak class="relative">
     <!-- Mic Button -->
     <button @click="toggleListening()">...</button>
-    
+
     <!-- Expand Button -->
     <button @click="isOpen = !isOpen">...</button>
-    
+
     <!-- Help Button (?) -->
     <button @click="showCommandsHelp = !showCommandsHelp">...</button>
-    
+
     <!-- Commands Help Modal -->
     <div x-show="showCommandsHelp">...</div>
-    
+
     <!-- Messages Panel -->
     <div x-show="isOpen">...</div>
 </div>
@@ -639,47 +639,47 @@ Template HTML del componente.
 
 ### Navigazione Globale (12 tools)
 
-| Comando Vocale | Tool | URL Target |
-|----------------|------|------------|
-| "Vai ai siti" | `nav_goto_sites` | `/` |
-| "Vai al giornale" | `nav_goto_giornale` | `/giornale` |
-| "Vai ai cantieri" | `nav_goto_cantieri` | `/cantieri` |
-| "Vai alle analisi" | `nav_goto_analisi` | `/analisi` |
-| "Vai al sito {nome}" | `nav_goto_site` | Cerca e naviga |
-| "Aggiorna" | `nav_refresh` | Reload pagina |
-| "Torna indietro" | `nav_go_back` | Browser back |
+| Comando Vocale       | Tool                | URL Target     |
+| -------------------- | ------------------- | -------------- |
+| "Vai ai siti"        | `nav_goto_sites`    | `/`            |
+| "Vai al giornale"    | `nav_goto_giornale` | `/giornale`    |
+| "Vai ai cantieri"    | `nav_goto_cantieri` | `/cantieri`    |
+| "Vai alle analisi"   | `nav_goto_analisi`  | `/analisi`     |
+| "Vai al sito {nome}" | `nav_goto_site`     | Cerca e naviga |
+| "Aggiorna"           | `nav_refresh`       | Reload pagina  |
+| "Torna indietro"     | `nav_go_back`       | Browser back   |
 
 ### Navigazione Sito (richiede site_id)
 
-| Comando Vocale | Tool | URL Target |
-|----------------|------|------------|
-| "Vai alle foto" | `nav_goto_photos` | `/view/{site_id}/photos` |
-| "Vai alle US" | `nav_goto_us` | `/view/{site_id}/us` |
-| "Vai alla Harris" | `nav_goto_harris` | `/view/{site_id}/harris-matrix` |
-| "Vai ai documenti" | `nav_goto_documents` | `/view/{site_id}/documents` |
-| "Vai alla dashboard" | `nav_goto_dashboard` | `/view/{site_id}/dashboard` |
+| Comando Vocale       | Tool                 | URL Target                      |
+| -------------------- | -------------------- | ------------------------------- |
+| "Vai alle foto"      | `nav_goto_photos`    | `/view/{site_id}/photos`        |
+| "Vai alle US"        | `nav_goto_us`        | `/view/{site_id}/us`            |
+| "Vai alla Harris"    | `nav_goto_harris`    | `/view/{site_id}/harris-matrix` |
+| "Vai ai documenti"   | `nav_goto_documents` | `/view/{site_id}/documents`     |
+| "Vai alla dashboard" | `nav_goto_dashboard` | `/view/{site_id}/dashboard`     |
 
 ### API Read-Only (33 tools)
 
-| Comando Vocale | Tool | Descrizione |
-|----------------|------|-------------|
-| "Mostra i siti" | `v1_get_sites_list` | Lista siti |
-| "Mostra statistiche" | `v1_get_overview_stats` | Stats generali |
-| "Mostra attività recenti" | `v1_get_recent_activities` | Attività |
-| "Elenca le foto" | `get_site_photos` | Foto del sito |
-| "Cerca foto {query}" | `search_photos_by_metadata` | Ricerca foto |
-| "Elenca documenti" | `v1_get_site_documents` | Documenti |
-| "Elenca US" | `v1_list_us` | Unità stratigrafiche |
-| "Mostra Harris Matrix" | `v1_generate_harris_matrix` | Genera matrice |
+| Comando Vocale            | Tool                        | Descrizione          |
+| ------------------------- | --------------------------- | -------------------- |
+| "Mostra i siti"           | `v1_get_sites_list`         | Lista siti           |
+| "Mostra statistiche"      | `v1_get_overview_stats`     | Stats generali       |
+| "Mostra attività recenti" | `v1_get_recent_activities`  | Attività             |
+| "Elenca le foto"          | `get_site_photos`           | Foto del sito        |
+| "Cerca foto {query}"      | `search_photos_by_metadata` | Ricerca foto         |
+| "Elenca documenti"        | `v1_get_site_documents`     | Documenti            |
+| "Elenca US"               | `v1_list_us`                | Unità stratigrafiche |
+| "Mostra Harris Matrix"    | `v1_generate_harris_matrix` | Genera matrice       |
 
 ### API Write (10 tools, richiedono conferma)
 
-| Comando Vocale | Tool | Note |
-|----------------|------|------|
-| "Aggiorna US {id}" | `v1_update_us` | ⚠️ Conferma |
-| "Aggiorna USM {id}" | `v1_update_usm` | ⚠️ Conferma |
-| "Salva layout matrice" | `v1_save_harris_matrix_layout` | ⚠️ Conferma |
-| "Valida la matrice" | `v1_validate_harris_matrix` | Solo validazione |
+| Comando Vocale         | Tool                           | Note             |
+| ---------------------- | ------------------------------ | ---------------- |
+| "Aggiorna US {id}"     | `v1_update_us`                 | ⚠️ Conferma      |
+| "Aggiorna USM {id}"    | `v1_update_usm`                | ⚠️ Conferma      |
+| "Salva layout matrice" | `v1_save_harris_matrix_layout` | ⚠️ Conferma      |
+| "Valida la matrice"    | `v1_validate_harris_matrix`    | Solo validazione |
 
 ---
 
@@ -756,15 +756,15 @@ log_voice_execution(
 class PipecatSettings:
     ENABLED: bool = True
     LANGUAGE: str = "it"
-    
+
     # Whisper
     WHISPER_MODEL: str = "medium"  # tiny, base, small, medium, large
     WHISPER_DEVICE: str = "auto"   # auto, cpu, cuda
-    
+
     # Ollama
     OLLAMA_MODEL: str = "qwen2.5:7b"
     OLLAMA_HOST: str = "http://localhost:11434"
-    
+
     # WebSocket
     MAX_SESSIONS: int = 10
     SESSION_TIMEOUT: int = 300  # seconds
@@ -852,10 +852,12 @@ API_TOOLS_WITH_NAVIGATION["v1_my_endpoint"] = "/my-page"
 **Cause e Soluzioni:**
 
 1. **Modello non supporta bene le istruzioni**
+   
    - Prova un modello più grande: `ollama pull qwen2.5:14b`
    - Modifica `OLLAMA_MODEL` in settings
 
 2. **System prompt non abbastanza forte**
+   
    - Aggiungi più esempi nella sezione `MAPPATURA COMANDI`
    - Rinforza le regole
 
@@ -880,6 +882,7 @@ python -c "from app.services.pipecat_local_services import LocalWhisperSTT; s = 
 ### Audio non catturato
 
 **Browser:**
+
 - Verifica permessi microfono
 - HTTPS richiesto in produzione
 - Controlla console JS per errori
@@ -912,8 +915,8 @@ pytest tests/ -v --tb=short
 
 ## Changelog
 
-| Versione | Data | Modifiche |
-|----------|------|-----------|
-| 2.0 | 2026-01-17 | Sistema strutturato JSON, ASGI transport, rimosso vecchio sistema |
-| 1.5 | 2026-01-16 | Aggiunto help modal, navigation tools |
-| 1.0 | 2026-01-15 | Implementazione iniziale |
+| Versione | Data       | Modifiche                                                         |
+| -------- | ---------- | ----------------------------------------------------------------- |
+| 2.0      | 2026-01-17 | Sistema strutturato JSON, ASGI transport, rimosso vecchio sistema |
+| 1.5      | 2026-01-16 | Aggiunto help modal, navigation tools                             |
+| 1.0      | 2026-01-15 | Implementazione iniziale                                          |

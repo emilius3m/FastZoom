@@ -250,10 +250,49 @@ def _handle_navigation_tool(
             # Return a custom action that frontend handles
             ui_actions=[
                 UIAction(
-                    action="search_navigate",  # Special action for frontend
+                    action=UIActionType.SEARCH_NAVIGATE,  # Special action for frontend
                     message=site_name,  # Site name to search
                 ),
             ]
+        )
+    
+    # UI Interaction Tools
+    if operation_id == "ui_select_all":
+        return VoiceCommandResult(
+            success=True,
+            message="Seleziono tutto",
+            ui_actions=[UIAction(action=UIActionType.SELECT_ALL)]
+        )
+    
+    if operation_id == "ui_deselect_all":
+        return VoiceCommandResult(
+            success=True,
+            message="Deseleziono tutto",
+            ui_actions=[UIAction(action=UIActionType.DESELECT_ALL)]
+        )
+        
+    if operation_id == "ui_set_filter":
+        key = args.get("filter_key")
+        value = args.get("filter_value")
+        return VoiceCommandResult(
+            success=True,
+            message=f"Imposto filtro {key}",
+            ui_actions=[UIAction(action=UIActionType.FILTER, key=key, value=value)]
+        )
+
+    if operation_id == "ui_delete_selected":
+        return VoiceCommandResult(
+            success=True,
+            message="Richiesta eliminazione elementi selezionati",
+            ui_actions=[UIAction(action=UIActionType.DELETE_SELECTED)]
+        )
+
+    if operation_id == "nav_create_element":
+        element_type = args.get("element_type", "photo")
+        return VoiceCommandResult(
+            success=True,
+            message=f"Apro creazione {element_type}",
+            ui_actions=[UIAction(action=UIActionType.CREATE, modal_name=element_type)]
         )
     
     # Dynamic navigation (Global or Site-specific)
