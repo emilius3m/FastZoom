@@ -41,7 +41,7 @@
 
             <!-- LEFT COLUMN: File Upload & List -->
             <div
-                class="w-full md:w-5/12 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+                class="w-full md:w-5/12 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800">
 
                 <!-- Upload Zone -->
                 <div class="p-4 flex-none">
@@ -94,7 +94,7 @@
 
                     <div x-show="files.length > 0">
                         <div
-                            class="flex items-center justify-between mb-2 sticky top-0 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur py-2 z-10">
+                            class="flex items-center justify-between mb-2 sticky top-0 bg-gray-50/95 dark:bg-gray-800 backdrop-blur py-2 z-10">
                             <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">File in coda (<span
                                     x-text="files.length"></span>)</h4>
                             <button @click="clearFiles()"
@@ -147,7 +147,7 @@
 
                     <!-- Instructions (Compact) -->
                     <div
-                        class="mb-6 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-lg flex items-start">
+                        class="mb-6 p-3 bg-blue-50 dark:bg-blue-900 border border-blue-100 dark:border-blue-800 rounded-lg flex items-start">
                         <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2 flex-none mt-0.5" fill="none"
                             viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
