@@ -3,6 +3,35 @@
 {% block content %}
 <div x-data="tmaManagerApp()" x-init="init()" class="dark:bg-gray-900 dark:text-white min-h-screen">
 
+    <!-- Breadcrumb Navigation -->
+    <div class="w-full px-4 pt-8 sm:px-6 lg:px-8">
+        <nav class="flex mb-4" aria-label="Breadcrumb">
+            <ol class="inline-flex items-center space-x-1 md:space-x-3">
+                <li class="inline-flex items-center">
+                    <a href="/dashboard"
+                        class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+                        <i class="fas fa-home mr-2"></i>Dashboard
+                    </a>
+                </li>
+                <li>
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <a href="/view/{{ site_id }}/dashboard"
+                            class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+                            {{ site_info.site_name if site_info else (site.name if site is defined else "Sito") }}
+                        </a>
+                    </div>
+                </li>
+                <li aria-current="page">
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <span class="text-gray-500 dark:text-gray-400">TMA</span>
+                    </div>
+                </li>
+            </ol>
+        </nav>
+    </div>
+
     <!-- Header -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
         <div class="px-6 py-4 border-b border-gray-200">
@@ -59,7 +88,7 @@
                 <button @click="showAdvancedSearch = !showAdvancedSearch"
                     class="inline-flex items-center px-3 py-1.5 border rounded-md text-xs font-medium transition-colors duration-200"
                     :class="showAdvancedSearch 
-                            ? 'border-orange-500 text-orange-700 bg-orange-50 dark:border-orange-400 dark:text-orange-300 dark:bg-orange-900/30' 
+                            ? 'border-orange-500 text-orange-700 bg-orange-50 dark:border-orange-400 dark:text-orange-300 dark:bg-orange-900' 
                             : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600'">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
@@ -107,7 +136,7 @@
             x-transition:leave-start="opacity-100 transform translate-y-0"
             x-transition:leave-end="opacity-0 transform -translate-y-2"
             class="border-t border-gray-200 dark:border-gray-700" x-cloak>
-            <div class="p-4 bg-gray-50 dark:bg-gray-800/50">
+            <div class="p-4 bg-gray-50 dark:bg-gray-800">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Codice NCT</label>
@@ -131,7 +160,7 @@
 
         <ul x-show="records.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
             <template x-for="row in records" :key="row.id">
-                <li class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150 relative">
+                <li class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 relative">
                     <div class="px-4 py-4 sm:px-6">
                         <div class="flex items-center justify-between">
                             <!-- Info Lato Sinistro -->
@@ -184,14 +213,14 @@
                                     <span class="hidden sm:inline">Visualizza</span>
                                 </button>
                                 <button @click="openEdit(row)"
-                                    class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 dark:text-blue-200 dark:bg-blue-900/50 dark:hover:bg-blue-800/80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 dark:text-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                                     <svg class="h-4 w-4 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                     </svg>
                                     <span class="hidden sm:inline">Modifica</span>
                                 </button>
                                 <button @click="deleteRow(row.id)"
-                                    class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 dark:text-red-200 dark:bg-red-900/50 dark:hover:bg-red-800/80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                    class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200 dark:text-red-200 dark:bg-red-900 dark:hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
                                     <svg class="h-4 w-4 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                     </svg>
@@ -231,7 +260,7 @@
                         <!-- Page Numbers (simplified, max 5) -->
                         <template x-for="pageNum in getPaginationPages()" :key="pageNum">
                             <button @click="pageNum !== '...' ? changePage(pageNum) : null" :disabled="pageNum === '...'"
-                                :class="{'bg-orange-50 border-orange-500 text-orange-600 dark:bg-orange-900/40 dark:border-orange-500 dark:text-orange-200 z-10': pageNum === pagination.page, 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600': pageNum !== pagination.page}"
+                                :class="{'bg-orange-50 border-orange-500 text-orange-600 dark:bg-orange-900 dark:border-orange-500 dark:text-orange-200 z-10': pageNum === pagination.page, 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600': pageNum !== pagination.page}"
                                 class="relative inline-flex items-center px-4 py-2 border text-sm font-medium"
                                 x-text="pageNum">
                             </button>
@@ -254,8 +283,8 @@
     <div x-show="showModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 z-50" @click.self="closeModal()">
         <div class="bg-white dark:bg-gray-800 absolute inset-0 flex flex-col overflow-hidden shadow-2xl border-4 border-cyan-500">
             <div class="sticky top-0 bg-gradient-to-r from-orange-600 to-orange-500 px-6 py-4 flex justify-between items-center z-10">
-                <h3 class="text-2xl font-bold text-gray-900 dark:text-white" x-text="editing ? 'Modifica TMA' : 'Nuovo record TMA'"></h3>
-                <button @click="closeModal()" class="text-gray-900 dark:text-white hover:text-orange-800 dark:hover:text-orange-200 transition p-2 rounded-full hover:bg-orange-700">✕</button>
+                <h3 class="text-2xl font-bold text-white" x-text="editing ? 'Modifica TMA' : 'Nuovo record TMA'"></h3>
+                <button @click="closeModal()" class="text-white hover:text-gray-200 transition p-2 rounded-full hover:bg-orange-700">✕</button>
             </div>
 
             <div class="flex-1 overflow-y-auto dark:bg-gray-800 p-6 space-y-8">
@@ -314,7 +343,7 @@
                         </div>
                         <div class="space-y-4">
                             <template x-for="(prov, idx) in form.provenienze" :key="idx">
-                                <div class="p-4 border rounded-lg dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                                <div class="p-4 border rounded-lg dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                                     <div class="flex items-center justify-between mb-3">
                                         <div class="text-sm font-semibold">Provenienza #<span x-text="idx + 1"></span></div>
                                         <button type="button" @click="removeProvenienza(idx)" x-show="!viewMode" class="text-red-600 text-sm">Rimuovi</button>
@@ -371,7 +400,7 @@
 
                         <div class="space-y-4">
                             <template x-for="(item, idx) in form.ma_items" :key="idx">
-                                <div class="p-4 border rounded-lg dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                                <div class="p-4 border rounded-lg dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                                     <div class="flex items-center justify-between mb-3">
                                         <div class="text-sm font-semibold">Materiale #<span x-text="idx + 1"></span></div>
                                         <button type="button" @click="removeMaItem(idx)" x-show="!viewMode" class="text-red-600 text-sm">Rimuovi</button>
@@ -406,10 +435,10 @@
                                 <div class="relative p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm transition-all duration-200 hover:shadow-md">
                                     <div class="flex items-center justify-between mb-3 border-b border-gray-100 dark:border-gray-700/50 pb-2">
                                         <div class="flex items-center space-x-2">
-                                            <div class="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold" x-text="idx + 1"></div>
+                                            <div class="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold" x-text="idx + 1"></div>
                                             <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Media file</span>
                                         </div>
-                                        <button type="button" @click="removeEntitaMultimediale(idx)" x-show="!viewMode" class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
+                                        <button type="button" @click="removeEntitaMultimediale(idx)" x-show="!viewMode" class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900 transition-colors">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
                                     </div>
@@ -443,7 +472,7 @@
                         </div>
                         <div class="space-y-4">
                             <template x-for="(foto, idx) in form.fta" :key="idx">
-                                <div class="p-4 border rounded-lg dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                                <div class="p-4 border rounded-lg dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                                     <div class="flex items-center justify-between mb-3">
                                         <div class="text-sm font-semibold">Foto #<span x-text="idx + 1"></span></div>
                                         <button type="button" @click="removeFoto(idx)" x-show="!viewMode" class="text-red-600 text-sm">Rimuovi</button>
