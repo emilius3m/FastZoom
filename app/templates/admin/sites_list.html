@@ -244,17 +244,17 @@
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
           <template x-for="site in paginatedSites" :key="site.id">
-            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
-              <td class="px-6 py-4">
+            <tr class="group">
+              <td class="px-6 py-4 transition-colors group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50">
                 <div class="font-medium text-gray-900 dark:text-white" x-text="site.name"></div>
                 <div x-show="site.description" class="text-xs text-gray-500 dark:text-gray-400 truncate" :title="site.description" x-text="site.description"></div>
               </td>
-              <td class="px-6 py-4">
+              <td class="px-6 py-4 transition-colors group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50">
                 <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-xs font-mono text-gray-900 dark:text-white" x-text="site.code"></code>
               </td>
-              <td class="px-6 py-4 text-gray-700 dark:text-gray-300" x-text="site.location || '-'"></td>
-              <td class="px-6 py-4 text-gray-700 dark:text-gray-300" x-text="site.region || '-'"></td>
-              <td class="px-6 py-4">
+              <td class="px-6 py-4 text-gray-700 dark:text-gray-300 transition-colors group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50" x-text="site.location || '-'"></td>
+              <td class="px-6 py-4 text-gray-700 dark:text-gray-300 transition-colors group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50" x-text="site.region || '-'"></td>
+              <td class="px-6 py-4 transition-colors group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50">
                 <div class="flex flex-wrap gap-1">
                   <span x-show="site.is_active" class="inline-block px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 rounded text-xs font-medium">
                     <i class="fas fa-check-circle mr-1"></i>Attivo
@@ -267,13 +267,13 @@
                   </span>
                 </div>
               </td>
-              <td class="px-6 py-4 text-center">
+              <td class="px-6 py-4 text-center transition-colors group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50">
                 <span class="inline-block px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 rounded-full font-bold text-sm" x-text="site.users_count || 0"></span>
               </td>
-              <td class="px-6 py-4 text-center">
+              <td class="px-6 py-4 text-center transition-colors group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50">
                 <span class="inline-block px-3 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200 rounded-full font-bold text-sm" x-text="site.photos_count || 0"></span>
               </td>
-              <td class="px-6 py-4">
+              <td class="px-6 py-4 transition-colors group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50">
                 <div class="flex gap-1 flex-wrap">
                   <a :href="`/admin/sites/${normalizeSiteId(site.id)}/users`" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded transition" title="Gestisci utenti">
                     <i class="fas fa-users mr-1"></i>Utenti

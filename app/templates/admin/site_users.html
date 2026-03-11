@@ -386,6 +386,83 @@
             </div>
         </div>
     </div>
+
+    <!-- Edit Permission Modal -->
+    <div x-show="showEditPermissionModal"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+         @click.self="showEditPermissionModal = false">
+
+        <div class="relative mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Modifica Permesso Utente</h3>
+                <button @click="showEditPermissionModal = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p class="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Utente:</strong>
+                    <span x-text="userToEdit ? getFullName(userToEdit) : ''"></span>
+                    <span x-text="userToEdit ? `(${userToEdit.email})` : ''"></span>
+                </p>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Livello Permesso</label>
+                <select x-model="editPermissionLevel"
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <option value="read">Visualizzatore</option>
+                    <option value="write">Editor</option>
+                    <option value="admin">Amministratore Sito</option>
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Note</label>
+                <textarea x-model="editPermissionNotes"
+                          rows="3"
+                          class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          placeholder="Note sul permesso..."></textarea>
+            </div>
+
+            <div class="mb-6">
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" x-model="editPermissionActive" class="sr-only peer">
+                    <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    <span class="ms-3 text-sm font-medium text-gray-700 dark:text-gray-300">Permesso attivo</span>
+                </label>
+            </div>
+
+            <div class="flex justify-end space-x-3">
+                <button @click="showEditPermissionModal = false"
+                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                    Annulla
+                </button>
+                <button @click="updateUserPermission"
+                        :disabled="!userToEdit || isUpdatingPermission"
+                        :class="(!userToEdit || isUpdatingPermission) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <span x-show="!isUpdatingPermission">Salva Modifiche</span>
+                    <span x-show="isUpdatingPermission" class="flex items-center">
+                        <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Salvando...
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Alpine.js Component Script -->
@@ -413,7 +490,7 @@ document.addEventListener('alpine:init', () => {
         // Add User Modal
         showAddUserModal: false,
         selectedUserId: '',
-        newPermissionLevel: 'viewer',
+        newPermissionLevel: 'read',
         newPermissionNotes: '',
         isAddingUser: false,
         
@@ -421,6 +498,14 @@ document.addEventListener('alpine:init', () => {
         showRemoveUserModal: false,
         userToRemove: null,
         isRemovingUser: false,
+
+        // Edit Permission Modal
+        showEditPermissionModal: false,
+        userToEdit: null,
+        editPermissionLevel: 'read',
+        editPermissionNotes: '',
+        editPermissionActive: true,
+        isUpdatingPermission: false,
         
         // Computed
         get activeUsersCount() {
@@ -488,11 +573,11 @@ document.addEventListener('alpine:init', () => {
         
         getPermissionLevelClass(level) {
             const classes = {
-                'viewer': 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-300',
-                'editor': 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300',
+                'read': 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-300',
+                'write': 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300',
                 'admin': 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-300'
             };
-            return classes[level] || classes.viewer;
+            return classes[level] || classes.read;
         },
         
         getPermissionLevelLabel(level) {
@@ -609,13 +694,56 @@ document.addEventListener('alpine:init', () => {
         },
         
         editUserPermission(user) {
-            // TODO: Implement edit permission modal
-            this.showInfo('Funzionalità di modifica permesso in sviluppo');
+            this.userToEdit = { ...user };
+            this.editPermissionLevel = user.permission_level || 'read';
+            this.editPermissionNotes = user.notes || '';
+            this.editPermissionActive = user.is_active_permission !== false;
+            this.showEditPermissionModal = true;
+        },
+
+        async updateUserPermission() {
+            if (!this.userToEdit) return;
+
+            this.isUpdatingPermission = true;
+
+            try {
+                if (typeof api === 'undefined') {
+                  throw new Error('API client not loaded. Please refresh page.');
+                }
+
+                const response = await api.put(
+                    `/api/v1/admin/sites/${encodeURIComponent(this.siteId)}/users/${encodeURIComponent(this.userToEdit.id)}`,
+                    {
+                        permission_level: this.editPermissionLevel,
+                        notes: this.editPermissionNotes,
+                        is_active: this.editPermissionActive
+                    }
+                );
+
+                if (!response || (!response.success && !response.message)) {
+                    throw new Error(response?.detail || 'Errore durante l\'aggiornamento del permesso');
+                }
+
+                const userIndex = this.users.findIndex(u => u.id === this.userToEdit.id);
+                if (userIndex !== -1) {
+                    this.users[userIndex].permission_level = this.editPermissionLevel;
+                    this.users[userIndex].notes = this.editPermissionNotes;
+                    this.users[userIndex].is_active_permission = this.editPermissionActive;
+                }
+
+                this.showEditPermissionModal = false;
+                this.userToEdit = null;
+                this.showSuccess('Permesso aggiornato con successo');
+            } catch (error) {
+                this.showError('Errore: ' + error.message);
+            } finally {
+                this.isUpdatingPermission = false;
+            }
         },
         
         resetAddUserForm() {
             this.selectedUserId = '';
-            this.newPermissionLevel = 'viewer';
+            this.newPermissionLevel = 'read';
             this.newPermissionNotes = '';
         },
         

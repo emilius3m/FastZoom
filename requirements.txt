@@ -53,6 +53,7 @@ loguru
 passlib
 aiofiles
 pillow
+reportlab
 python-multipart
 piexif
 jsonschema

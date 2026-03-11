@@ -295,7 +295,7 @@
                         </tr>
 
                         <!-- Member Rows -->
-                        <template x-for="member in filteredMembers" :key="member.id">
+                        <template x-for="member in filteredMembers" :key="member.user_id || member.email">
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700"
                                 :class="{'opacity-50': !member.is_active}">
                                 <!-- User Info -->

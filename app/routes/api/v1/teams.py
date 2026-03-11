@@ -174,8 +174,8 @@ async def v1_invite_team_member(
     """
     site_info = verify_site_access(site_id, user_sites)
     
-    # Verifica permessi di admin
-    if site_info.get("permission_level") not in ["admin"]:
+    # Verifica permessi di admin/regional_admin
+    if site_info.get("permission_level") not in ["admin", "regional_admin"]:
         raise InsufficientPermissionsError("Solo gli amministratori possono invitare membri al team")
     
     try:
@@ -251,8 +251,8 @@ async def v1_update_team_member(
     """
     site_info = verify_site_access(site_id, user_sites)
     
-    # Verifica permessi di admin
-    if site_info.get("permission_level") not in ["admin"]:
+    # Verifica permessi di admin/regional_admin
+    if site_info.get("permission_level") not in ["admin", "regional_admin"]:
         raise InsufficientPermissionsError("Solo gli amministratori possono modificare i permessi")
     
     try:
@@ -321,8 +321,8 @@ async def v1_remove_team_member(
     """
     site_info = verify_site_access(site_id, user_sites)
     
-    # Verifica permessi di admin
-    if site_info.get("permission_level") not in ["admin"]:
+    # Verifica permessi di admin/regional_admin
+    if site_info.get("permission_level") not in ["admin", "regional_admin"]:
         raise InsufficientPermissionsError("Solo gli amministratori possono rimuovere membri dal team")
     
     try:
@@ -466,8 +466,8 @@ async def v1_get_available_users_for_invite(
     """
     site_info = verify_site_access(site_id, user_sites)
     
-    # Verifica permessi di admin
-    if site_info.get("permission_level") not in ["admin"]:
+    # Verifica permessi di admin/regional_admin
+    if site_info.get("permission_level") not in ["admin", "regional_admin"]:
         raise InsufficientPermissionsError("Solo gli amministratori possono invitare membri")
     
     try:

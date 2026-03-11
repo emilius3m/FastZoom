@@ -106,6 +106,20 @@ Dependencies are managed via Poetry (`pyproject.toml` and `poetry.lock`).
 
 Use these to access admin dashboard after setup.
 
+## Docker Compose
+
+1. Copy `.env.example` to `.env` and adjust secrets/URLs as needed.
+2. Build and start containers:
+   ```bash
+   docker compose up --build
+   ```
+3. Access the app at http://localhost:8000
+4. Access MinIO console at http://localhost:9001 (user/pass: minioadmin)
+5. Stop containers:
+   ```bash
+   docker compose down
+   ```
+
 ## Quick Setup Using PowerShell Script
 
 For Windows, use `setup.ps1` to automate setup.

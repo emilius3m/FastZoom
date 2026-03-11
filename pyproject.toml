@@ -29,6 +29,7 @@ bcrypt = "^4.0.1"
 python-dotenv = "^1.0.0"
 python-multipart = "^0.0.9"
 pillow = "11.3.0"
+reportlab = "^4.2.2"
 loguru = "^0.7.2"
 # Pipecat Voice Assistant
 pipecat-ai = {extras = ["deepgram", "openai", "silero", "websocket"], version = "^0.0.53"}

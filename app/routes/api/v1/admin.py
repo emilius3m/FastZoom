@@ -115,6 +115,11 @@ class SiteUserAdd(BaseModel):
     permission_level: str
     notes: Optional[str] = None
 
+class SiteUserUpdate(BaseModel):
+    permission_level: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+
 # ===== ROUTER =====
 
 router = APIRouter( tags=["Administration"])
@@ -727,6 +732,7 @@ async def get_site_users(
             user_ids_with_permissions.add(str(user.id))
             
             users_data.append({
+                "permission_id": str(perm.id),
                 "id": str(user.id),
                 "email": user.email,
                 "first_name": first_name,
@@ -734,6 +740,7 @@ async def get_site_users(
                 "permission_level": str(perm.permission_level),
                 "is_active": user.is_active,
                 "is_active_permission": perm.is_active,
+                "notes": perm.notes,
                 "granted_at": perm.granted_at.isoformat() if perm.granted_at else None,
                 "is_superuser": user.is_superuser
             })
@@ -885,6 +892,71 @@ async def remove_site_user(
     except Exception as e:
         await db.rollback()
         logger.error(f"Error removing site user: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/sites/{site_id}/users/{user_id}")
+async def update_site_user(
+    site_id: str,
+    user_id: UUID,
+    user_data: SiteUserUpdate,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """Aggiorna permesso utente su sito (livello, note, stato attivo)"""
+    await verify_admin_access(current_user_id, db)
+
+    try:
+        if user_data.permission_level is not None:
+            valid_permission_levels = [level.value for level in PermissionLevel]
+            if user_data.permission_level not in valid_permission_levels:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"permission_level must be one of: {', '.join(valid_permission_levels)}"
+                )
+
+        perm_result = await db.execute(
+            select(UserSitePermission).where(
+                and_(
+                    UserSitePermission.user_id == str(user_id),
+                    UserSitePermission.site_id == site_id
+                )
+            )
+        )
+        perm = perm_result.scalar_one_or_none()
+
+        if not perm:
+            raise HTTPException(status_code=404, detail="Permesso non trovato")
+
+        if user_data.permission_level is not None:
+            perm.permission_level = user_data.permission_level
+
+        if user_data.notes is not None:
+            perm.notes = user_data.notes
+
+        if user_data.is_active is not None:
+            perm.is_active = user_data.is_active
+
+        await db.commit()
+        await db.refresh(perm)
+
+        return {
+            "success": True,
+            "message": "Permesso aggiornato con successo",
+            "permission": {
+                "id": str(perm.id),
+                "user_id": str(perm.user_id),
+                "site_id": str(perm.site_id),
+                "permission_level": str(perm.permission_level),
+                "is_active": perm.is_active,
+                "notes": perm.notes,
+                "granted_at": perm.granted_at.isoformat() if perm.granted_at else None
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error updating site user permission: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ===== USERS ENDPOINTS =====

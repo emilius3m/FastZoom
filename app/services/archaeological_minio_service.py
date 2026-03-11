@@ -1164,8 +1164,8 @@ class ArchaeologicalMinIOService(FileStorageInterface):
             logger.error(f"Error getting tile content: {e}")
             return None
 
-    async def get_file(self, object_path: str) -> bytes:
-        """Scarica file da MinIO"""
+    async def _get_file_by_path(self, object_path: str) -> bytes:
+        """Scarica file da MinIO usando un path completo (legacy/public API)."""
         try:
             logger.info(f"Attempting to download file from MinIO: {object_path}")
             bucket, object_name = self._parse_minio_path(object_path)
@@ -1438,10 +1438,20 @@ class ArchaeologicalMinIOService(FileStorageInterface):
             metadata=metadata
         )
 
-    async def get_file(self, bucket: str, object_name: str) -> bytes:
-        """Retrieve file content from storage to satisfy FileStorageInterface"""
-        
-        # Use execute_with_retry for robust retrieval
+    async def get_file(self, bucket: str, object_name: Optional[str] = None) -> bytes:
+        """
+        Retrieve file content from storage.
+
+        Supports both invocation styles:
+        - get_file(bucket, object_name)  -> FileStorageInterface style
+        - get_file(object_path)          -> legacy/path style
+        """
+
+        # Legacy/path style: single argument containing full path/URL/minio://
+        if object_name is None:
+            return await self._get_file_by_path(bucket)
+
+        # Interface style: explicit bucket + object_name
         async def _get_operation():
             response = None
             try:
@@ -1450,7 +1460,7 @@ class ArchaeologicalMinIOService(FileStorageInterface):
             finally:
                 if response:
                     response.close()
-                    
+
         return await self.retry_handler.execute_with_retry(
             _get_operation,
             f"get_file:{bucket}/{object_name}"

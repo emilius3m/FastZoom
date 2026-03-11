@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import JSONResponse, Response
 from uuid import UUID
 from typing import List, Dict, Any, Optional
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
@@ -95,11 +97,90 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
     
     return site_info
 
+
+def read_payload_field(payload: Any, *field_names: str, default: Any = None) -> Any:
+    """Legge un campo da payload in modo robusto (dict/object, snake_case/camelCase)."""
+    sentinel = object()
+
+    for field_name in field_names:
+        # Mapping/dict-like access
+        try:
+            if isinstance(payload, dict):
+                value = payload.get(field_name, sentinel)
+                if value is not sentinel:
+                    return value
+            elif hasattr(payload, "get"):
+                value = payload.get(field_name, sentinel)
+                if value is not sentinel:
+                    return value
+        except Exception:
+            pass
+
+        # Attribute access fallback
+        try:
+            value = getattr(payload, field_name, sentinel)
+            if value is not sentinel:
+                return value
+        except Exception:
+            pass
+
+    return default
+
+
+def parse_optional_iso_date(value: Any, field_name: str) -> Optional[date]:
+    """Converte una data ISO opzionale in `date` con errore HTTP esplicito."""
+    if value in (None, ""):
+        return None
+
+    if isinstance(value, date):
+        return value
+
+    try:
+        return date.fromisoformat(str(value))
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Formato data non valido per '{field_name}'. Usa YYYY-MM-DD"
+        )
+
+
+def parse_optional_decimal(value: Any, field_name: str) -> Optional[Decimal]:
+    """Converte un valore numerico opzionale in Decimal; stringhe vuote diventano None."""
+    if value in (None, ""):
+        return None
+
+    if isinstance(value, Decimal):
+        return value
+
+    try:
+        normalized = str(value).strip().replace(",", ".")
+        if normalized == "":
+            return None
+        return Decimal(normalized)
+    except (InvalidOperation, ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Formato numerico non valido per '{field_name}'"
+        )
+
+
+def parse_optional_int(value: Any, field_name: str, default: Optional[int] = None) -> Optional[int]:
+    """Converte un intero opzionale; stringhe vuote usano default."""
+    if value in (None, ""):
+        return default
+
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Formato intero non valido per '{field_name}'"
+        )
+
 # Import required models
 from app.models.cantiere import Cantiere
 from app.models.sites import ArchaeologicalSite
 from app.models.giornale_cantiere import GiornaleCantiere
-from datetime import date
 from sqlalchemy import select, func, and_, or_, desc, distinct
 from sqlalchemy.orm import selectinload
 
@@ -346,40 +427,97 @@ async def v1_create_cantiere(
     try:
         # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
+
+        # Normalizza payload in forma dict-like robusta
+        if not isinstance(cantiere_data, dict):
+            try:
+                cantiere_data = dict(cantiere_data)
+            except Exception:
+                cantiere_data = {}
+
+        nome = read_payload_field(cantiere_data, "nome", default=None)
+        if not nome:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Il campo 'nome' è obbligatorio"
+            )
+
+        codice = read_payload_field(cantiere_data, "codice", default=None)
+        descrizione = read_payload_field(cantiere_data, "descrizione", default=None)
+
+        committente = read_payload_field(cantiere_data, "committente", default=None)
+        impresa_esecutrice = read_payload_field(cantiere_data, "impresa_esecutrice", "impresaEsecutrice", default=None)
+        direttore_lavori = read_payload_field(cantiere_data, "direttore_lavori", "direttoreLavori", default=None)
+        responsabile_procedimento = read_payload_field(cantiere_data, "responsabile_procedimento", "responsabileProcedimento", default=None)
+        oggetto_appalto = read_payload_field(cantiere_data, "oggetto_appalto", "oggettoAppalto", default=None)
+
+        codice_cup = read_payload_field(cantiere_data, "codice_cup", "codiceCup", default=None)
+        codice_cig = read_payload_field(cantiere_data, "codice_cig", "codiceCig", default=None)
+        importo_lavori = parse_optional_decimal(
+            read_payload_field(cantiere_data, "importo_lavori", "importoLavori", default=None),
+            "importo_lavori"
+        )
+
+        data_inizio_prevista = parse_optional_iso_date(
+            read_payload_field(cantiere_data, "data_inizio_prevista", "dataInizioPrevista", default=None),
+            "data_inizio_prevista"
+        )
+        data_fine_prevista = parse_optional_iso_date(
+            read_payload_field(cantiere_data, "data_fine_prevista", "dataFinePrevista", default=None),
+            "data_fine_prevista"
+        )
+
+        stato = read_payload_field(cantiere_data, "stato", default="pianificato")
+        area_descrizione = read_payload_field(cantiere_data, "area_descrizione", "areaDescrizione", default=None)
+        coordinate_lat = read_payload_field(cantiere_data, "coordinate_lat", "coordinateLat", default=None)
+        coordinate_lon = read_payload_field(cantiere_data, "coordinate_lon", "coordinateLon", default=None)
+        quota = read_payload_field(cantiere_data, "quota", default=None)
+
+        iccd_re_tipo = read_payload_field(cantiere_data, "iccd_re_tipo", "iccdReTipo", default=None)
+        iccd_re_metodo = read_payload_field(cantiere_data, "iccd_re_metodo", "iccdReMetodo", default=None)
+        iccd_geometria = read_payload_field(cantiere_data, "iccd_geometria", "iccdGeometria", default=None)
+
+        responsabile_cantiere = read_payload_field(cantiere_data, "responsabile_cantiere", "responsabileCantiere", default=None)
+        tipologia_intervento = read_payload_field(cantiere_data, "tipologia_intervento", "tipologiaIntervento", default=None)
+        priorita = parse_optional_int(
+            read_payload_field(cantiere_data, "priorita", default=3),
+            "priorita",
+            default=3
+        )
         
         # Crea nuovo cantiere
         nuovo_cantiere = Cantiere(
             site_id=str(site_id),  # Convert UUID to string for SQLite compatibility
-            nome=cantiere_data.get("nome"),
-            codice=cantiere_data.get("codice"),
-            descrizione=cantiere_data.get("descrizione"),
+            nome=nome,
+            codice=codice,
+            descrizione=descrizione,
             # Campi per il giornale dei lavori
-            committente=cantiere_data.get("committente"),
-            impresa_esecutrice=cantiere_data.get("impresa_esecutrice"),
-            direttore_lavori=cantiere_data.get("direttore_lavori"),
-            responsabile_procedimento=cantiere_data.get("responsabile_procedimento"),
-            oggetto_appalto=cantiere_data.get("oggetto_appalto"),
+            committente=committente,
+            impresa_esecutrice=impresa_esecutrice,
+            direttore_lavori=direttore_lavori,
+            responsabile_procedimento=responsabile_procedimento,
+            oggetto_appalto=oggetto_appalto,
             # Campi opzionali
-            codice_cup=cantiere_data.get("codice_cup"),
-            codice_cig=cantiere_data.get("codice_cig"),
-            importo_lavori=cantiere_data.get("importo_lavori"),
+            codice_cup=codice_cup,
+            codice_cig=codice_cig,
+            importo_lavori=importo_lavori,
             # Campi temporali
-            data_inizio_prevista=date.fromisoformat(cantiere_data.get("data_inizio_prevista")) if cantiere_data.get("data_inizio_prevista") else None,
-            data_fine_prevista=date.fromisoformat(cantiere_data.get("data_fine_prevista")) if cantiere_data.get("data_fine_prevista") else None,
-            stato=cantiere_data.get("stato", "pianificato"),
+            data_inizio_prevista=data_inizio_prevista,
+            data_fine_prevista=data_fine_prevista,
+            stato=stato,
             # Campi geografici
-            area_descrizione=cantiere_data.get("area_descrizione"),
-            coordinate_lat=cantiere_data.get("coordinate_lat"),
-            coordinate_lon=cantiere_data.get("coordinate_lon"),
-            quota=cantiere_data.get("quota"),
+            area_descrizione=area_descrizione,
+            coordinate_lat=coordinate_lat,
+            coordinate_lon=coordinate_lon,
+            quota=quota,
             # Campi Scientifici ICCD
-            iccd_re_tipo=cantiere_data.get("iccd_re_tipo"),
-            iccd_re_metodo=cantiere_data.get("iccd_re_metodo"),
-            iccd_geometria=cantiere_data.get("iccd_geometria"),
+            iccd_re_tipo=iccd_re_tipo,
+            iccd_re_metodo=iccd_re_metodo,
+            iccd_geometria=iccd_geometria,
             # Metadati
-            responsabile_cantiere=cantiere_data.get("responsabile_cantiere"),
-            tipologia_intervento=cantiere_data.get("tipologia_intervento"),
-            priorita=cantiere_data.get("priorita", 3)
+            responsabile_cantiere=responsabile_cantiere,
+            tipologia_intervento=tipologia_intervento,
+            priorita=priorita
         )
         
         db.add(nuovo_cantiere)
@@ -392,9 +530,16 @@ async def v1_create_cantiere(
             "site_info": site_info
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Errore creazione cantiere: {str(e)}")
-        logger.error(f"Unexpected error: {e}", exc_info=True)
+        payload_keys = list(cantiere_data.keys()) if isinstance(cantiere_data, dict) else []
+        logger.exception(
+            "Errore creazione cantiere site_id={} payload_keys={} error={}",
+            str(site_id),
+            payload_keys,
+            str(e)
+        )
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/cantieri/{cantiere_id}", summary="Dettaglio cantiere", tags=["Cantieri"])
@@ -509,7 +654,7 @@ async def v1_update_cantiere(
         if "codice_cig" in cantiere_data:
             cantiere.codice_cig = cantiere_data["codice_cig"]
         if "importo_lavori" in cantiere_data:
-            cantiere.importo_lavori = cantiere_data["importo_lavori"]
+            cantiere.importo_lavori = parse_optional_decimal(cantiere_data["importo_lavori"], "importo_lavori")
         
         # Aggiorna campi temporali
         if "data_inizio_prevista" in cantiere_data:
@@ -543,7 +688,7 @@ async def v1_update_cantiere(
         if "tipologia_intervento" in cantiere_data:
             cantiere.tipologia_intervento = cantiere_data["tipologia_intervento"]
         if "priorita" in cantiere_data:
-            cantiere.priorita = cantiere_data["priorita"]
+            cantiere.priorita = parse_optional_int(cantiere_data["priorita"], "priorita", default=cantiere.priorita)
         
         # Se lo stato cambia a "in_corso", imposta data inizio effettiva
         if cantiere_data.get("stato") == "in_corso" and not cantiere.data_inizio_effettiva:

@@ -568,3 +568,77 @@ class UnitaStratigraficaMuraria(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     def has_sezione_muraria(self) -> bool:
         """Controlla se ha sezione muraria documentata"""
         return self.sezione_muraria_visibile and bool(self.sezione_muraria_tipo)
+
+
+# ===== MODELLO TMA (TABELLA MATERIALI ARCHEOLOGICI) =====
+
+class TabellaMaterialiArcheologici(Base, SiteMixin, UserMixin, SoftDeleteMixin):
+    """
+    Tabella Materiali Archeologici (TMA) - ICCD 3.00 livello inventariale.
+    Struttura minima operativa per la raccolta dati in linea con specifiche obbligatorie.
+    """
+    __tablename__ = "tma_materiali_archeologici"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id"), nullable=False, index=True)
+
+    # ===== CD - CODICI =====
+    tsk = Column(String(4), nullable=False, default="TMA")
+    lir = Column(String(5), nullable=False, default="I")
+    nctr = Column(String(2), nullable=False)
+    nctn = Column(String(8), nullable=False)
+    esc = Column(String(25), nullable=False)
+    ecp = Column(String(25), nullable=False)
+
+    # ===== OG - OGGETTO =====
+    ogtd = Column(String(100), nullable=False)
+    ogtm = Column(String(250), nullable=False)
+
+    # ===== LC - LOCALIZZAZIONE =====
+    pvcs = Column(String(50), nullable=False)
+    pvcr = Column(String(25), nullable=False)
+    pvcp = Column(String(3), nullable=False)
+    pvcc = Column(String(50), nullable=False)
+
+    # ===== DT - CRONOLOGIA =====
+    dtzg = Column(String(50), nullable=False)
+    dtm = Column(JSON, default=list, nullable=False)  # motivazioni cronologia (ripetitivo)
+
+    # ===== MA - MATERIALE =====
+    macc = Column(String(100), nullable=False)
+    macq = Column(String(100), nullable=False)
+
+    # ===== TU - CONDIZIONE GIURIDICA =====
+    cdgg = Column(String(50), nullable=False)
+
+    # ===== AD - ACCESSO AI DATI =====
+    adsp = Column(String(1), nullable=False, default="2")
+    adsm = Column(String(70), nullable=False)
+
+    # ===== CM - COMPILAZIONE =====
+    cmpd = Column(String(4), nullable=False)  # anno compilazione
+    cmpn = Column(JSON, default=list, nullable=False)  # ripetitivo (cognome, nome)
+    fur = Column(JSON, default=list, nullable=False)   # ripetitivo (cognome, nome)
+
+    # Note operative opzionali
+    notes = Column(Text)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    site = relationship("ArchaeologicalSite", back_populates="tma_records")
+
+    __table_args__ = (
+        UniqueConstraint("site_id", "nctr", "nctn", name="uq_tma_site_nct"),
+        Index("idx_tma_site_nct", "site_id", "nctr", "nctn"),
+        Index("idx_tma_oggetto", "ogtd"),
+        Index("idx_tma_localizzazione", "pvcc"),
+    )
+
+    @property
+    def nct(self) -> str:
+        """Codice univoco ICCD (concatenazione NCTR + NCTN)."""
+        return f"{self.nctr or ''}{self.nctn or ''}"
+
+    def __repr__(self):
+        return f"<TMA(nct={self.nct}, site_id={self.site_id})>"
