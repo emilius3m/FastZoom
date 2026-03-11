@@ -799,64 +799,6 @@
                         </p>
                     </div>
 
-                    <!-- Stato Validazione -->
-                    <div class="mb-8" x-show="editingGiornale">
-                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                            <i class="fas fa-certificate mr-2 text-green-600"></i>
-                            Stato Validazione
-                        </h4>
-
-                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0">
-                                        <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium"
-                                            :class="editingGiornaleData && editingGiornaleData.validato ?
-                                                'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-                                                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'">
-                                            <i class="fas" :class="editingGiornaleData && editingGiornaleData.validato ?
-                                                'fa-check-circle' : 'fa-clock'"></i>
-                                            <span class="ml-2" x-text="editingGiornaleData && editingGiornaleData.validato ?
-                                                'Validato' : 'Non Validato'"></span>
-                                        </span>
-                                    </div>
-                                    <div class="ml-4">
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                                            <span x-show="editingGiornaleData && editingGiornaleData.validato">
-                                                Validato il: <span x-text="(editingGiornaleData && editingGiornaleData.data_validazione) ?
-                                                new Date(editingGiornaleData.data_validazione).toLocaleString('it-IT') :
-                                                'Data non disponibile'"></span>
-                                            </span>
-                                            <span x-show="!editingGiornaleData || !editingGiornaleData.validato">
-                                                Il giornale non è ancora stato validato
-                                            </span>
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <!-- Azioni Validazione -->
-                                <div class="flex space-x-2"
-                                    x-show="!editingGiornaleData || !editingGiornaleData.validato">
-                                    <button type="button" @click="validateGiornale()" :disabled="saving"
-                                        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 text-sm flex items-center">
-                                        <i x-show="saving" class="fas fa-spinner fa-spin mr-2"></i>
-                                        <i x-show="!saving" class="fas fa-check-circle mr-2"></i>
-                                        <span x-text="saving ? 'Validazione...' : 'Valida Giornale'"></span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Note sulla Validazione -->
-                            <div class="mt-3 text-sm text-gray-600 dark:text-gray-400">
-                                <p>
-                                    <i class="fas fa-info-circle mr-1"></i>
-                                    La validazione rende il giornale non più modificabile e ne attesta l'autenticità.
-                                    Una volta validato, il giornale può essere esportato con firma digitale.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Foto Documentation -->
                     <div class="mb-8">
                         <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
@@ -1164,6 +1106,64 @@
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     <span x-show="mezzi_disponibili.length > 0">Compilato automaticamente in base ai mezzi selezionati</span>
                                     <span x-show="mezzi_disponibili.length === 0">Inserimento manuale (nessun mezzo configurato nel sito)</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stato Validazione -->
+                    <div class="mb-8" x-show="editingGiornale">
+                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                            <i class="fas fa-certificate mr-2 text-green-600"></i>
+                            Stato Validazione
+                        </h4>
+
+                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium"
+                                            :class="editingGiornaleData && editingGiornaleData.validato ?
+                                                'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
+                                                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'">
+                                            <i class="fas" :class="editingGiornaleData && editingGiornaleData.validato ?
+                                                'fa-check-circle' : 'fa-clock'"></i>
+                                            <span class="ml-2" x-text="editingGiornaleData && editingGiornaleData.validato ?
+                                                'Validato' : 'Non Validato'"></span>
+                                        </span>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            <span x-show="editingGiornaleData && editingGiornaleData.validato">
+                                                Validato il: <span x-text="(editingGiornaleData && editingGiornaleData.data_validazione) ?
+                                                new Date(editingGiornaleData.data_validazione).toLocaleString('it-IT') :
+                                                'Data non disponibile'"></span>
+                                            </span>
+                                            <span x-show="!editingGiornaleData || !editingGiornaleData.validato">
+                                                Il giornale non è ancora stato validato
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Azioni Validazione -->
+                                <div class="flex space-x-2"
+                                    x-show="!editingGiornaleData || !editingGiornaleData.validato">
+                                    <button type="button" @click="validateGiornale()" :disabled="saving"
+                                        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 text-sm flex items-center">
+                                        <i x-show="saving" class="fas fa-spinner fa-spin mr-2"></i>
+                                        <i x-show="!saving" class="fas fa-check-circle mr-2"></i>
+                                        <span x-text="saving ? 'Validazione...' : 'Valida Giornale'"></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Note sulla Validazione -->
+                            <div class="mt-3 text-sm text-gray-600 dark:text-gray-400">
+                                <p>
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    La validazione rende il giornale non più modificabile e ne attesta l'autenticità.
+                                    Una volta validato, il giornale può essere esportato con firma digitale.
                                 </p>
                             </div>
                         </div>
