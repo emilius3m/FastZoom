@@ -191,13 +191,19 @@ async def v1_cantieri_sito_view(
                 "updated_at": cantiere.updated_at.isoformat() if hasattr(cantiere.updated_at, 'isoformat') else None
             })
 
+        # Serializza il sito basandosi su site_info
+        site_data = {
+            "id": str(site_id),
+            "name": site_info.get("site_name", "Sito") if site_info else "Sito"
+        }
+
         # Prepara context base
         context = await get_base_template_context(
             request, current_user_id, user_sites, db, current_page="cantieri"
         )
         context.update({
             "site_id": str(site_id),
-            "site": site_info,  # Template expects 'site', not 'site_info'
+            "site": site_data,  # Template expects a dict with 'id'
             "site_info": site_info,
             "cantieri": cantieri_data,  # Pass serialized data
             "total_cantieri": total_cantieri,
@@ -422,12 +428,19 @@ async def v1_nuovo_cantiere_view(
             {"value": "altro", "label": "Altro"}
         ]
         
+        # Serializza il sito basandosi su site_info
+        site_data = {
+            "id": str(site_id),
+            "name": site_info.get("site_name", "Sito") if site_info else "Sito"
+        }
+
         # Prepara context base
         context = await get_base_template_context(
             request, current_user_id, user_sites, db, current_page="cantieri"
         )
         context.update({
             "site_id": str(site_id),
+            "site": site_data,
             "site_info": site_info,
             "stati_options": stati_options,
             "priorita_options": priorita_options,
@@ -507,12 +520,19 @@ async def v1_modifica_cantiere_view(
             {"value": "altro", "label": "Altro"}
         ]
         
+        # Serializza il sito basandosi su site_info
+        site_data = {
+            "id": str(cantiere.site_id),
+            "name": site_info.get("site_name", "Sito") if site_info else "Sito"
+        }
+
         # Prepara context base
         context = await get_base_template_context(
             request, current_user_id, user_sites, db, current_page="cantieri"
         )
         context.update({
             "cantiere": cantiere,
+            "site": site_data,
             "site_info": site_info,
             "stati_options": stati_options,
             "priorita_options": priorita_options,
