@@ -46,6 +46,7 @@ class GiornaleService:
             "responsabile_scavo": g.responsabile_nome or (g.responsabile.email if g.responsabile else None),
             "descrizione_lavori": g.descrizione_lavori,
             "condizioni_meteo": g.condizioni_meteo,
+            "validato": bool(g.validato),
             "stato": "validato" if g.validato else "in_attesa",
             "us_elaborate": g.get_us_list() if hasattr(g, "get_us_list") else [],
             "us_elaborate_input": g.us_elaborate if g.us_elaborate else "",
@@ -152,6 +153,40 @@ class GiornaleService:
                     detail=f"Il cantiere {cantiere_id} non appartiene al sito {site_id}"
                 )
 
+        # Validate and normalize selected mezzi
+        mezzi_utilizzati_value = giornale_data.get("mezzi_utilizzati", "")
+        mezzi_ids_raw = giornale_data.get("mezzi_ids", []) or []
+        if mezzi_ids_raw:
+            normalized_mezzi_ids: List[UUID] = []
+            for mezzo_id in mezzi_ids_raw:
+                try:
+                    normalized_mezzi_ids.append(UUID(str(mezzo_id)))
+                except Exception:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"ID mezzo non valido: {mezzo_id}"
+                    )
+
+            mezzi_records = await self.repository.get_mezzi_by_ids(site_id, normalized_mezzi_ids)
+            mezzi_map = {str(m.id): m for m in mezzi_records}
+
+            if len(mezzi_map) != len(set(str(mid) for mid in normalized_mezzi_ids)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Uno o più mezzi selezionati non sono assegnati al sito"
+                )
+
+            ordered_mezzi_labels: List[str] = []
+            for mezzo_id in normalized_mezzi_ids:
+                mezzo = mezzi_map.get(str(mezzo_id))
+                if mezzo:
+                    label = mezzo.nome
+                    if mezzo.targa:
+                        label = f"{label} ({mezzo.targa})"
+                    ordered_mezzi_labels.append(label)
+
+            mezzi_utilizzati_value = ", ".join(ordered_mezzi_labels)
+
         # Create giornale object
         nuovo_giornale = GiornaleCantiere(
             site_id=str(site_id),
@@ -176,6 +211,7 @@ class GiornaleService:
             strutture=giornale_data.get("strutture"),
             us_elaborate=giornale_data.get("us_elaborate_input", ""),
             attrezzatura_utilizzata=giornale_data.get("apparecchiature_input", ""),
+            mezzi_utilizzati=mezzi_utilizzati_value,
             validato=False
         )
         
@@ -272,6 +308,42 @@ class GiornaleService:
 
         # Update base fields
         update_dict = giornale_data.copy()
+
+        # Mezzi selected from UI (ids -> readable label string)
+        if "mezzi_ids" in update_dict:
+            mezzi_ids_raw = update_dict.get("mezzi_ids") or []
+            if mezzi_ids_raw:
+                normalized_mezzi_ids: List[UUID] = []
+                for mezzo_id in mezzi_ids_raw:
+                    try:
+                        normalized_mezzi_ids.append(UUID(str(mezzo_id)))
+                    except Exception:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"ID mezzo non valido: {mezzo_id}"
+                        )
+
+                mezzi_records = await self.repository.get_mezzi_by_ids(site_id, normalized_mezzi_ids)
+                mezzi_map = {str(m.id): m for m in mezzi_records}
+
+                if len(mezzi_map) != len(set(str(mid) for mid in normalized_mezzi_ids)):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Uno o più mezzi selezionati non sono assegnati al sito"
+                    )
+
+                ordered_mezzi_labels: List[str] = []
+                for mezzo_id in normalized_mezzi_ids:
+                    mezzo = mezzi_map.get(str(mezzo_id))
+                    if mezzo:
+                        label = mezzo.nome
+                        if mezzo.targa:
+                            label = f"{label} ({mezzo.targa})"
+                        ordered_mezzi_labels.append(label)
+
+                update_dict["mezzi_utilizzati"] = ", ".join(ordered_mezzi_labels)
+            else:
+                update_dict["mezzi_utilizzati"] = ""
         
         # Helper per i campi data/time
         if "data" in update_dict:
@@ -293,7 +365,7 @@ class GiornaleService:
                 update_dict[list_field] = ", ".join(update_dict[list_field]) if update_dict[list_field] else ""
 
         # Cleanup fields we processed manually
-        for field in ["operatori", "id", "site_id"]:
+        for field in ["operatori", "mezzi_ids", "id", "site_id"]:
             update_dict.pop(field, None)
 
         await self.repository.update(giornale, update_dict)

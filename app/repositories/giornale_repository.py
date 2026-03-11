@@ -6,7 +6,12 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.base import BaseRepository
-from app.models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere, giornale_operatori_association
+from app.models.giornale_cantiere import (
+    GiornaleCantiere,
+    OperatoreCantiere,
+    MezzoCantiere,
+    giornale_operatori_association,
+)
 from app.models.cantiere import Cantiere
 
 class GiornaleRepository(BaseRepository[GiornaleCantiere]):
@@ -136,6 +141,32 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
         )
         result = await self.db_session.execute(query)
         return result.scalar_one_or_none() is not None
+
+    async def verify_mezzo_site_access(self, mezzo_id: UUID, site_id: UUID) -> bool:
+        """Verifica che il mezzo sia assegnato al sito"""
+        query = select(MezzoCantiere).where(
+            and_(
+                MezzoCantiere.id == str(mezzo_id),
+                MezzoCantiere.site_id == str(site_id)
+            )
+        )
+        result = await self.db_session.execute(query)
+        return result.scalar_one_or_none() is not None
+
+    async def get_mezzi_by_ids(self, site_id: UUID, mezzi_ids: List[UUID]) -> List[MezzoCantiere]:
+        """Recupera i mezzi di un sito filtrando per lista ID"""
+        normalized_ids = [str(mezzo_id) for mezzo_id in (mezzi_ids or []) if mezzo_id]
+        if not normalized_ids:
+            return []
+
+        query = select(MezzoCantiere).where(
+            and_(
+                MezzoCantiere.site_id == str(site_id),
+                MezzoCantiere.id.in_(normalized_ids)
+            )
+        )
+        result = await self.db_session.execute(query)
+        return result.scalars().all()
 
     async def add_operatore_association(self, giornale_id: UUID, operatore_id: UUID, ore: float = None, note: str = None):
         """Aggiunge associazione operatore-giornale"""

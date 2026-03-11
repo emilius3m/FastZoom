@@ -1028,6 +1028,68 @@
                         </div>
                     </div>
 
+                    <!-- Mezzi Utilizzati (selezione guidata) -->
+                    <div class="mb-8">
+                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                            <i class="fas fa-truck-monster mr-2 text-amber-600"></i>
+                            Mezzi Utilizzati
+                            <span class="ml-2 text-sm text-gray-500" x-show="mezzi_disponibili.length === 0">(Nessun
+                                mezzo disponibile)</span>
+                        </h4>
+
+                        <div
+                            class="max-h-72 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-4 bg-gray-50 dark:bg-gray-700">
+                            <template x-for="mezzo in mezzi_disponibili" :key="mezzo.id">
+                                <label
+                                    class="mb-3 p-3 bg-white dark:bg-gray-600 rounded-lg border border-gray-200 dark:border-gray-500 flex items-start cursor-pointer">
+                                    <input type="checkbox" name="mezzi_ids" :value="mezzo.id" @change="toggleMezzo(mezzo)"
+                                        :checked="isMezzoSelezionato(mezzo.id)"
+                                        class="mt-1 rounded border-gray-300 dark:border-gray-600 text-orange-600 focus:ring-orange-500">
+                                    <div class="ml-3 flex-1 min-w-0">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <span class="font-medium text-gray-900 dark:text-white" x-text="mezzo.nome"></span>
+                                            <span class="text-xs px-2 py-1 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                                                x-text="mezzo.tipo || 'N/D'"></span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            <span x-text="[mezzo.marca, mezzo.modello].filter(Boolean).join(' ')"></span>
+                                            <span x-show="mezzo.targa" class="ml-2 font-medium"
+                                                x-text="mezzo.targa ? `• Targa: ${mezzo.targa}` : ''"></span>
+                                        </div>
+                                    </div>
+                                </label>
+                            </template>
+
+                            <div x-show="mezzi_disponibili.length === 0"
+                                class="text-center text-gray-500 dark:text-gray-400 py-6">
+                                <i class="fas fa-truck text-4xl mb-3 text-gray-300 dark:text-gray-600"></i>
+                                <p>Nessun mezzo disponibile per questo sito</p>
+                                <p class="text-sm mt-2">Aggiungi prima i mezzi dalla sezione Gestione Mezzi.</p>
+                            </div>
+                        </div>
+
+                        <div x-show="getMezziSelezionatiCount() > 0"
+                            class="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+                            <h5 class="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2 flex items-center">
+                                <i class="fas fa-clipboard-check mr-2"></i>
+                                Riepilogo Mezzi Selezionati (<span x-text="getMezziSelezionatiCount()"></span>)
+                            </h5>
+                            <div class="space-y-1 max-h-24 overflow-y-auto">
+                                <template x-for="mezzo in getMezziSelezionati()" :key="mezzo.id">
+                                    <div class="text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between">
+                                        <span x-text="mezzo.nome"></span>
+                                        <span x-show="mezzo.targa" class="font-medium" x-text="mezzo.targa"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Seleziona i mezzi presenti in cantiere. Il campo testuale verrà compilato automaticamente.
+                        </p>
+                    </div>
+
                     <!-- Attrezzature e Mezzi -->
                     <div class="mb-8">
                         <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
@@ -1054,10 +1116,12 @@
                                     Mezzi Utilizzati
                                 </label>
                                 <textarea name="mezzi_utilizzati" x-model="formData.mezzi_utilizzati" rows="3"
+                                    :readonly="mezzi_disponibili.length > 0"
                                     placeholder="Es: Escavatore, Pala meccanica, Camion (separate da virgole)"
                                     class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    Mezzi meccanici utilizzati durante i lavori
+                                    <span x-show="mezzi_disponibili.length > 0">Compilato automaticamente in base ai mezzi selezionati</span>
+                                    <span x-show="mezzi_disponibili.length === 0">Inserimento manuale (nessun mezzo configurato nel sito)</span>
                                 </p>
                             </div>
                         </div>

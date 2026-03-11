@@ -534,7 +534,7 @@
                         </h3>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {% if cantiere.codice_cup %}
-                            <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
+                            <div class="bg-purple-50 dark:bg-gray-800 rounded-lg p-3">
                                 <div class="flex items-center">
                                     <i class="fas fa-hashtag text-purple-600 dark:text-purple-400 mr-2"></i>
                                     <div>
@@ -547,7 +547,7 @@
                             </div>
                             {% endif %}
                             {% if cantiere.codice_cig %}
-                            <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3">
+                            <div class="bg-indigo-50 dark:bg-gray-800 rounded-lg p-3">
                                 <div class="flex items-center">
                                     <i class="fas fa-fingerprint text-indigo-600 dark:text-indigo-400 mr-2"></i>
                                     <div>
@@ -560,7 +560,7 @@
                             </div>
                             {% endif %}
                             {% if cantiere.importo_lavori %}
-                            <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                            <div class="bg-green-50 dark:bg-gray-800 rounded-lg p-3">
                                 <div class="flex items-center">
                                     <i class="fas fa-euro-sign text-green-600 dark:text-green-400 mr-2"></i>
                                     <div>
@@ -590,7 +590,7 @@
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                             <i class="fas fa-clipboard-list mr-2 text-orange-600"></i>Oggetto Appalto
                         </h3>
-                        <div class="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
+                        <div class="bg-orange-50 dark:bg-gray-800 rounded-lg p-4">
                             <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{
                                 cantiere.oggetto_appalto }}</p>
                         </div>
@@ -606,7 +606,7 @@
                         <!-- Periodo Programmato -->
                         <div class="mb-4">
                             <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Programmato</h4>
-                            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                            <div class="bg-blue-50 dark:bg-gray-800 rounded-lg p-3">
                                 {% if cantiere.data_inizio_prevista %}
                                 <p class="text-sm text-blue-800 dark:text-blue-300">
                                     <i class="fas fa-calendar-plus mr-2"></i>
@@ -628,7 +628,7 @@
                         {% if cantiere.data_inizio_effettiva %}
                         <div>
                             <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Effettivo</h4>
-                            <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                            <div class="bg-green-50 dark:bg-gray-800 rounded-lg p-3">
                                 <p class="text-sm text-green-800 dark:text-green-300">
                                     <i class="fas fa-calendar-plus mr-2"></i>
                                     Inizio: {{ cantiere.data_inizio_effettiva[:10] if cantiere.data_inizio_effettiva is
@@ -659,11 +659,11 @@
                 <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">Storia del Cantiere</h3>
 
                 <!-- Timeline Flowbite -->
-                <ol class="relative border-s border-gray-200 dark:border-gray-700">
+                <ol class="relative border-l border-gray-200 dark:border-gray-700">
                     {% if cantiere.created_at %}
-                    <li class="mb-10 ms-6">
+                    <li class="mb-10 ml-8 relative">
                         <span
-                            class="absolute flex items-center justify-center w-6 h-6 bg-blue-100 rounded-full -start-3 ring-8 ring-white dark:ring-gray-800 dark:bg-blue-900">
+                            class="absolute flex items-center justify-center w-6 h-6 bg-blue-100 rounded-full -left-11 ring-8 ring-white dark:ring-gray-800 dark:bg-blue-900">
                             <i class="fas fa-plus w-2 h-2 text-blue-800 dark:text-blue-300"></i>
                         </span>
                         <h3 class="flex items-center mb-1 text-lg font-semibold text-gray-900 dark:text-white">
@@ -679,9 +679,9 @@
                     {% endif %}
 
                     {% if cantiere.data_inizio_effettiva %}
-                    <li class="mb-10 ms-6">
+                    <li class="mb-10 ml-8 relative">
                         <span
-                            class="absolute flex items-center justify-center w-6 h-6 bg-green-100 rounded-full -start-3 ring-8 ring-white dark:ring-gray-800 dark:bg-green-900">
+                            class="absolute flex items-center justify-center w-6 h-6 bg-green-100 rounded-full -left-11 ring-8 ring-white dark:ring-gray-800 dark:bg-green-900">
                             <i class="fas fa-play w-2 h-2 text-green-800 dark:text-green-300"></i>
                         </span>
                         <h3 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">Avvio Lavori</h3>
@@ -696,9 +696,9 @@
                     {% endif %}
 
                     {% if cantiere.data_fine_effettiva %}
-                    <li class="ms-6">
+                    <li class="ml-8 relative">
                         <span
-                            class="absolute flex items-center justify-center w-6 h-6 bg-gray-100 rounded-full -start-3 ring-8 ring-white dark:ring-gray-800 dark:bg-gray-700">
+                            class="absolute flex items-center justify-center w-6 h-6 bg-gray-100 rounded-full -left-11 ring-8 ring-white dark:ring-gray-800 dark:bg-gray-700">
                             <i class="fas fa-check w-2 h-2 text-gray-800 dark:text-gray-300"></i>
                         </span>
                         <h3 class="mb-1 text-lg font-semibold text-gray-900 dark:text-white">Completamento</h3>
@@ -778,7 +778,8 @@
                 attrezzatura_utilizzata: '',
                 mezzi_utilizzati: '',
                 apparecchiature_input: '',
-                operatori_ids: []
+                operatori_ids: [],
+                mezzi_ids: []
             },
 
             // Available options (these would normally be loaded from API)
@@ -795,6 +796,7 @@
             ],
 
             operatori_disponibili: [],
+            mezzi_disponibili: [],
 
             // Alert state
             alert: {
@@ -824,9 +826,11 @@
 
                 // Load operators before showing the modal
                 await this.loadOperatoriDisponibili();
+                await this.loadMezziDisponibili();
 
                 // Load operator data for editing after operators are loaded
                 this.loadOperatoriDataForEditing(this.editingGiornaleData);
+                this.loadMezziDataForEditing(this.editingGiornaleData);
 
                 this.showCreateModal = true;
             },
@@ -855,6 +859,7 @@
                 this.editingGiornale = false;
                 this.resetForm();
                 await this.loadOperatoriDisponibili();
+                await this.loadMezziDisponibili();
             },
 
             async openEditModal() {
@@ -925,7 +930,8 @@
                         attrezzatura_utilizzata: '',
                         mezzi_utilizzati: '',
                         apparecchiature_input: '',
-                        operatori_ids: []
+                        operatori_ids: [],
+                        mezzi_ids: []
                     };
 
                     // Reset enhanced operator data
@@ -1226,6 +1232,39 @@
                 console.log('DEBUG: Fine caricamento operatori, operatori_disponibili.length:', this.operatori_disponibili.length);
             },
 
+            async loadMezziDisponibili() {
+                console.log('DEBUG: Inizio caricamento mezzi per sito:', '{{ site.id }}');
+
+                try {
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/mezzi`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'include'
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.mezzi && Array.isArray(data.mezzi)) {
+                            this.mezzi_disponibili = data.mezzi;
+                        } else if (Array.isArray(data)) {
+                            this.mezzi_disponibili = data;
+                        } else {
+                            this.mezzi_disponibili = [];
+                        }
+                    } else {
+                        this.mezzi_disponibili = [];
+                    }
+                } catch (error) {
+                    console.error('Errore caricamento mezzi:', error);
+                    this.mezzi_disponibili = [];
+                }
+
+                console.log('DEBUG: Fine caricamento mezzi, mezzi_disponibili.length:', this.mezzi_disponibili.length);
+            },
+
             // ===== ENHANCED OPERATOR FUNCTIONS =====
 
             // Toggle operator selection
@@ -1310,6 +1349,68 @@
                             note_presenza: op.note_presenza || ''
                         };
                     });
+                }
+            },
+
+            toggleMezzo(mezzo) {
+                const mezzoId = mezzo.id;
+                const index = this.formData.mezzi_ids.indexOf(mezzoId);
+
+                if (index === -1) {
+                    this.formData.mezzi_ids.push(mezzoId);
+                } else {
+                    this.formData.mezzi_ids.splice(index, 1);
+                }
+
+                this.syncMezziUtilizzatiFromSelection();
+            },
+
+            isMezzoSelezionato(mezzoId) {
+                return this.formData.mezzi_ids.includes(mezzoId);
+            },
+
+            getMezziSelezionati() {
+                return this.mezzi_disponibili.filter(mezzo => this.isMezzoSelezionato(mezzo.id));
+            },
+
+            getMezziSelezionatiCount() {
+                return this.formData.mezzi_ids.length;
+            },
+
+            syncMezziUtilizzatiFromSelection() {
+                const selected = this.getMezziSelezionati().map(mezzo => {
+                    if (mezzo.targa) {
+                        return `${mezzo.nome} (${mezzo.targa})`;
+                    }
+                    return mezzo.nome;
+                });
+                this.formData.mezzi_utilizzati = selected.join(', ');
+            },
+
+            loadMezziDataForEditing(giornale) {
+                this.formData.mezzi_ids = [];
+
+                const mezziText = (giornale && giornale.mezzi_utilizzati) ? giornale.mezzi_utilizzati.toLowerCase() : '';
+                if (!mezziText || !Array.isArray(this.mezzi_disponibili) || this.mezzi_disponibili.length === 0) {
+                    return;
+                }
+
+                let matchedCount = 0;
+                this.mezzi_disponibili.forEach(mezzo => {
+                    const nome = (mezzo.nome || '').toLowerCase();
+                    const targa = (mezzo.targa || '').toLowerCase();
+
+                    const nomeMatch = nome && mezziText.includes(nome);
+                    const targaMatch = targa && mezziText.includes(targa);
+
+                    if (nomeMatch || targaMatch) {
+                        this.formData.mezzi_ids.push(mezzo.id);
+                        matchedCount += 1;
+                    }
+                });
+
+                if (matchedCount > 0) {
+                    this.syncMezziUtilizzatiFromSelection();
                 }
             },
 
@@ -1951,6 +2052,7 @@
                         mezzi_utilizzati: giornale.mezzi_utilizzati || '',
                         apparecchiature_input: giornale.attrezzatura_utilizzata ? giornale.attrezzatura_utilizzata : (giornale.apparecchiature || ''),
                         operatori_ids: giornale.operatori_presenti ? giornale.operatori_presenti.map(op => op.id) : [],
+                        mezzi_ids: [],
                         area_intervento: giornale.area_intervento || '',
                         saggio: giornale.saggio || '',
                         obiettivi: giornale.obiettivi || '',

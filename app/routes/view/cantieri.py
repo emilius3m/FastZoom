@@ -17,7 +17,7 @@ from app.core.security import get_current_user_id_with_blacklist, get_current_us
 from app.database.db import get_async_session
 from app.models.cantiere import Cantiere
 from app.models.sites import ArchaeologicalSite
-from app.models.giornale_cantiere import GiornaleCantiere
+from app.models.giornale_cantiere import GiornaleCantiere, giornale_operatori_association
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload
 
@@ -287,7 +287,17 @@ async def v1_cantiere_detail_view(
         )
         ultimo_giornale = ultimo_giornale_result.scalar_one_or_none()
         
-        operatori_count = 0
+        # Operatori distinti coinvolti nei giornali del cantiere
+        operatori_count_result = await db.execute(
+            select(func.count(func.distinct(giornale_operatori_association.c.operatore_id)))
+            .select_from(giornale_operatori_association)
+            .join(
+                GiornaleCantiere,
+                GiornaleCantiere.id == giornale_operatori_association.c.giornale_id
+            )
+            .where(GiornaleCantiere.cantiere_id == str(cantiere_id))
+        )
+        operatori_count = operatori_count_result.scalar() or 0
         
         # Serializza i dati del cantiere per evitare lazy loading nel template
         cantiere_data = {
