@@ -176,8 +176,8 @@ def setup_logging_interception() -> None:
     for logger_name in loggers_to_configure:
         logging_logger = logging.getLogger(logger_name)
         logging_logger.handlers = []
-        # Set SQLAlchemy loggers to WARNING to reduce verbose query logging
-        if logger_name.startswith("sqlalchemy"):
+        # Set SQLAlchemy and uvicorn.access loggers to WARNING to reduce verbose logging
+        if logger_name.startswith("sqlalchemy") or logger_name == "uvicorn.access":
             logging_logger.setLevel(logging.WARNING)
         else:
             logging_logger.setLevel(logging.DEBUG)
@@ -211,7 +211,7 @@ def configure_third_party_loggers(
     """
     default_config = {
         "uvicorn": {"level": "INFO"},
-        "uvicorn.access": {"level": "INFO"},
+        "uvicorn.access": {"level": "WARNING"},
         "uvicorn.error": {"level": "INFO"},
         "fastapi": {"level": "INFO"},
         "sqlalchemy.engine": {"level": "WARNING"},

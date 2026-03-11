@@ -183,7 +183,7 @@ class AuthService:
                 
                 # Superuser gets access to all active sites
                 if user.is_superuser:
-                    logger.info(
+                    logger.debug(
                         "Superuser accessing all active sites",
                         extra={
                             "user_email": user.email,
@@ -357,7 +357,7 @@ class AuthService:
                         }
                     )
                 
-                logger.success(
+                logger.debug(
                     "Retrieved all active sites for superuser",
                     extra={
                         "sites_count": len(sites_data),
