@@ -147,7 +147,6 @@ class GiornaleCantiereBase(BaseModel):
     
     modalita_lavorazioni: Optional[str] = Field(None, max_length=1000, description="Modalità e metodologie di lavorazione")
     attrezzatura_utilizzata: Optional[str] = Field(None, max_length=1000, description="Attrezzatura e strumenti utilizzati")
-    mezzi_utilizzati: Optional[str] = Field(None, max_length=500, description="Mezzi meccanici utilizzati")
     
     # Documentazione archeologica
     us_elaborate: Optional[str] = Field(None, max_length=500, description="Unità Stratigrafiche elaborate (es: US001, US002)")
@@ -199,7 +198,6 @@ class GiornaleCantiereUpdate(BaseModel):
     strutture: Optional[str] = Field(None)
     modalita_lavorazioni: Optional[str] = Field(None, max_length=1000)
     attrezzatura_utilizzata: Optional[str] = Field(None, max_length=1000)
-    mezzi_utilizzati: Optional[str] = Field(None, max_length=500)
     us_elaborate: Optional[str] = Field(None, max_length=500)
     usm_elaborate: Optional[str] = Field(None, max_length=500)
     usr_elaborate: Optional[str] = Field(None, max_length=500)

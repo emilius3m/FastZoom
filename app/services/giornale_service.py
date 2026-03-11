@@ -13,6 +13,152 @@ class GiornaleService:
         self.repository = GiornaleRepository(db_session)
         self.db = db_session
 
+    async def _resolve_mezzi_associations(
+        self,
+        site_id: UUID,
+        payload: Dict[str, Any],
+        strict: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Risolve i mezzi in un formato persistibile su tabella associativa.
+
+        Returns:
+            {
+                "associations": [{"mezzo_id": "...", "ore_utilizzo": float|None, "note_utilizzo": str}],
+                "display_value": "stringa leggibile per compatibilità storica"
+            }
+        """
+        mezzi_payload = payload.get("mezzi")
+        normalized_items: List[Dict[str, Any]] = []
+
+        if isinstance(mezzi_payload, list):
+            for mezzo_info in mezzi_payload:
+                mezzo_id_raw = (mezzo_info or {}).get("id")
+                if not mezzo_id_raw:
+                    if strict:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Ogni mezzo selezionato deve avere un ID valido"
+                        )
+                    continue
+
+                try:
+                    mezzo_id = str(UUID(str(mezzo_id_raw)))
+                except Exception:
+                    if strict:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"ID mezzo non valido: {mezzo_id_raw}"
+                        )
+                    continue
+
+                ore_raw = (mezzo_info or {}).get("ore_utilizzo")
+                if ore_raw in ("", None):
+                    ore_utilizzo = None
+                else:
+                    try:
+                        ore_utilizzo = float(ore_raw)
+                    except (TypeError, ValueError):
+                        if strict:
+                            raise HTTPException(
+                                status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"Ore utilizzo non valide per mezzo {mezzo_id}"
+                            )
+                        ore_utilizzo = None
+
+                    if ore_utilizzo is not None and ore_utilizzo < 0:
+                        if strict:
+                            raise HTTPException(
+                                status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"Ore utilizzo non valide per mezzo {mezzo_id}"
+                            )
+                        ore_utilizzo = None
+
+                note_utilizzo = (mezzo_info or {}).get("note_utilizzo") or ""
+
+                normalized_items.append({
+                    "mezzo_id": mezzo_id,
+                    "ore_utilizzo": ore_utilizzo,
+                    "note_utilizzo": note_utilizzo,
+                })
+
+        elif payload.get("mezzi_ids"):
+            for mezzo_id_raw in payload.get("mezzi_ids", []) or []:
+                try:
+                    mezzo_id = str(UUID(str(mezzo_id_raw)))
+                except Exception:
+                    if strict:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"ID mezzo non valido: {mezzo_id_raw}"
+                        )
+                    continue
+
+                normalized_items.append({
+                    "mezzo_id": mezzo_id,
+                    "ore_utilizzo": None,
+                    "note_utilizzo": "",
+                })
+        else:
+            return {
+                "associations": [],
+                "display_value": "",
+            }
+
+        if not normalized_items:
+            return {"associations": [], "display_value": ""}
+
+        seen = set()
+        ordered_ids: List[UUID] = []
+        by_mezzo_id: Dict[str, Dict[str, Any]] = {}
+        for item in normalized_items:
+            mezzo_id = item["mezzo_id"]
+            if mezzo_id not in seen:
+                seen.add(mezzo_id)
+                ordered_ids.append(UUID(mezzo_id))
+            by_mezzo_id[mezzo_id] = item
+
+        mezzi_records = await self.repository.get_mezzi_by_ids(site_id, ordered_ids)
+        mezzi_map = {str(m.id): m for m in mezzi_records}
+        mezzi_map_compact = {str(m.id).replace("-", "").lower(): m for m in mezzi_records}
+
+        associations: List[Dict[str, Any]] = []
+        labels: List[str] = []
+
+        for mezzo_uuid in ordered_ids:
+            mezzo_id = str(mezzo_uuid)
+            mezzo = mezzi_map.get(mezzo_id) or mezzi_map_compact.get(mezzo_id.replace("-", "").lower())
+
+            if not mezzo:
+                if strict:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Uno o più mezzi selezionati non sono assegnati al sito"
+                    )
+                continue
+
+            item = by_mezzo_id.get(mezzo_id, {})
+            ore_utilizzo = item.get("ore_utilizzo")
+            note_utilizzo = item.get("note_utilizzo") or ""
+
+            associations.append({
+                "mezzo_id": str(mezzo.id),
+                "ore_utilizzo": ore_utilizzo,
+                "note_utilizzo": note_utilizzo,
+            })
+
+            label = mezzo.nome
+            if mezzo.targa:
+                label = f"{label} ({mezzo.targa})"
+            if ore_utilizzo is not None:
+                label = f"{label} [{ore_utilizzo:g}h]"
+            labels.append(label)
+
+        return {
+            "associations": associations,
+            "display_value": ", ".join(labels),
+        }
+
     async def _format_giornale(self, g: GiornaleCantiere) -> Dict[str, Any]:
         """Helper to format giornale for API response"""
         # Recupera info cantiere
@@ -36,6 +182,27 @@ class GiornaleService:
 
         # Recupera operatori con ore
         enhanced_operators = await self.repository.get_enhanced_operators(g.id, g.operatori or [])
+
+        # Recupera mezzi con ore/note dalla tabella associativa.
+        enhanced_mezzi = await self.repository.get_enhanced_mezzi(g.id, g.mezzi or [])
+        mezzi_labels: List[str] = []
+        for mezzo in enhanced_mezzi:
+            label = mezzo.get("nome") or "Mezzo"
+            if mezzo.get("targa"):
+                label = f"{label} ({mezzo['targa']})"
+            details: List[str] = []
+            if mezzo.get("ore_utilizzo") is not None:
+                details.append(f"{mezzo['ore_utilizzo']:g}h")
+            if mezzo.get("note_utilizzo"):
+                details.append(mezzo["note_utilizzo"])
+            if details:
+                label = f"{label} [{' - '.join(details)}]"
+            mezzi_labels.append(label)
+
+        mezzi_data = {
+            "mezzi_presenti": enhanced_mezzi,
+            "display_value": ", ".join(mezzi_labels)
+        }
 
         # Format response dict
         return {
@@ -71,7 +238,8 @@ class GiornaleService:
             "modalita_lavorazioni": g.modalita_lavorazioni,
             "attrezzatura_utilizzata": g.attrezzatura_utilizzata,
             "apparecchiature_input": g.attrezzatura_utilizzata,
-            "mezzi_utilizzati": g.mezzi_utilizzati,
+            "mezzi_utilizzati": mezzi_data["display_value"],
+            "mezzi_presenti": mezzi_data["mezzi_presenti"],
             "materiali_rinvenuti": g.materiali_rinvenuti,
             "documentazione_prodotta": g.documentazione_prodotta,
             "sopralluoghi": g.sopralluoghi,
@@ -153,39 +321,9 @@ class GiornaleService:
                     detail=f"Il cantiere {cantiere_id} non appartiene al sito {site_id}"
                 )
 
-        # Validate and normalize selected mezzi
-        mezzi_utilizzati_value = giornale_data.get("mezzi_utilizzati", "")
-        mezzi_ids_raw = giornale_data.get("mezzi_ids", []) or []
-        if mezzi_ids_raw:
-            normalized_mezzi_ids: List[UUID] = []
-            for mezzo_id in mezzi_ids_raw:
-                try:
-                    normalized_mezzi_ids.append(UUID(str(mezzo_id)))
-                except Exception:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"ID mezzo non valido: {mezzo_id}"
-                    )
-
-            mezzi_records = await self.repository.get_mezzi_by_ids(site_id, normalized_mezzi_ids)
-            mezzi_map = {str(m.id): m for m in mezzi_records}
-
-            if len(mezzi_map) != len(set(str(mid) for mid in normalized_mezzi_ids)):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Uno o più mezzi selezionati non sono assegnati al sito"
-                )
-
-            ordered_mezzi_labels: List[str] = []
-            for mezzo_id in normalized_mezzi_ids:
-                mezzo = mezzi_map.get(str(mezzo_id))
-                if mezzo:
-                    label = mezzo.nome
-                    if mezzo.targa:
-                        label = f"{label} ({mezzo.targa})"
-                    ordered_mezzi_labels.append(label)
-
-            mezzi_utilizzati_value = ", ".join(ordered_mezzi_labels)
+        # Validate and normalize selected mezzi (nuova tabella associativa)
+        mezzi_resolution = await self._resolve_mezzi_associations(site_id, giornale_data, strict=True)
+        mezzi_associations = mezzi_resolution["associations"]
 
         # Create giornale object
         nuovo_giornale = GiornaleCantiere(
@@ -211,7 +349,6 @@ class GiornaleService:
             strutture=giornale_data.get("strutture"),
             us_elaborate=giornale_data.get("us_elaborate_input", ""),
             attrezzatura_utilizzata=giornale_data.get("apparecchiature_input", ""),
-            mezzi_utilizzati=mezzi_utilizzati_value,
             validato=False
         )
         
@@ -245,6 +382,15 @@ class GiornaleService:
                     float(ore_lavorate) if ore_lavorate is not None else None,
                     note_presenza
                 )
+
+        # Add mezzi associations
+        for mezzo_info in mezzi_associations:
+            await self.repository.add_mezzo_association(
+                nuovo_giornale.id,
+                mezzo_info["mezzo_id"],
+                mezzo_info.get("ore_utilizzo"),
+                mezzo_info.get("note_utilizzo"),
+            )
         
         await self.db.commit()
         await self.db.refresh(nuovo_giornale)
@@ -306,45 +452,23 @@ class GiornaleService:
                         note_presenza
                     )
 
+        # Handle mezzi (nuova tabella associativa)
+        if "mezzi" in giornale_data or "mezzi_ids" in giornale_data:
+            mezzi_resolution = await self._resolve_mezzi_associations(site_id, giornale_data, strict=False)
+            mezzi_associations = mezzi_resolution["associations"]
+
+            await self.repository.clear_mezzo_associations(giornale.id)
+            for mezzo_info in mezzi_associations:
+                await self.repository.add_mezzo_association(
+                    giornale.id,
+                    mezzo_info["mezzo_id"],
+                    mezzo_info.get("ore_utilizzo"),
+                    mezzo_info.get("note_utilizzo"),
+                )
+
         # Update base fields
         update_dict = giornale_data.copy()
 
-        # Mezzi selected from UI (ids -> readable label string)
-        if "mezzi_ids" in update_dict:
-            mezzi_ids_raw = update_dict.get("mezzi_ids") or []
-            if mezzi_ids_raw:
-                normalized_mezzi_ids: List[UUID] = []
-                for mezzo_id in mezzi_ids_raw:
-                    try:
-                        normalized_mezzi_ids.append(UUID(str(mezzo_id)))
-                    except Exception:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"ID mezzo non valido: {mezzo_id}"
-                        )
-
-                mezzi_records = await self.repository.get_mezzi_by_ids(site_id, normalized_mezzi_ids)
-                mezzi_map = {str(m.id): m for m in mezzi_records}
-
-                if len(mezzi_map) != len(set(str(mid) for mid in normalized_mezzi_ids)):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Uno o più mezzi selezionati non sono assegnati al sito"
-                    )
-
-                ordered_mezzi_labels: List[str] = []
-                for mezzo_id in normalized_mezzi_ids:
-                    mezzo = mezzi_map.get(str(mezzo_id))
-                    if mezzo:
-                        label = mezzo.nome
-                        if mezzo.targa:
-                            label = f"{label} ({mezzo.targa})"
-                        ordered_mezzi_labels.append(label)
-
-                update_dict["mezzi_utilizzati"] = ", ".join(ordered_mezzi_labels)
-            else:
-                update_dict["mezzi_utilizzati"] = ""
-        
         # Helper per i campi data/time
         if "data" in update_dict:
              update_dict["data"] = date.fromisoformat(update_dict["data"])
@@ -365,7 +489,7 @@ class GiornaleService:
                 update_dict[list_field] = ", ".join(update_dict[list_field]) if update_dict[list_field] else ""
 
         # Cleanup fields we processed manually
-        for field in ["operatori", "mezzi_ids", "id", "site_id"]:
+        for field in ["operatori", "mezzi", "mezzi_ids", "mezzi_utilizzati", "id", "site_id"]:
             update_dict.pop(field, None)
 
         await self.repository.update(giornale, update_dict)
@@ -395,6 +519,7 @@ class GiornaleService:
             raise HTTPException(status_code=404, detail="Giornale non trovato")
             
         await self.repository.clear_operatore_associations(giornale.id)
+        await self.repository.clear_mezzo_associations(giornale.id)
         await self.repository.remove(giornale.id)
         return True
 

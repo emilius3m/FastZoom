@@ -1159,6 +1159,37 @@ async def export_giornali_pdf(
                         g["allegati_paths"] = json.loads(g["allegati_paths"])
                     except:
                         g["allegati_paths"] = []
+
+        # Pre-load photo bytes for PDF embedding (for all giornali)
+        from app.services.archaeological_minio_service import archaeological_minio_service
+        from app.models.documentation_and_field import Photo
+
+        for giornale in giornali_data:
+            foto_list = giornale.get("foto", [])
+            for foto in foto_list:
+                try:
+                    thumbnail_url = foto.get("thumbnail_url", "")
+                    if thumbnail_url and "/thumbnail" in thumbnail_url:
+                        photo_id = foto.get("id")
+                        if photo_id:
+                            photo_result = await db.execute(select(Photo).where(Photo.id == str(photo_id)))
+                            photo_obj = photo_result.scalar_one_or_none()
+
+                            if photo_obj:
+                                # Use original file when available for better PDF quality
+                                path_to_load = photo_obj.filepath or photo_obj.thumbnail_path
+                                if path_to_load:
+                                    if path_to_load.startswith("sites/"):
+                                        path_to_load = path_to_load[6:]
+
+                                    try:
+                                        image_bytes = await archaeological_minio_service.get_file(path_to_load)
+                                        if image_bytes and isinstance(image_bytes, bytes):
+                                            foto["_image_bytes"] = image_bytes
+                                    except Exception as e:
+                                        logger.warning(f"Could not load image for photo {photo_id}: {e}")
+                except Exception as e:
+                    logger.warning(f"Error pre-loading photo bytes for PDF: {e}")
                         
         # Genera PDF
         from app.services.giornale_pdf_service import generate_giornale_pdf_quick

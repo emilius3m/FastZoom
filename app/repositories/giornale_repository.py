@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional, Tuple
 from uuid import UUID
 from datetime import date
-from sqlalchemy import select, and_, or_, desc, delete
+from sqlalchemy import select, and_, or_, desc, delete, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,7 @@ from app.models.giornale_cantiere import (
     OperatoreCantiere,
     MezzoCantiere,
     giornale_operatori_association,
+    giornale_mezzi_association,
 )
 from app.models.cantiere import Cantiere
 
@@ -25,6 +26,7 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
             selectinload(GiornaleCantiere.site),
             selectinload(GiornaleCantiere.responsabile),
             selectinload(GiornaleCantiere.operatori),
+            selectinload(GiornaleCantiere.mezzi),
             selectinload(GiornaleCantiere.foto),
             selectinload(GiornaleCantiere.cantiere),
         )
@@ -80,6 +82,7 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
             selectinload(GiornaleCantiere.site),
             selectinload(GiornaleCantiere.responsabile),
             selectinload(GiornaleCantiere.operatori),
+            selectinload(GiornaleCantiere.mezzi),
             # Carichiamo anche foto e cantiere se necessario, ma foto è già selectin nel model
         )
         
@@ -117,6 +120,37 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
                 "qualifica": op.qualifica,
                 "ore_lavorate": float(assoc_data.ore_lavorate) if assoc_data and assoc_data.ore_lavorate is not None else None,
                 "note_presenza": assoc_data.note_presenza if assoc_data else None,
+            })
+        return enhanced_data
+
+    async def get_enhanced_mezzi(self, giornale_id: UUID, mezzi: List[MezzoCantiere]) -> List[Dict[str, Any]]:
+        """
+        Recupera dati estesi dei mezzi (ore, note) dalla tabella di associazione
+        """
+        enhanced_data = []
+        for mezzo in mezzi:
+            query = select(
+                giornale_mezzi_association.c.ore_utilizzo,
+                giornale_mezzi_association.c.note_utilizzo
+            ).where(
+                and_(
+                    giornale_mezzi_association.c.giornale_id == str(giornale_id),
+                    giornale_mezzi_association.c.mezzo_id == str(mezzo.id)
+                )
+            )
+            result = await self.db_session.execute(query)
+            assoc_data = result.first()
+
+            enhanced_data.append({
+                "id": str(mezzo.id),
+                "nome": mezzo.nome,
+                "tipo": mezzo.tipo,
+                "marca": mezzo.marca,
+                "modello": mezzo.modello,
+                "targa": mezzo.targa,
+                "matricola": mezzo.matricola,
+                "ore_utilizzo": float(assoc_data.ore_utilizzo) if assoc_data and assoc_data.ore_utilizzo is not None else None,
+                "note_utilizzo": assoc_data.note_utilizzo if assoc_data else None,
             })
         return enhanced_data
 
@@ -159,10 +193,15 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
         if not normalized_ids:
             return []
 
+        compact_ids = [mid.replace("-", "").lower() for mid in normalized_ids]
+
         query = select(MezzoCantiere).where(
             and_(
                 MezzoCantiere.site_id == str(site_id),
-                MezzoCantiere.id.in_(normalized_ids)
+                or_(
+                    MezzoCantiere.id.in_(normalized_ids),
+                    func.replace(func.lower(MezzoCantiere.id), "-", "").in_(compact_ids),
+                ),
             )
         )
         result = await self.db_session.execute(query)
@@ -182,6 +221,23 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
         """Rimuove tutte le associazioni operatori per un giornale"""
         stmt = giornale_operatori_association.delete().where(
             giornale_operatori_association.c.giornale_id == str(giornale_id)
+        )
+        await self.db_session.execute(stmt)
+
+    async def add_mezzo_association(self, giornale_id: UUID, mezzo_id: UUID, ore: float = None, note: str = None):
+        """Aggiunge associazione mezzo-giornale"""
+        stmt = giornale_mezzi_association.insert().values(
+            giornale_id=str(giornale_id),
+            mezzo_id=str(mezzo_id),
+            ore_utilizzo=ore,
+            note_utilizzo=note
+        )
+        await self.db_session.execute(stmt)
+
+    async def clear_mezzo_associations(self, giornale_id: UUID):
+        """Rimuove tutte le associazioni mezzi per un giornale"""
+        stmt = giornale_mezzi_association.delete().where(
+            giornale_mezzi_association.c.giornale_id == str(giornale_id)
         )
         await self.db_session.execute(stmt)
 

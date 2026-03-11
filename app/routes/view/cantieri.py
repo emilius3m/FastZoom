@@ -180,6 +180,10 @@ async def v1_cantieri_sito_view(
                 "coordinate_lat": cantiere.coordinate_lat,
                 "coordinate_lon": cantiere.coordinate_lon,
                 "quota": cantiere.quota,
+                # Campi ICCD
+                "iccd_re_tipo": cantiere.iccd_re_tipo,
+                "iccd_re_metodo": cantiere.iccd_re_metodo,
+                "iccd_geometria": cantiere.iccd_geometria,
                 # Metadati
                 "responsabile_cantiere": cantiere.responsabile_cantiere,
                 "tipologia_intervento": cantiere.tipologia_intervento,
@@ -333,6 +337,10 @@ async def v1_cantiere_detail_view(
             "coordinate_lat": cantiere.coordinate_lat,
             "coordinate_lon": cantiere.coordinate_lon,
             "quota": cantiere.quota,
+            # Campi ICCD
+            "iccd_re_tipo": cantiere.iccd_re_tipo,
+            "iccd_re_metodo": cantiere.iccd_re_metodo,
+            "iccd_geometria": cantiere.iccd_geometria,
             # Metadati
             "responsabile_cantiere": cantiere.responsabile_cantiere,
             "tipologia_intervento": cantiere.tipologia_intervento,

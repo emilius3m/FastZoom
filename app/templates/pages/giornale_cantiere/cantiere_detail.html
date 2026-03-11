@@ -527,6 +527,49 @@
                         </dl>
                     </div>
 
+                    <!-- Dati Scientifici -->
+                    {% if cantiere.iccd_re_tipo or cantiere.iccd_re_metodo or cantiere.iccd_geometria %}
+                    <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-6 lg:col-span-2">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-microscope mr-2 text-teal-600"></i>Dati Scientifici (Standard ICCD)
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {% if cantiere.iccd_re_tipo %}
+                            <div class="bg-teal-50 dark:bg-gray-800 rounded-lg p-3">
+                                <div class="flex flex-col">
+                                    <dt class="text-xs font-medium text-teal-700 dark:text-teal-300 mb-1">Tipo Indagine</dt>
+                                    <dd class="text-sm text-gray-900 dark:text-white font-medium">
+                                        {% if cantiere.iccd_re_tipo == 'scavo' %}Scavo (RES)
+                                        {% elif cantiere.iccd_re_tipo == 'ricognizione' %}Ricognizione (RER)
+                                        {% else %}Altra Indagine (REA){% endif %}
+                                    </dd>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if cantiere.iccd_re_metodo %}
+                            <div class="bg-teal-50 dark:bg-gray-800 rounded-lg p-3">
+                                <div class="flex flex-col">
+                                    <dt class="text-xs font-medium text-teal-700 dark:text-teal-300 mb-1">Metodo</dt>
+                                    <dd class="text-sm text-gray-900 dark:text-white font-medium">{{ cantiere.iccd_re_metodo|title }}</dd>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if cantiere.iccd_geometria %}
+                            <div class="md:col-span-2 bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                                <div class="flex flex-col">
+                                    <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Geometria Estesa (WKT/GeoJSON)</dt>
+                                    <dd class="text-xs text-gray-800 dark:text-gray-200 font-mono break-all bg-gray-100 dark:bg-gray-900 p-2 rounded max-h-24 overflow-y-auto">
+                                        {{ cantiere.iccd_geometria }}
+                                    </dd>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <!-- Codici e Importi -->
                     <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-6 lg:col-span-2">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -746,6 +789,7 @@
 
             // Enhanced operator data structure
             operatori_data: {}, // Store enhanced operator data { operatorId: { ore_lavorate, note_presenza } }
+            mezzi_data: {}, // Store enhanced mezzi data { mezzoId: { ore_utilizzo, note_utilizzo } }
 
             // Form data for the complete modal
             formData: {
@@ -936,6 +980,7 @@
 
                     // Reset enhanced operator data
                     this.operatori_data = {};
+                    this.mezzi_data = {};
                 }
             },
 
@@ -1023,7 +1068,9 @@
                         temperatura_min: this.formData.temperatura_min || null,
                         temperatura_max: this.formData.temperatura_max || null,
                         // Enhanced operatori structure
-                        operatori: this.getEnhancedOperatoriData()
+                        operatori: this.getEnhancedOperatoriData(),
+                        // Enhanced mezzi structure
+                        mezzi: this.getEnhancedMezziData()
                     };
 
                     const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}`, {
@@ -1119,7 +1166,9 @@
                         temperatura_min: this.formData.temperatura_min || null,
                         temperatura_max: this.formData.temperatura_max || null,
                         // Enhanced operatori structure
-                        operatori: this.getEnhancedOperatoriData()
+                        operatori: this.getEnhancedOperatoriData(),
+                        // Enhanced mezzi structure
+                        mezzi: this.getEnhancedMezziData()
                     };
 
                     // Chiama API reale per salvare il giornale
@@ -1358,8 +1407,16 @@
 
                 if (index === -1) {
                     this.formData.mezzi_ids.push(mezzoId);
+
+                    if (!this.mezzi_data[mezzoId]) {
+                        this.mezzi_data[mezzoId] = {
+                            ore_utilizzo: null,
+                            note_utilizzo: ''
+                        };
+                    }
                 } else {
                     this.formData.mezzi_ids.splice(index, 1);
+                    delete this.mezzi_data[mezzoId];
                 }
 
                 this.syncMezziUtilizzatiFromSelection();
@@ -1367,6 +1424,31 @@
 
             isMezzoSelezionato(mezzoId) {
                 return this.formData.mezzi_ids.includes(mezzoId);
+            },
+
+            getMezzoData(mezzoId) {
+                return this.mezzi_data[mezzoId] || { ore_utilizzo: null, note_utilizzo: '' };
+            },
+
+            updateMezzoData(mezzoId, field, value) {
+                if (!this.mezzi_data[mezzoId]) {
+                    this.mezzi_data[mezzoId] = { ore_utilizzo: null, note_utilizzo: '' };
+                }
+
+                if (field === 'ore_utilizzo') {
+                    const hours = parseFloat(value);
+                    this.mezzi_data[mezzoId].ore_utilizzo = isNaN(hours) ? null : hours;
+                } else {
+                    this.mezzi_data[mezzoId][field] = value;
+                }
+            },
+
+            getEnhancedMezziData() {
+                return this.formData.mezzi_ids.map(mezzoId => ({
+                    id: mezzoId,
+                    ore_utilizzo: this.mezzi_data[mezzoId]?.ore_utilizzo || null,
+                    note_utilizzo: this.mezzi_data[mezzoId]?.note_utilizzo || ''
+                }));
             },
 
             getMezziSelezionati() {
@@ -1389,6 +1471,24 @@
 
             loadMezziDataForEditing(giornale) {
                 this.formData.mezzi_ids = [];
+                this.mezzi_data = {};
+
+                if (giornale && Array.isArray(giornale.mezzi_presenti) && giornale.mezzi_presenti.length > 0) {
+                    giornale.mezzi_presenti.forEach(mezzo => {
+                        if (!mezzo || !mezzo.id) {
+                            return;
+                        }
+
+                        this.formData.mezzi_ids.push(mezzo.id);
+                        this.mezzi_data[mezzo.id] = {
+                            ore_utilizzo: mezzo.ore_utilizzo || null,
+                            note_utilizzo: mezzo.note_utilizzo || ''
+                        };
+                    });
+
+                    this.syncMezziUtilizzatiFromSelection();
+                    return;
+                }
 
                 const mezziText = (giornale && giornale.mezzi_utilizzati) ? giornale.mezzi_utilizzati.toLowerCase() : '';
                 if (!mezziText || !Array.isArray(this.mezzi_disponibili) || this.mezzi_disponibili.length === 0) {
@@ -1405,6 +1505,10 @@
 
                     if (nomeMatch || targaMatch) {
                         this.formData.mezzi_ids.push(mezzo.id);
+                        this.mezzi_data[mezzo.id] = {
+                            ore_utilizzo: null,
+                            note_utilizzo: ''
+                        };
                         matchedCount += 1;
                     }
                 });

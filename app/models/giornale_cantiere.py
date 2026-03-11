@@ -40,6 +40,19 @@ giornale_operatori_association = Table(
 )
 
 
+# ===== TABELLA ASSOCIATIVA GIORNALE-MEZZI =====
+giornale_mezzi_association = Table(
+    'giornale_mezzi',
+    Base.metadata,
+    Column('id', String(36), primary_key=True, default=lambda: str(uuid4())),
+    Column('giornale_id', String(36), ForeignKey('giornali_cantiere.id', ondelete='CASCADE'), nullable=False),
+    Column('mezzo_id', String(36), ForeignKey('mezzi_cantiere.id', ondelete='CASCADE'), nullable=False),
+    Column('ore_utilizzo', Numeric(5, 2), nullable=True, comment="Ore effettivamente utilizzate del mezzo"),
+    Column('note_utilizzo', Text, nullable=True, comment="Note specifiche sull'utilizzo del mezzo"),
+    Column('created_at', DateTime, server_default=func.now())
+)
+
+
 # ===== TABELLA ASSOCIATIVA GIORNALE-FOTO =====
 giornale_foto_association = Table(
     'giornale_foto_associations',
@@ -161,6 +174,13 @@ class MezzoCantiere(Base):
     # Relazione con sito
     site = relationship("ArchaeologicalSite", back_populates="mezzi_cantiere")
 
+    # Relazione many-to-many con giornali di cantiere
+    giornali = relationship(
+        "GiornaleCantiere",
+        secondary=giornale_mezzi_association,
+        back_populates="mezzi"
+    )
+
     def __repr__(self):
         return f"<MezzoCantiere(nome='{self.nome}', tipo='{self.tipo}', targa='{self.targa}')>"
 
@@ -205,7 +225,6 @@ class GiornaleCantiere(Base):
     
     # Attrezzatura e mezzi utilizzati
     attrezzatura_utilizzata = Column(Text, nullable=True)
-    mezzi_utilizzati = Column(Text, nullable=True)  # Es: "Escavatore, Pala meccanica"
     
     # ===== DOCUMENTAZIONE ARCHEOLOGICA PRODOTTA =====
     # Riferimenti alle Unità Stratigrafiche elaborate
@@ -278,6 +297,13 @@ class GiornaleCantiere(Base):
     operatori = relationship(
         "OperatoreCantiere",
         secondary=giornale_operatori_association,
+        back_populates="giornali"
+    )
+
+    # Relazione many-to-many con mezzi
+    mezzi = relationship(
+        "MezzoCantiere",
+        secondary=giornale_mezzi_association,
         back_populates="giornali"
     )
     
@@ -369,4 +395,4 @@ def init_giornale_cantiere_models():
     Da aggiungere alla funzione init_models() in app/database/base.py
     """
     # Import per assicurarsi che i modelli siano registrati
-    from app.models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere  # noqa: F401
+    from app.models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere, MezzoCantiere  # noqa: F401
