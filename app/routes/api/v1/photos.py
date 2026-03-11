@@ -134,9 +134,13 @@ async def process_tus_upload(
     from app.services.permissions_service import PermissionsService
     from app.models import PermissionLevel
     
+    logger.info(f"TUS process_upload -> current_user_id: {current_user_id} (type: {type(current_user_id)}), site_id: {site_id} (type: {type(site_id)})")
+    
     can_write = await PermissionsService.user_can_access_site(
         db, current_user_id, site_id, required_level=PermissionLevel.WRITE
     )
+    
+    logger.info(f"TUS process_upload -> can_write result: {can_write}")
     
     if not can_write:
         raise HTTPException(status_code=403, detail="Permessi di scrittura richiesti")

@@ -22,10 +22,10 @@ class PermissionsService:
     ) -> List[UserSitePermission]:
         """Recupera i permessi di un utente, opzionalmente filtrati per sito"""
         
-        query = select(UserSitePermission).where(UserSitePermission.user_id == user_id)
+        query = select(UserSitePermission).where(UserSitePermission.user_id == str(user_id))
         
         if site_id:
-            query = query.where(UserSitePermission.site_id == site_id)
+            query = query.where(UserSitePermission.site_id == str(site_id))
         
         if active_only:
             query = query.where(
