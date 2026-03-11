@@ -509,6 +509,9 @@ from app.models.documentazione_grafica import MatrixHarris  # noqa: F401
 # OperatoreCantiere è importato da app.models.giornale_cantiere per evitare duplicazione
 from app.models.giornale_cantiere import OperatoreCantiere  # noqa: F401
 
+# MezzoCantiere è importato da app.models.giornale_cantiere per evitare duplicazione
+from app.models.giornale_cantiere import MezzoCantiere  # noqa: F401
+
 
 # GiornaleCantiere è importato da app.models.giornale_cantiere per evitare duplicazione
 from app.models.giornale_cantiere import GiornaleCantiere  # noqa: F401

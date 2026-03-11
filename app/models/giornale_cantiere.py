@@ -125,7 +125,45 @@ class OperatoreCantiere(Base):
     def nome_completo(self) -> str:
         """Restituisce nome e cognome completi"""
         return f"{self.nome} {self.cognome}"
-    
+
+
+class MezzoCantiere(Base):
+    """
+    Modello per i mezzi/attrezzature meccaniche disponibili nel cantiere.
+    Esempi: escavatore, bobcat, dumper, camion, gru.
+
+    I mezzi sono associati al sito archeologico e riutilizzabili tra i
+    cantieri dello stesso sito.
+    """
+    __tablename__ = "mezzi_cantiere"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
+
+    # Associazione al sito archeologico
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    # Dati mezzo
+    nome = Column(String(150), nullable=False, index=True)  # Es. "Bobcat E17"
+    tipo = Column(String(100), nullable=True, index=True)   # Es. "bobcat", "escavatore"
+    marca = Column(String(100), nullable=True)
+    modello = Column(String(100), nullable=True)
+    targa = Column(String(20), nullable=True, index=True)
+    matricola = Column(String(80), nullable=True, index=True)
+
+    # Stato e note
+    is_active = Column('is_active', Boolean, default=True, nullable=False)
+    note = Column(Text, nullable=True)
+
+    # Timestamp
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+
+    # Relazione con sito
+    site = relationship("ArchaeologicalSite", back_populates="mezzi_cantiere")
+
+    def __repr__(self):
+        return f"<MezzoCantiere(nome='{self.nome}', tipo='{self.tipo}', targa='{self.targa}')>"
+
 
 
 # ===== MODELLO GIORNALE DI CANTIERE =====

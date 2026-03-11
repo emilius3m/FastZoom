@@ -77,7 +77,48 @@ class OperatoreCantiereOut(OperatoreCantiereBase):
     updated_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
-    
+
+
+# ===== SCHEMI MEZZI DI CANTIERE =====
+
+class MezzoCantiereBase(BaseModel):
+    """Schema base per mezzo di cantiere"""
+    nome: str = Field(..., min_length=2, max_length=150, description="Nome del mezzo")
+    tipo: Optional[str] = Field(None, max_length=100, description="Tipologia mezzo")
+    marca: Optional[str] = Field(None, max_length=100, description="Marca")
+    modello: Optional[str] = Field(None, max_length=100, description="Modello")
+    targa: Optional[str] = Field(None, max_length=20, description="Targa del mezzo")
+    matricola: Optional[str] = Field(None, max_length=80, description="Matricola interna")
+    note: Optional[str] = Field(None, description="Note aggiuntive")
+    is_active: bool = Field(True, description="Mezzo attivo")
+
+
+class MezzoCantiereCreate(MezzoCantiereBase):
+    """Schema per creazione mezzo"""
+    pass
+
+
+class MezzoCantiereUpdate(BaseModel):
+    """Schema per aggiornamento mezzo"""
+    nome: Optional[str] = Field(None, min_length=2, max_length=150)
+    tipo: Optional[str] = Field(None, max_length=100)
+    marca: Optional[str] = Field(None, max_length=100)
+    modello: Optional[str] = Field(None, max_length=100)
+    targa: Optional[str] = Field(None, max_length=20)
+    matricola: Optional[str] = Field(None, max_length=80)
+    note: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class MezzoCantiereOut(MezzoCantiereBase):
+    """Schema per output mezzo"""
+    id: UUID
+    site_id: Optional[UUID] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 
 # ===== SCHEMI GIORNALE DI CANTIERE =====

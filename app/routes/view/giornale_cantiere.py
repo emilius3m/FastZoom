@@ -173,6 +173,32 @@ async def operatori_management(
     except Exception as e:
         logger.error(f"Errore reindirizzamento operatori: {str(e)}")
         return RedirectResponse(url="/giornale-cantiere", status_code=302)
+
+
+@router.get("/mezzi", response_class=HTMLResponse)
+async def mezzi_management(
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Pagina gestione mezzi - Reindirizza alla home per selezionare un sito
+    """
+    try:
+        # Se l'utente ha accesso a un solo sito, reindirizza direttamente alla pagina mezzi del sito
+        if len(user_sites) == 1:
+            site_id = user_sites[0]['site_id']
+            return RedirectResponse(url=f"/giornale-cantiere/site/{site_id}/mezzi", status_code=302)
+
+        # Altrimenti, reindirizza alla home per selezionare un sito
+        return RedirectResponse(url="/giornale-cantiere", status_code=302)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore reindirizzamento mezzi: {str(e)}")
+        return RedirectResponse(url="/giornale-cantiere", status_code=302)
     
 
 @router.get("/site/{site_id}/operatori", response_class=HTMLResponse)
@@ -259,6 +285,90 @@ async def site_operatori_view(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore interno visualizzazione operatori sito"
+        )
+
+
+@router.get("/site/{site_id}/mezzi", response_class=HTMLResponse)
+async def site_mezzi_view(
+    site_id: UUID,
+    request: Request,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """
+    Visualizza i mezzi specifici per un sito archeologico
+    URL RESTful: /giornale-cantiere/site/{site_id}/mezzi
+    """
+    try:
+        # Verifica accesso al sito - Handle both hyphenated and non-hyphenated UUID formats
+        site_id_str = str(site_id)
+        site_info = next(
+            (site for site in user_sites if
+             site["site_id"] == site_id_str or
+             site["site_id"].replace("-", "") == site_id_str.replace("-", "")
+            ),
+            None
+        )
+
+        if not site_info:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Sito {site_id} non trovato o access denied"
+            )
+
+        # Ottieni profilo utente
+        user_profile_result = await db.execute(
+            select(UserProfile).where(UserProfile.user_id == current_user_id)
+        )
+        user_profile = user_profile_result.scalar_one_or_none()
+
+        # CSRF opzionale
+        csrf_token, signed_token, csrf_instance = _csrf_tokens_optional()
+
+        # Prepare context for template
+        context = await get_base_template_context(
+            request, current_user_id, user_sites, db, current_page="giornale-mezzi"
+        )
+        context.update({
+            "title": f"Gestione Mezzi - {site_info['site_name']} | Sistema Archeologico",
+            "message": f"Mezzi del sito: {site_info['site_name']}",
+
+            # Site-specific context
+            "site_id": str(site_id),
+            "site": {
+                "id": site_info["site_id"],
+                "name": site_info["site_name"],
+                **site_info
+            },
+            "site_info": site_info,
+            "site_name": site_info["site_name"],
+            "site_code": site_info.get("code", ""),
+            "site_location": site_info.get("location", ""),
+
+            "user_profile": user_profile,
+            "csrf_token": csrf_token,
+
+            # Flag to indicate this is site-specific mezzi view
+            "is_site_specific": True
+        })
+
+        logger.info(f"Site mezzi view rendered: user_id={current_user_id}, site_id={site_id}, site_name={site_info['site_name']}")
+        response = templates.TemplateResponse("pages/giornale_cantiere/mezzi.html", context)
+
+        # Se CSRF disponibile, imposta cookie firmato
+        if csrf_instance and signed_token:
+            csrf_instance.set_csrf_cookie(signed_token, response)
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Site mezzi view error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore interno visualizzazione mezzi sito"
         )
 
 

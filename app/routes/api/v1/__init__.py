@@ -30,6 +30,7 @@ from app.routes.api.v1.harris_matrix_mapping import router as harris_matrix_mapp
 from app.routes.api.v1.ocr_us_import import router as ocr_us_import_router
 from app.routes.api.v1.ocr_debug import router as ocr_debug_router
 from app.routes.api.v1.tus_uploads import router as tus_uploads_router
+from app.routes.api.v1.tma import router as tma_router
 
 # Migrated from v0 (now in v1)
 from app.routes.api.v1.us_word_export_api import router as us_word_export_router
@@ -70,6 +71,7 @@ api_v1_router.include_router(unified_router, prefix="/unified", tags=["Unified D
 api_v1_router.include_router(ocr_us_import_router, prefix="/ocr", tags=["OCR US Import"])
 api_v1_router.include_router(ocr_debug_router, tags=["OCR Debug"])
 api_v1_router.include_router(tus_uploads_router, tags=["TUS Uploads"])
+api_v1_router.include_router(tma_router, prefix="/tma", tags=["TMA"])
 
 # Moved routers from V0
 from app.routes.api.v1.form_schemas import form_schemas_router

@@ -1,0 +1,497 @@
+<script>
+    function tmaManagerApp() {
+        return {
+            siteId: '{{ site_id }}',
+            records: [],
+            totalRecords: 0,
+            totalPages: 0,
+            pagination: {
+                page: 1,
+                per_page: 10
+            },
+            showModal: false,
+            editing: null,
+            viewMode: false,
+            saving: false,
+            errorMessage: '',
+            showAdvancedSearch: false,
+            filters: {
+                search: '',
+                nct: '',
+                ogtd: '',
+                pvcc: '',
+                // advanced
+                code: '',
+                periodo: '',
+                fase: '',
+                definizione: '',
+                localita: '',
+                affidabilita: '',
+                tipo: ''
+            },
+            form: {},
+
+            defaultMaItem() {
+                return {
+                    macc: '',
+                    macq: '',
+                    macl: '',
+                    macd: '',
+                    macp: '',
+                    mas: ''
+                };
+            },
+
+            defaultProvenienza() {
+                return {
+                    tcl: '',
+                    prvs: '',
+                    prvr: '',
+                    prvp: '',
+                    prvc: '',
+                    prcu: ''
+                };
+            },
+
+            defaultFoto() {
+                return {
+                    ftax: '',
+                    ftap: '',
+                    ftan: ''
+                };
+            },
+
+            defaultEntitaMultimediale() {
+                return {
+                    ftap: '',
+                    ftan: '',
+                    mmto: ''
+                };
+            },
+
+            formatDate(dateString) {
+                if (!dateString) return '';
+                const date = new Date(dateString);
+                return date.toLocaleDateString('it-IT', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            },
+
+            getActiveFiltersCount() {
+                let count = 0;
+                for (const key in this.filters) {
+                    if (this.filters[key] !== '' && this.filters[key] !== null) {
+                        count++;
+                    }
+                }
+                return count;
+            },
+
+            resetAllFilters() {
+                this.filters = {
+                    search: '',
+                    nct: '',
+                    ogtd: '',
+                    pvcc: '',
+                    code: '',
+                    periodo: '',
+                    fase: '',
+                    definizione: '',
+                    localita: '',
+                    affidabilita: '',
+                    tipo: ''
+                };
+                this.pagination.page = 1;
+                this.loadList();
+            },
+
+            getPaginationPages() {
+                const current = this.pagination.page;
+                const last = this.totalPages;
+                const delta = 2;
+                const left = current - delta;
+                const right = current + delta + 1;
+                const range = [];
+                const rangeWithDots = [];
+                let l;
+
+                for (let i = 1; i <= last; i++) {
+                    if (i === 1 || i === last || i >= left && i < right) {
+                        range.push(i);
+                    }
+                }
+
+                for (let i of range) {
+                    if (l) {
+                        if (i - l === 2) {
+                            rangeWithDots.push(l + 1);
+                        } else if (i - l !== 1) {
+                            rangeWithDots.push('...');
+                        }
+                    }
+                    rangeWithDots.push(i);
+                    l = i;
+                }
+
+                return rangeWithDots;
+            },
+
+            changePage(page) {
+                if (page < 1 || page > this.totalPages) return;
+                this.pagination.page = page;
+                this.loadList();
+            },
+
+            async init() {
+                this.resetForm();
+                await this.loadList();
+            },
+
+            getCSRFToken() {
+                return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+            },
+
+            buildQuery() {
+                const q = new URLSearchParams();
+                if (this.filters.search) q.append('search', this.filters.search);
+                if (this.filters.nct) q.append('nct', this.filters.nct);
+                if (this.filters.ogtd) q.append('ogtd', this.filters.ogtd);
+                if (this.filters.pvcc) q.append('pvcc', this.filters.pvcc);
+                
+                // Advanced search fields can be added here if the API supports them for TMA
+                
+                q.append('skip', ((this.pagination.page - 1) * this.pagination.per_page).toString());
+                q.append('limit', this.pagination.per_page.toString());
+                
+                return q.toString();
+            },
+
+            async loadList() {
+                try {
+                    const resp = await fetch(`/api/v1/tma/sites/${this.siteId}/records?${this.buildQuery()}`, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCSRFToken()
+                        }
+                    });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        // Assume the API might return either an array directly, or an object { items: [], total: X }
+                        // For ICCD endpoints, it's often an array directly unless pagination is fully implemented on backend.
+                        // Let's handle both.
+                        if (Array.isArray(data)) {
+                            this.records = data;
+                            this.totalRecords = data.length; // Actually should be total from DB, but if backend doesn't return it...
+                            this.totalPages = 1;
+                        } else {
+                            this.records = data.items || [];
+                            this.totalRecords = data.total || 0;
+                            this.totalPages = Math.ceil(this.totalRecords / this.pagination.per_page) || 1;
+                        }
+                    }
+                } catch (err) {
+                    console.error("Errore caricamento lista TMA", err);
+                }
+            },
+
+            async exportData() {
+                try {
+                    // Costruiamo una query senza limiti per l'export o usiamo l'endpoint di export se esiste
+                    const exportQuery = new URLSearchParams();
+                    if (this.filters.search) exportQuery.append('search', this.filters.search);
+                    if (this.filters.nct) exportQuery.append('nct', this.filters.nct);
+                    // ... altri filtri ...
+                    
+                    exportQuery.append('format', 'csv'); // Esempio
+                    
+                    const url = `/api/v1/tma/sites/${this.siteId}/export?${exportQuery.toString()}`;
+                    window.open(url, '_blank');
+                } catch(e) {
+                    console.error("Errore export", e);
+                    alert("Funzionalità di esportazione non ancora implementata sul server per TMA.");
+                }
+            },
+
+            resetForm() {
+                this.form = {
+                    tsk: 'TMA',
+                    lir: 'I',
+                    nctr: '',
+                    nctn: '',
+                    esc: '',
+                    ecp: '',
+                    ogtd: '',
+                    ogtm: '',
+                    pvcs: '',
+                    pvcr: '',
+                    pvcp: '',
+                    pvcc: '',
+                    dtzg: '',
+                    dtm_text: '',
+
+                    macc: '',
+                    macq: '',
+                    ma_items: [this.defaultMaItem()],
+
+                    cdgg: '',
+                    adsp: '2',
+                    adsm: '',
+                    cmpd: '',
+                    cmpn_text: '',
+                    fur_text: '',
+
+                    ldc: {
+                        ldct: '',
+                        ldcn: '',
+                        ldcu: '',
+                        ldcs: ''
+                    },
+                    provenienze: [],
+                    scavo: {
+                        scan: '',
+                        dscf: '',
+                        dsca: '',
+                        dsct: '',
+                        dscm: '',
+                        dscd: '',
+                        dscu: '',
+                        dscn: ''
+                    },
+                    nsc: '',
+                    fta: [],
+                    entita_multimediali: [],
+
+                    notes: ''
+                };
+            },
+
+            addMaItem() {
+                this.form.ma_items.push(this.defaultMaItem());
+            },
+
+            removeMaItem(index) {
+                if (this.form.ma_items.length <= 1) return;
+                this.form.ma_items.splice(index, 1);
+            },
+
+            addProvenienza() {
+                this.form.provenienze.push(this.defaultProvenienza());
+            },
+
+            removeProvenienza(index) {
+                this.form.provenienze.splice(index, 1);
+            },
+
+            addFoto() {
+                this.form.fta.push(this.defaultFoto());
+            },
+
+            removeFoto(index) {
+                this.form.fta.splice(index, 1);
+            },
+
+            addEntitaMultimediale() {
+                this.form.entita_multimediali.push(this.defaultEntitaMultimediale());
+            },
+
+            removeEntitaMultimediale(index) {
+                this.form.entita_multimediali.splice(index, 1);
+            },
+
+            openCreate() {
+                this.editing = null;
+                this.viewMode = false;
+                this.errorMessage = '';
+                this.resetForm();
+                this.showModal = true;
+            },
+
+            openEdit(row) {
+                this.editing = row;
+                this.viewMode = false;
+                this.errorMessage = '';
+
+                const maItems = Array.isArray(row.ma_items) && row.ma_items.length > 0
+                    ? row.ma_items
+                    : [{
+                        macc: row.macc || '',
+                        macq: row.macq || '',
+                        macl: '',
+                        macd: '',
+                        macp: '',
+                        mas: ''
+                    }];
+
+                this.form = {
+                    tsk: row.tsk || 'TMA',
+                    lir: row.lir || 'I',
+                    nctr: row.nctr || '',
+                    nctn: row.nctn || '',
+                    esc: row.esc || '',
+                    ecp: row.ecp || '',
+                    ogtd: row.ogtd || '',
+                    ogtm: row.ogtm || '',
+                    pvcs: row.pvcs || '',
+                    pvcr: row.pvcr || '',
+                    pvcp: row.pvcp || '',
+                    pvcc: row.pvcc || '',
+                    dtzg: row.dtzg || '',
+                    dtm_text: Array.isArray(row.dtm) ? row.dtm.join(', ') : '',
+
+                    macc: row.macc || '',
+                    macq: row.macq || '',
+                    ma_items: maItems,
+
+                    cdgg: row.cdgg || '',
+                    adsp: row.adsp || '2',
+                    adsm: row.adsm || '',
+                    cmpd: row.cmpd || '',
+                    cmpn_text: Array.isArray(row.cmpn) ? row.cmpn.join(', ') : '',
+                    fur_text: Array.isArray(row.fur) ? row.fur.join(', ') : '',
+
+                    ldc: {
+                        ldct: row.ldc?.ldct || '',
+                        ldcn: row.ldc?.ldcn || '',
+                        ldcu: row.ldc?.ldcu || '',
+                        ldcs: row.ldc?.ldcs || ''
+                    },
+                    provenienze: Array.isArray(row.provenienze) ? row.provenienze : [],
+                    scavo: {
+                        scan: row.scavo?.scan || '',
+                        dscf: row.scavo?.dscf || '',
+                        dsca: row.scavo?.dsca || '',
+                        dsct: row.scavo?.dsct || '',
+                        dscm: row.scavo?.dscm || '',
+                        dscd: row.scavo?.dscd || '',
+                        dscu: row.scavo?.dscu || '',
+                        dscn: row.scavo?.dscn || ''
+                    },
+                    nsc: row.nsc || '',
+                    fta: Array.isArray(row.fta) ? row.fta : [],
+                    entita_multimediali: Array.isArray(row.entita_multimediali) ? row.entita_multimediali : [],
+
+                    notes: row.notes || ''
+                };
+
+                this.showModal = true;
+            },
+
+            openView(row) {
+                this.openEdit(row);
+                this.viewMode = true;
+            },
+
+            closeModal() {
+                this.showModal = false;
+                this.editing = null;
+                this.viewMode = false;
+                this.errorMessage = '';
+            },
+
+            toArray(textValue) {
+                if (!textValue || !textValue.trim()) return [];
+                return textValue.split(',').map(s => s.trim()).filter(Boolean);
+            },
+
+            cleanArrayObjects(items) {
+                return (items || []).filter(item => item && Object.values(item).some(v => String(v || '').trim() !== ''));
+            },
+
+            buildPayload() {
+                const cleanedMaItems = this.cleanArrayObjects(this.form.ma_items);
+                const firstMa = cleanedMaItems[0] || { macc: '', macq: '' };
+
+                return {
+                    site_id: this.siteId,
+                    tsk: this.form.tsk,
+                    lir: this.form.lir,
+                    nctr: this.form.nctr,
+                    nctn: this.form.nctn,
+                    esc: this.form.esc,
+                    ecp: this.form.ecp,
+                    ogtd: this.form.ogtd,
+                    ogtm: this.form.ogtm,
+                    pvcs: this.form.pvcs,
+                    pvcr: this.form.pvcr,
+                    pvcp: this.form.pvcp,
+                    pvcc: this.form.pvcc,
+                    dtzg: this.form.dtzg,
+                    dtm: this.toArray(this.form.dtm_text),
+
+                    macc: firstMa.macc || this.form.macc,
+                    macq: firstMa.macq || this.form.macq,
+                    ma_items: cleanedMaItems,
+
+                    cdgg: this.form.cdgg,
+                    adsp: this.form.adsp || '2',
+                    adsm: this.form.adsm,
+                    cmpd: this.form.cmpd,
+                    cmpn: this.toArray(this.form.cmpn_text),
+                    fur: this.toArray(this.form.fur_text),
+
+                    ldc: this.form.ldc,
+                    provenienze: this.cleanArrayObjects(this.form.provenienze),
+                    scavo: this.form.scavo,
+                    nsc: this.form.nsc,
+                    fta: this.cleanArrayObjects(this.form.fta),
+                    entita_multimediali: this.cleanArrayObjects(this.form.entita_multimediali),
+
+                    notes: this.form.notes
+                };
+            },
+
+            async save() {
+                this.saving = true;
+                this.errorMessage = '';
+
+                try {
+                    const payload = this.buildPayload();
+                    const url = this.editing
+                        ? `/api/v1/tma/sites/${this.siteId}/records/${this.editing.id}`
+                        : `/api/v1/tma/sites/${this.siteId}/records`;
+                    const method = this.editing ? 'PUT' : 'POST';
+
+                    const resp = await fetch(url, {
+                        method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': this.getCSRFToken()
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!resp.ok) {
+                        const err = await resp.json();
+                        throw new Error(err.detail || 'Errore salvataggio TMA');
+                    }
+
+                    await this.loadList();
+                    this.closeModal();
+                } catch (e) {
+                    this.errorMessage = e.message || 'Errore salvataggio TMA';
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            async deleteRow(id) {
+                if (!confirm('Eliminare questo record TMA?')) return;
+
+                const resp = await fetch(`/api/v1/tma/sites/${this.siteId}/records/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': this.getCSRFToken()
+                    }
+                });
+                if (resp.ok) {
+                    await this.loadList();
+                }
+            }
+        }
+    }
+</script>
+

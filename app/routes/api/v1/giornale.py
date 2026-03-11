@@ -118,6 +118,7 @@ def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) -> Dict[
 from app.models.giornale_cantiere import (
     GiornaleCantiere,
     OperatoreCantiere,
+    MezzoCantiere,
     giornale_operatori_association,
     giornale_foto_association,
     CondizioniMeteoEnum
@@ -126,6 +127,8 @@ from app.schemas.giornale_cantiere import (
     OperatoreCantiereCreate,
     OperatoreCantiereOut,
     OperatoreCantiereUpdate,
+    MezzoCantiereCreate,
+    MezzoCantiereUpdate,
 )
 from datetime import date, time
 from sqlalchemy import select, func, and_, or_, desc, distinct
@@ -586,6 +589,177 @@ async def v1_update_operatore(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nell'aggiornamento dell'operatore"
+        )
+
+
+@router.get("/sites/{site_id}/mezzi", summary="Mezzi specifici sito", tags=["Giornale di Cantiere"])
+async def v1_get_site_mezzi(
+    site_id: UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=200),
+    search: Optional[str] = Query(None),
+    tipo: Optional[str] = Query(None),
+    stato: Optional[str] = Query(None),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """Recupera tutti i mezzi assegnati a un sito archeologico specifico."""
+    try:
+        site_info = verify_site_access(site_id, user_sites)
+
+        query = select(MezzoCantiere).where(MezzoCantiere.site_id == str(site_id))
+
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    MezzoCantiere.nome.ilike(search_pattern),
+                    MezzoCantiere.tipo.ilike(search_pattern),
+                    MezzoCantiere.marca.ilike(search_pattern),
+                    MezzoCantiere.modello.ilike(search_pattern),
+                    MezzoCantiere.targa.ilike(search_pattern),
+                    MezzoCantiere.matricola.ilike(search_pattern),
+                )
+            )
+
+        if tipo:
+            query = query.where(MezzoCantiere.tipo == tipo)
+
+        if stato:
+            query = query.where(MezzoCantiere.is_active == (stato == "attivo"))
+
+        query = query.order_by(MezzoCantiere.nome).offset(skip).limit(limit)
+
+        result = await db.execute(query)
+        mezzi = result.scalars().all()
+
+        mezzi_data = []
+        for mezzo in mezzi:
+            mezzi_data.append({
+                "id": str(mezzo.id),
+                "nome": mezzo.nome,
+                "tipo": mezzo.tipo,
+                "marca": mezzo.marca,
+                "modello": mezzo.modello,
+                "targa": mezzo.targa,
+                "matricola": mezzo.matricola,
+                "stato": "attivo" if mezzo.is_active else "inattivo",
+                "note": mezzo.note,
+                "created_at": mezzo.created_at.isoformat() if mezzo.created_at else None,
+                "updated_at": mezzo.updated_at.isoformat() if mezzo.updated_at else None,
+            })
+
+        return {
+            "site_id": str(site_id),
+            "mezzi": mezzi_data,
+            "count": len(mezzi_data),
+            "site_info": site_info,
+            "filters_applied": {
+                "search": search,
+                "tipo": tipo,
+                "stato": stato,
+            },
+        }
+    except (InsufficientPermissionsError, SiteNotFoundError):
+        raise
+    except Exception as e:
+        logger.error(f"Errore recupero mezzi sito {site_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nel recupero dei mezzi del sito",
+        )
+
+
+@router.post("/sites/{site_id}/mezzi", summary="Crea nuovo mezzo", tags=["Giornale di Cantiere"])
+async def v1_create_mezzo(
+    site_id: UUID,
+    mezzo_data: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """Crea un nuovo mezzo di cantiere assegnato a un sito specifico."""
+    try:
+        site_info = verify_site_access(site_id, user_sites)
+
+        nuovo_mezzo = MezzoCantiere(
+            site_id=str(site_id),
+            nome=mezzo_data.get("nome"),
+            tipo=mezzo_data.get("tipo"),
+            marca=mezzo_data.get("marca"),
+            modello=mezzo_data.get("modello"),
+            targa=mezzo_data.get("targa"),
+            matricola=mezzo_data.get("matricola"),
+            note=mezzo_data.get("note"),
+            is_active=mezzo_data.get("is_active", True),
+        )
+
+        db.add(nuovo_mezzo)
+        await db.commit()
+        await db.refresh(nuovo_mezzo)
+
+        return {
+            "id": str(nuovo_mezzo.id),
+            "site_id": str(site_id),
+            "message": "Mezzo creato con successo e assegnato al sito",
+            "site_info": site_info,
+        }
+    except Exception as e:
+        logger.error(f"Errore creazione mezzo: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nella creazione del mezzo",
+        )
+
+
+@router.put("/mezzi/{mezzo_id}", summary="Aggiorna mezzo", tags=["Giornale di Cantiere"])
+async def v1_update_mezzo(
+    mezzo_id: UUID,
+    mezzo_data: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """Aggiorna un mezzo di cantiere esistente."""
+    try:
+        result = await db.execute(
+            select(MezzoCantiere).where(MezzoCantiere.id == str(mezzo_id))
+        )
+        mezzo = result.scalar_one_or_none()
+
+        if not mezzo:
+            raise ResourceNotFoundError("MezzoCantiere", str(mezzo_id))
+
+        if "nome" in mezzo_data:
+            mezzo.nome = mezzo_data["nome"]
+        if "tipo" in mezzo_data:
+            mezzo.tipo = mezzo_data["tipo"]
+        if "marca" in mezzo_data:
+            mezzo.marca = mezzo_data["marca"]
+        if "modello" in mezzo_data:
+            mezzo.modello = mezzo_data["modello"]
+        if "targa" in mezzo_data:
+            mezzo.targa = mezzo_data["targa"]
+        if "matricola" in mezzo_data:
+            mezzo.matricola = mezzo_data["matricola"]
+        if "is_active" in mezzo_data:
+            mezzo.is_active = mezzo_data["is_active"]
+        if "note" in mezzo_data:
+            mezzo.note = mezzo_data["note"]
+
+        await db.commit()
+
+        return {
+            "id": str(mezzo.id),
+            "message": "Mezzo aggiornato con successo",
+        }
+    except (ResourceNotFoundError):
+        raise
+    except Exception as e:
+        logger.error(f"Errore aggiornamento mezzo: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Errore nell'aggiornamento del mezzo",
         )
 
 

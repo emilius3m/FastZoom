@@ -142,6 +142,7 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
     unita_stratigrafiche = relationship("UnitaStratigrafica", back_populates="site", cascade="all, delete-orphan")
     unita_stratigrafiche_murarie = relationship("UnitaStratigraficaMuraria", back_populates="site",
                                                 cascade="all, delete-orphan")
+    tma_records = relationship("TabellaMaterialiArcheologici", back_populates="site", cascade="all, delete-orphan")
 
 
 
@@ -164,6 +165,8 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
     giornali_cantiere = relationship("app.models.giornale_cantiere.GiornaleCantiere", back_populates="site", cascade="all, delete-orphan")
     # Operatori di cantiere assegnati al sito
     operatori_cantiere = relationship("app.models.giornale_cantiere.OperatoreCantiere", back_populates="site", cascade="all, delete-orphan")
+    # Mezzi di cantiere assegnati al sito
+    mezzi_cantiere = relationship("app.models.giornale_cantiere.MezzoCantiere", back_populates="site", cascade="all, delete-orphan")
 
     # === CONFIGURAZIONI E STANDARD ===
     # Form personalizzati e ICCD

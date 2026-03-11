@@ -20,7 +20,7 @@ from app.models import (
     User,
 )
 from app.models.giornale_cantiere import GiornaleCantiere
-from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria, TabellaMaterialiArcheologici
 
 
 class DashboardService:
@@ -123,12 +123,19 @@ class DashboardService:
             
             us_usm_count = us_count + usm_count
 
+            # Count TMA records
+            tma_count = await db.scalar(
+                select(func.count(TabellaMaterialiArcheologici.id))
+                .where(TabellaMaterialiArcheologici.site_id == site_id_str)
+            ) or 0
+
             return {
                 "photos_count": photos_count,
                 "documents_count": documents_count,
                 "us_usm_count": us_usm_count,
                 "us_count": us_count,
                 "usm_count": usm_count,
+                "tma_count": tma_count,
                 "giornali_totali": giornali_totali,
                 "giornali_validati": giornali_validati,
                 "giornali_pendenti": giornali_totali - giornali_validati,
@@ -147,6 +154,7 @@ class DashboardService:
                 "us_usm_count": 0,
                 "us_count": 0,
                 "usm_count": 0,
+                "tma_count": 0,
                 "giornali_totali": 0,
                 "giornali_validati": 0,
                 "giornali_pendenti": 0,

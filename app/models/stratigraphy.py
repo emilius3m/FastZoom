@@ -607,6 +607,7 @@ class TabellaMaterialiArcheologici(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     # ===== MA - MATERIALE =====
     macc = Column(String(100), nullable=False)
     macq = Column(String(100), nullable=False)
+    ma_items = Column(JSON, default=list, nullable=False)  # blocchi MA ripetibili estesi (MACL/MACD/MACP/MAS)
 
     # ===== TU - CONDIZIONE GIURIDICA =====
     cdgg = Column(String(50), nullable=False)
@@ -619,6 +620,14 @@ class TabellaMaterialiArcheologici(Base, SiteMixin, UserMixin, SoftDeleteMixin):
     cmpd = Column(String(4), nullable=False)  # anno compilazione
     cmpn = Column(JSON, default=list, nullable=False)  # ripetitivo (cognome, nome)
     fur = Column(JSON, default=list, nullable=False)   # ripetitivo (cognome, nome)
+
+    # ===== ESTENSIONI STRUTTURA TMA (esempio output completo) =====
+    ldc = Column(JSON, default=dict, nullable=False)  # collocazione specifica (LDCT/LDCN/LDCU/LDCS)
+    provenienze = Column(JSON, default=list, nullable=False)  # LA/PRV ripetibile
+    scavo = Column(JSON, default=dict, nullable=False)  # RE/DSC
+    nsc = Column(Text)  # DA/NSC notizie storico-critiche
+    fta = Column(JSON, default=list, nullable=False)  # DO/FTA documentazione fotografica
+    entita_multimediali = Column(JSON, default=list, nullable=False)  # MC/MM/MMT entità multimediali associate
 
     # Note operative opzionali
     notes = Column(Text)

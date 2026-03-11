@@ -45,6 +45,7 @@ from app.routes.api.queue_monitoring import queue_monitoring_router
 from app.routes.api.performance_monitoring import router as performance_monitoring_router
 
 from app.routes.view.us import us_view_router
+from app.routes.view.tma import tma_view_router
 
 
 
@@ -410,6 +411,12 @@ if ICCD_ROUTE_EXISTS:
 app.include_router(
     us_view_router,
     tags=["Pages", "US/USM"],
+    dependencies=[Depends(get_current_user_id_with_blacklist)]
+)
+
+app.include_router(
+    tma_view_router,
+    tags=["Pages", "TMA"],
     dependencies=[Depends(get_current_user_id_with_blacklist)]
 )
 
@@ -969,6 +976,5 @@ async def on_startup():
         logger.error(f"❌ Critical error during application startup: {e}")
         logger.error("❌ Application startup failed - cannot continue")
         raise
-
 
 

@@ -148,6 +148,7 @@ from app.models.geographic_maps import (
 from app.models.stratigraphy import (
     UnitaStratigrafica,
     UnitaStratigraficaMuraria,
+    TabellaMaterialiArcheologici,
     USFile,
     us_files_association,
     usm_files_association,
@@ -166,6 +167,7 @@ from app.models.documentation_and_field import (
     TavolaGrafica,
     MatrixHarris,
     OperatoreCantiere,
+    MezzoCantiere,
     GiornaleCantiere,
     FormSchema,
     giornale_operatori_association,
@@ -295,7 +297,8 @@ __all__ = [
     
     # Stratigraphy
     'UnitaStratigrafica',
-    'UnitaStratigraficaMuraria', 
+    'UnitaStratigraficaMuraria',
+    'TabellaMaterialiArcheologici',
     'USFile',
     'us_files_association',
     'usm_files_association',
@@ -310,6 +313,7 @@ __all__ = [
     'TavolaGrafica',
     'MatrixHarris',
     'OperatoreCantiere',
+    'MezzoCantiere',
     'GiornaleCantiere',
     'FormSchema',
     'FormData',
