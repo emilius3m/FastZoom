@@ -563,7 +563,7 @@ class AuthService:
                     }
                 )
                 
-                payload = SecurityService.verify_token(token)
+                payload = await SecurityService.verify_token(token, db)
                 
                 user_id_str = payload.get("sub")
                 
@@ -902,7 +902,7 @@ class AuthService:
             try:
                 # Extract user_id from token for blacklist
                 try:
-                    payload = SecurityService.verify_token(token)
+                    payload = await SecurityService.verify_token(token, db=None)
                     user_id = UUID(payload.get("sub"))
                     
                     # Blacklist the token

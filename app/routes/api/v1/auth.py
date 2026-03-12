@@ -40,6 +40,8 @@ from app.core.security import SecurityService
 from app.core.domain_exceptions import (
     InvalidCredentialsError,
     UserInactiveError,
+    TokenInvalidError,
+    TokenExpiredError,
     ResourceAlreadyExistsError,
     ValidationError,
 )

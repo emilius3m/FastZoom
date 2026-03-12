@@ -1,10 +1,60 @@
 <script>
 function schedaTMAForm() {
+  const defaultForm = {
+    tsk: 'TMA',
+    lir: 'I',
+    nctr: '',
+    nctn: '',
+    esc: '',
+    ecp: '',
+
+    ogtd: '',
+    ogtm: '',
+
+    pvcs: 'ITALIA',
+    pvcr: '',
+    pvcp: '',
+    pvcc: '',
+
+    ldct: '',
+    ldcn: '',
+    ldcu: '',
+    ldcs: '',
+
+    scan: '',
+    dscf: '',
+    dsca: '',
+    dsct: '',
+    dscm: '',
+    dscd: '',
+    dscu: '',
+    dscn: '',
+
+    dtzg: '',
+    nsc: '',
+    cdgg: '',
+    adsp: 2,
+    adsm: '',
+    cmpd: '',
+
+    dtm: [],
+    altre_localizzazioni: [],
+    materiali: [
+      { macc: '', macl: '', macd: '', macp: '', macq: null, mas: '' }
+    ],
+    fotografie: [],
+    cmpn: [''],
+    fur: ['']
+  }
+
   return {
     siteId: '{{ site_id }}',
+    listSearch: '',
     records: [],
     listLoading: false,
     listError: '',
+    formMode: 'create',
+    editingRecordId: null,
     sections: {
       og: true, lc: false, la: false, re: false,
       dt: true, da: false, ma: true, tu: false,
@@ -14,6 +64,8 @@ function schedaTMAForm() {
     successMessage: '',
     errorMessage: '',
     warningMessage: '',
+    defaultForm,
+    form: JSON.parse(JSON.stringify(defaultForm)),
 
     regioni: [
       { code: '01', name: 'Piemonte' },
@@ -76,55 +128,22 @@ function schedaTMAForm() {
       'NR (recupero pregresso)'
     ],
 
-    form: {
-      tsk: 'TMA',
-      lir: 'I',
-      nctr: '',
-      nctn: '',
-      esc: '',
-      ecp: '',
-
-      ogtd: '',
-      ogtm: '',
-
-      pvcs: 'ITALIA',
-      pvcr: '',
-      pvcp: '',
-      pvcc: '',
-
-      ldct: '',
-      ldcn: '',
-      ldcu: '',
-      ldcs: '',
-
-      scan: '',
-      dscf: '',
-      dsca: '',
-      dsct: '',
-      dscm: '',
-      dscd: '',
-      dscu: '',
-      dscn: '',
-
-      dtzg: '',
-      nsc: '',
-      cdgg: '',
-      adsp: 2,
-      adsm: '',
-      cmpd: '',
-
-      dtm: [],
-      altre_localizzazioni: [],
-      materiali: [
-        { macc: '', macl: '', macd: '', macp: '', macq: null, mas: '' }
-      ],
-      fotografie: [],
-      cmpn: [''],
-      fur: ['']
-    },
-
     async init() {
       await this.fetchRecords()
+    },
+
+    get filteredRecords() {
+      const q = (this.listSearch || '').trim().toLowerCase()
+      if (!q) return this.records
+      return this.records.filter((r) => {
+        const nct = this.recordNct(r).toLowerCase()
+        return (
+          nct.includes(q) ||
+          String(r?.ogtd || '').toLowerCase().includes(q) ||
+          String(r?.pvcc || '').toLowerCase().includes(q) ||
+          String(r?.dtzg || '').toLowerCase().includes(q)
+        )
+      })
     },
 
     async fetchRecords() {
@@ -141,6 +160,99 @@ function schedaTMAForm() {
         this.listError = e.message || 'Errore caricamento elenco TMA'
       } finally {
         this.listLoading = false
+      }
+    },
+
+    beginNewRecord() {
+      this.formMode = 'create'
+      this.editingRecordId = null
+      this.successMessage = ''
+      this.errorMessage = ''
+      this.warningMessage = ''
+      this.form = JSON.parse(JSON.stringify(this.defaultForm))
+      this.scrollToForm()
+    },
+
+    editRecord(record) {
+      if (!record) return
+      this.formMode = 'edit'
+      this.editingRecordId = record.id
+      this.successMessage = ''
+      this.errorMessage = ''
+      this.warningMessage = ''
+      this.form = this.buildFormFromRecord(record)
+      this.scrollToForm()
+    },
+
+    isEditingRecord(recordId) {
+      return this.formMode === 'edit' && this.editingRecordId === recordId
+    },
+
+    buildFormFromRecord(record) {
+      const safeStrings = (arr) => (Array.isArray(arr) && arr.length ? arr.map((v) => String(v || '')) : [''])
+      return {
+        ...JSON.parse(JSON.stringify(this.defaultForm)),
+        tsk: record?.tsk || 'TMA',
+        lir: record?.lir || 'I',
+        nctr: record?.nctr || '',
+        nctn: record?.nctn || '',
+        esc: record?.esc || '',
+        ecp: record?.ecp || '',
+        ogtd: record?.ogtd || '',
+        ogtm: record?.ogtm || '',
+        pvcs: record?.pvcs || 'ITALIA',
+        pvcr: record?.pvcr || '',
+        pvcp: record?.pvcp || '',
+        pvcc: record?.pvcc || '',
+        ldct: record?.ldct || '',
+        ldcn: record?.ldcn || '',
+        ldcu: record?.ldcu || '',
+        ldcs: record?.ldcs || '',
+        scan: record?.scan || '',
+        dscf: record?.dscf || '',
+        dsca: record?.dsca || '',
+        dsct: record?.dsct || '',
+        dscm: record?.dscm || '',
+        dscd: record?.dscd || '',
+        dscu: record?.dscu || '',
+        dscn: record?.dscn || '',
+        dtzg: record?.dtzg || '',
+        nsc: record?.nsc || '',
+        cdgg: record?.cdgg || '',
+        adsp: record?.adsp || 2,
+        adsm: record?.adsm || '',
+        cmpd: record?.cmpd || '',
+        dtm: Array.isArray(record?.dtm) ? [...record.dtm] : [],
+        altre_localizzazioni: Array.isArray(record?.altre_localizzazioni)
+          ? record.altre_localizzazioni.map((a) => ({
+              tcl: a?.tcl || '',
+              prvs: a?.prvs || '',
+              prvr: a?.prvr || '',
+              prvp: a?.prvp || '',
+              prvc: a?.prvc || '',
+              prcu: a?.prcu || ''
+            }))
+          : [],
+        materiali: Array.isArray(record?.materiali) && record.materiali.length
+          ? record.materiali.map((m) => ({
+              macc: m?.macc || '',
+              macl: m?.macl || '',
+              macd: m?.macd || '',
+              macp: m?.macp || '',
+              macq: m?.macq ?? null,
+              mas: m?.mas || ''
+            }))
+          : [{ macc: '', macl: '', macd: '', macp: '', macq: null, mas: '' }],
+        fotografie: Array.isArray(record?.fotografie)
+          ? record.fotografie.map((f) => ({
+              ftax: f?.ftax || '',
+              ftap: f?.ftap || '',
+              ftan: f?.ftan || '',
+              file_path: f?.file_path || ''
+            }))
+          : [],
+        cmpn: safeStrings(record?.cmpn),
+        fur: safeStrings(record?.fur)
       }
     },
 
@@ -296,6 +408,13 @@ function schedaTMAForm() {
       }
     },
 
+    scrollToForm() {
+      const el = document.getElementById('tma-form-anchor')
+      if (el?.scrollIntoView) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    },
+
     buildPayload() {
       const materiali = (this.form.materiali || []).map(m => ({
         macc: (m.macc || '').trim(),
@@ -378,7 +497,7 @@ function schedaTMAForm() {
       return document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
     },
 
-    async submitForm(event) {
+    async submitForm() {
       this.errorMessage = ''
       this.successMessage = ''
       this.warningMessage = ''
@@ -395,8 +514,13 @@ function schedaTMAForm() {
 
       this.saving = true
       try {
-        const response = await fetch(`/api/v1/tma/sites/${this.siteId}/records`, {
-          method: 'POST',
+        const isEdit = this.formMode === 'edit' && !!this.editingRecordId
+        const endpoint = isEdit
+          ? `/api/v1/tma/sites/${this.siteId}/records/${this.editingRecordId}`
+          : `/api/v1/tma/sites/${this.siteId}/records`
+
+        const response = await fetch(endpoint, {
+          method: isEdit ? 'PUT' : 'POST',
           headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': this.getCSRFToken()
@@ -416,7 +540,17 @@ function schedaTMAForm() {
           throw new Error((backendMessage || 'Errore salvataggio scheda TMA').trim())
         }
 
-        this.successMessage = 'Scheda TMA salvata correttamente.'
+        const saved = await response.json().catch(() => null)
+        if (saved?.id) {
+          this.formMode = 'edit'
+          this.editingRecordId = saved.id
+          this.form = this.buildFormFromRecord(saved)
+        }
+
+        this.successMessage = isEdit
+          ? 'Scheda TMA aggiornata correttamente.'
+          : 'Scheda TMA salvata correttamente.'
+
         await this.fetchRecords()
         this.scrollToFeedback()
       } catch (e) {

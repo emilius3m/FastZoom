@@ -182,6 +182,9 @@ class SchedaTMABase(BaseModel):
     def normalize_dtm(cls, values: List[str]) -> List[str]:
         normalized = [v.strip() for v in values if v and v.strip()]
         if not normalized:
+            # Backward compatibility: existing historical records may have empty arrays.
+            if cls.__name__ == "SchedaTMARead":
+                return []
             raise ValueError("DTM richiede almeno una motivazione")
         return normalized
 
@@ -190,6 +193,9 @@ class SchedaTMABase(BaseModel):
     def validate_name_list(cls, values: List[str]) -> List[str]:
         normalized = [v.strip() for v in values if v and v.strip()]
         if not normalized:
+            # Backward compatibility: allow empty arrays only for read serialization.
+            if cls.__name__ == "SchedaTMARead":
+                return []
             raise ValueError("La lista non può essere vuota")
         return normalized
 

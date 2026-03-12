@@ -118,7 +118,7 @@ document.addEventListener("alpine:init", () => {
     allocateCSRFToken(value) {
       this.csrfToken = value;
     },
-    setCookie() {
+    async setCookie() {
       const formData = new URLSearchParams();
       formData.append("grant_type", "password");
       formData.append("username", this.username);
@@ -128,46 +128,63 @@ document.addEventListener("alpine:init", () => {
       formData.append("client_id", "");
       formData.append("client_secret", "");
 
-      fetch("/api/v1/auth/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-CSRF-Token": this.csrfToken,
-        },
-        body: formData,
-      })
-        .then((response) => {
+      // Reset UI state before request
+      this.showError = false;
+      this.message = "";
 
-          console.log("Response status:", response.status);
-          console.log("Response headers:", response.headers);
-          
-          if (response.status === 204) {
-
-            // Successful login, navigate to /dashboard
-            console.log("Login successful, redirecting...");
-
-            // Test che il cookie sia settato
-            console.log("Document cookies:", document.cookie);
-
-            // Store authentication token for WebSocket and API calls
-            // Since we're using cookie-based auth, we'll use a placeholder
-            // In a real implementation, you might want to extract token from response
-            localStorage.setItem('access_token', 'authenticated'); // Placeholder token
-
-            window.location.href = "/dashboard";
-
-          } else if (response.status === 400) {
-            // Incorrect username or password
-            this.message = "Incorrect username or password";
-            this.showError = true;
-            return response.text();
-          }
-        })
-        .then((errorMessage) => {
-          if (errorMessage) {
-            console.log(errorMessage);
-          }
+      try {
+        const response = await fetch("/api/v1/auth/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRF-Token": this.csrfToken,
+          },
+          body: formData,
         });
+
+        console.log("Response status:", response.status);
+        console.log("Response headers:", response.headers);
+
+        if (response.status === 204) {
+          console.log("Login successful, redirecting...");
+          console.log("Document cookies:", document.cookie);
+          localStorage.setItem('access_token', 'authenticated');
+          window.location.href = "/dashboard";
+          return;
+        }
+
+        // Read backend message safely (JSON first, then text)
+        let backendMessage = "";
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          try {
+            const data = await response.json();
+            backendMessage = data?.detail || data?.message || "";
+          } catch (_) {
+            backendMessage = "";
+          }
+        } else {
+          try {
+            const text = await response.text();
+            backendMessage = text && text.trim() ? text.trim() : "";
+          } catch (_) {
+            backendMessage = "";
+          }
+        }
+
+        if (response.status === 401 || response.status === 400) {
+          this.message = "Email o password non corretti";
+          this.showError = true;
+          return;
+        }
+
+        this.message = backendMessage || `Errore login (HTTP ${response.status})`;
+        this.showError = true;
+      } catch (error) {
+        console.error("Login request failed:", error);
+        this.message = "Errore di rete durante il login";
+        this.showError = true;
+      }
     },
   }));
 });
