@@ -3,6 +3,8 @@ version: "3.9"
 services:
   app:
     build: .
+    security_opt:
+      - apparmor=unconfined
     working_dir: /app
     environment:
       DATABASE_URL: sqlite+aiosqlite:///./archaeological_catalog.db
