@@ -13,7 +13,7 @@ services:
       MINIO_LOCAL_BUCKET: archaeological-photos
       MINIO_LOCAL_SECURE: "false"
     ports:
-      - "8080:8000"
+      - "8000:8000"
     depends_on:
       - minio
 
