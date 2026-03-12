@@ -272,7 +272,7 @@ class AuthService:
                         }
                     )
                 else:
-                    logger.success(
+                    logger.debug(
                         "Found accessible sites for user",
                         extra={
                             "user_email": user.email,
