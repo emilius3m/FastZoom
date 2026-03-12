@@ -7,7 +7,8 @@ services:
       - apparmor=unconfined
     working_dir: /app
     environment:
-      DATABASE_URL: sqlite+aiosqlite:///./archaeological_catalog.db
+#      DATABASE_URL: sqlite+aiosqlite:///./archaeological_catalog.db
+      DATABASE_URL: sqlite+aiosqlite:////app/data/archaeological_catalog.db
       MINIO_CONFIG_PROFILE: local
       MINIO_LOCAL_URL: http://minio:9000
       MINIO_LOCAL_ACCESS_KEY: minioadmin
@@ -21,6 +22,8 @@ services:
       - "8000:8000"
     depends_on:
       - minio
+    volumes:
+      - /opt/FastZoom/data:/app/data
 
   minio:
     image: minio/minio:latest
