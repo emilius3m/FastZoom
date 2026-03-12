@@ -50,6 +50,8 @@ function schedaTMAForm() {
   return {
     siteId: '{{ site_id }}',
     listSearch: '',
+    listSort: 'newest',
+    showTMAModal: false,
     records: [],
     listLoading: false,
     listError: '',
@@ -238,16 +240,35 @@ function schedaTMAForm() {
 
     get filteredRecords() {
       const q = (this.listSearch || '').trim().toLowerCase()
-      if (!q) return this.records
-      return this.records.filter((r) => {
-        const nct = this.recordNct(r).toLowerCase()
-        return (
-          nct.includes(q) ||
-          String(r?.ogtd || '').toLowerCase().includes(q) ||
-          String(r?.pvcc || '').toLowerCase().includes(q) ||
-          String(r?.dtzg || '').toLowerCase().includes(q)
-        )
-      })
+      let results = this.records
+      if (q) {
+        results = results.filter((r) => {
+          const nct = this.recordNct(r).toLowerCase()
+          return (
+            nct.includes(q) ||
+            String(r?.ogtd || '').toLowerCase().includes(q) ||
+            String(r?.pvcc || '').toLowerCase().includes(q) ||
+            String(r?.dtzg || '').toLowerCase().includes(q)
+          )
+        })
+      }
+      // Sort
+      const sorted = [...results]
+      switch (this.listSort) {
+        case 'newest':
+          sorted.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))
+          break
+        case 'oldest':
+          sorted.sort((a, b) => new Date(a.updated_at || 0) - new Date(b.updated_at || 0))
+          break
+        case 'nct_asc':
+          sorted.sort((a, b) => this.recordNct(a).localeCompare(this.recordNct(b)))
+          break
+        case 'nct_desc':
+          sorted.sort((a, b) => this.recordNct(b).localeCompare(this.recordNct(a)))
+          break
+      }
+      return sorted
     },
 
     async fetchRecords() {
@@ -267,6 +288,17 @@ function schedaTMAForm() {
       }
     },
 
+    openTMAModal() {
+      this.beginNewRecord()
+      this.showTMAModal = true
+      document.body.style.overflow = 'hidden'
+    },
+
+    closeTMAModal() {
+      this.showTMAModal = false
+      document.body.style.overflow = ''
+    },
+
     beginNewRecord() {
       this.formMode = 'create'
       this.editingRecordId = null
@@ -274,7 +306,6 @@ function schedaTMAForm() {
       this.errorMessage = ''
       this.warningMessage = ''
       this.form = JSON.parse(JSON.stringify(this.defaultForm))
-      this.scrollToForm()
     },
 
     editRecord(record) {
@@ -285,7 +316,8 @@ function schedaTMAForm() {
       this.errorMessage = ''
       this.warningMessage = ''
       this.form = this.buildFormFromRecord(record)
-      this.scrollToForm()
+      this.showTMAModal = true
+      document.body.style.overflow = 'hidden'
     },
 
     isEditingRecord(recordId) {
@@ -638,7 +670,6 @@ function schedaTMAForm() {
       const validationErrors = this.validatePayload(payload)
       if (validationErrors.length) {
         this.errorMessage = `Compilare i campi obbligatori: ${validationErrors.join(', ')}`
-        this.scrollToFeedback()
         return
       }
 
@@ -682,10 +713,9 @@ function schedaTMAForm() {
           : 'Scheda TMA salvata correttamente.'
 
         await this.fetchRecords()
-        this.scrollToFeedback()
+        this.closeTMAModal()
       } catch (e) {
         this.errorMessage = e.message || 'Errore salvataggio scheda TMA'
-        this.scrollToFeedback()
       } finally {
         this.saving = false
       }

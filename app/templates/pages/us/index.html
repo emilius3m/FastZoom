@@ -23,49 +23,33 @@
 {% endif %}
 <div x-data="usUSMManagerApp()" x-init="init()" class="dark:bg-gray-900 dark:text-white min-h-screen">
 
-    <!-- Breadcrumb Navigation -->
-    <div class="w-full px-4 pt-8 sm:px-6 lg:px-8">
-        <nav class="flex mb-4" aria-label="Breadcrumb">
-            <ol class="inline-flex items-center space-x-1 md:space-x-3">
-                <li class="inline-flex items-center">
-                    <a href="/dashboard"
-                        class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                        <i class="fas fa-home mr-2"></i>Dashboard
-                    </a>
-                </li>
-                <li>
-                    <div class="flex items-center">
-                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <a href="{% if current_site_id %}/view/{{ current_site_id }}/dashboard{% else %}/dashboard{% endif %}"
-                            class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                            {{ site.name if site is defined else "Sito" }}
-                        </a>
-                    </div>
-                </li>
-                <li aria-current="page">
-                    <div class="flex items-center">
-                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <span class="text-gray-500 dark:text-gray-400">US</span>
-                    </div>
-                </li>
-            </ol>
-        </nav>
-    </div>
-
     <!-- Header -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                <div>
+        <div class="px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex flex-col">
+                    <!-- Breadcrumb Navigation -->
+                    <nav class="flex items-center space-x-4 text-sm mb-2">
+                        <i class="fas fa-home text-gray-500 text-lg"></i>
+                        <div class="flex items-center space-x-4">
+                            <span class="text-gray-400 text-lg">→</span>
+                            <a href="{% if current_site_id %}/view/{{ current_site_id }}/dashboard{% else %}/dashboard{% endif %}"
+                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
+                                {{ site.name if site is defined else "Sito" }} ({{ site.code if site is defined else 'SITE' }})
+                            </a>
+                            <span class="text-gray-400 text-lg">→</span>
+                            <span class="text-gray-700 dark:text-gray-300 font-semibold px-2 py-1">Gestione US</span>
+                        </div>
+                    </nav>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gestione Unità Stratigrafiche</h1>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                        Gestione US e USM per il sito {{ site.name if site is defined else 'Archeologico' }} ({{
-                        site.code if site is defined else 'SITE-CODE' }})
+                        Gestione US e USM per il sito archeologico
                     </p>
                 </div>
-                <div class="flex items-center space-x-3 mt-4 sm:mt-0">
+
+                <div class="flex items-center space-x-3 flex-wrap">
                     <button @click="openUSModal()"
-                        class="inline-flex items-center px-4 py-2 bg-orange-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 dark:focus:ring-offset-gray-800">
+                        class="inline-flex items-center px-4 py-2 bg-orange-600 dark:bg-orange-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-orange-700 dark:hover:bg-orange-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 dark:focus:ring-offset-gray-800">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -73,7 +57,7 @@
                         Nuova US
                     </button>
                     <button @click="openUSMModal()"
-                        class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-800">
+                        class="inline-flex items-center px-4 py-2 bg-red-600 dark:bg-red-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-800">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -114,7 +98,7 @@
 
                     <!-- PDF Import GPU Button -->
                     <button @click="$refs.pdfImportInputGPU.click()" :disabled="pdfImporting"
-                        class="ml-2 inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-gray-800 disabled:opacity-50"
+                        class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-gray-800 disabled:opacity-50"
                         title="Importa usando GPU (più veloce, richiede CUDA)">
                         <svg x-show="!pdfImporting" class="w-4 h-4 mr-2" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24">
@@ -135,7 +119,7 @@
 
                     <!-- DEBUG: Load from localStorage button -->
                     <button @click="loadOCRFromLocalStorage()"
-                        class="ml-2 px-3 py-2 text-xs bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 font-medium flex items-center"
+                        class="px-3 py-2 text-xs bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 font-medium flex items-center"
                         title="DEBUG: Carica ultimi risultati OCR da localStorage">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

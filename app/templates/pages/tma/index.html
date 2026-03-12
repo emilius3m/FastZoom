@@ -3,7 +3,8 @@
 {% block title %}TMA{% endblock %}
 
 {% block content %}
-<div class=" mx-auto p-6" x-data="schedaTMAForm()" x-init="init()">
+<div x-data="schedaTMAForm()" x-init="init()" class="dark:bg-gray-900 dark:text-white min-h-screen">
+  <div class="mx-auto p-6">
 
     <!-- Header -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
@@ -33,7 +34,7 @@
                     <button
                         type="button"
                         class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800"
-                        @click="beginNewRecord()"
+                        @click="openTMAModal()"
                     >
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -49,13 +50,51 @@
     <div class="space-y-6 dark:text-gray-100">
 
     <!-- Filters Panel -->
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
-        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- Search -->
-                <div>
+    <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <!-- Filter Header with Toggle -->
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z">
+                    </path>
+                </svg>
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white">Filtri di Ricerca</h3>
+                <span x-show="listSearch.length > 0"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    1 attivo
+                </span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button @click="listSearch = ''" x-show="listSearch.length > 0"
+                    class="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 flex items-center space-x-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                    <span>Reset Filtri</span>
+                </button>
+                <button
+                    type="button"
+                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                    @click="fetchRecords"
+                    :disabled="listLoading"
+                >
+                    <svg class="w-4 h-4 mr-2" :class="listLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span x-text="listLoading ? 'Aggiornamento...' : 'Aggiorna'"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Basic Filters (Always Visible) -->
+        <div class="p-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="md:col-span-2">
                     <label for="tma-search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="inline w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
                         Ricerca Rapida
@@ -63,23 +102,18 @@
                     <input type="text"
                            id="tma-search"
                            x-model="listSearch"
-                           placeholder="NCT, OGTD, Comune..."
-                           class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm">
+                           placeholder="NCT, OGTD, Comune, descrizione..."
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
                 </div>
-
-                <!-- Refresh -->
-                <div class="flex items-end">
-                    <button
-                        type="button"
-                        class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
-                        @click="fetchRecords"
-                        :disabled="listLoading"
-                    >
-                        <svg class="w-4 h-4 mr-2" :class="listLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                        <span x-text="listLoading ? 'Aggiornamento...' : 'Aggiorna'"></span>
-                    </button>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ordinamento</label>
+                    <select x-model="listSort"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                        <option value="newest">Più recenti</option>
+                        <option value="oldest">Più vecchi</option>
+                        <option value="nct_asc">NCT crescente</option>
+                        <option value="nct_desc">NCT decrescente</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -92,114 +126,145 @@
         </div>
     </div>
 
-    <!-- Table Card -->
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
-      <div class="p-4 space-y-3">
+    <!-- List Card -->
+    <div class="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
         <template x-if="listError">
-          <div class="rounded border border-red-300 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-3 py-2 text-sm" x-text="listError"></div>
+            <div class="rounded border border-red-300 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-3 py-2 text-sm m-4" x-text="listError"></div>
         </template>
 
-        <div class="overflow-x-auto">
-          <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
-            <thead class="bg-gray-50 dark:bg-gray-700 text-xs uppercase">
-              <tr>
-                <th class="text-left px-4 py-3">NCT</th>
-                <th class="text-left px-4 py-3">OGTD</th>
-                <th class="text-left px-4 py-3">Comune</th>
-                <th class="text-left px-4 py-3">Cronologia</th>
-                <th class="text-left px-4 py-3">Materiali</th>
-                <th class="text-left px-4 py-3">Ultimo aggiornamento</th>
-                <th class="text-left px-4 py-3">Azioni</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-if="listLoading">
-                <tr>
-                  <td colspan="7" class="px-4 py-3 text-gray-500 dark:text-gray-400">Caricamento elenco in corso...</td>
-                </tr>
-              </template>
-
-              <template x-if="!listLoading && filteredRecords.length === 0">
-                <tr>
-                  <td colspan="7" class="px-4 py-3 text-gray-500 dark:text-gray-400">Nessuna scheda TMA presente per questo sito.</td>
-                </tr>
-              </template>
-
-              <template x-for="r in filteredRecords" :key="r.id">
-                <tr class="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td class="px-4 py-3 font-mono" x-text="recordNct(r)"></td>
-                  <td class="px-4 py-3" x-text="r.ogtd || '-' "></td>
-                  <td class="px-4 py-3" x-text="r.pvcc || '-' "></td>
-                  <td class="px-4 py-3" x-text="r.dtzg || '-' "></td>
-                  <td class="px-4 py-3" x-text="(r.materiali || []).length"></td>
-                  <td class="px-4 py-3" x-text="formatDate(r.updated_at || r.created_at)"></td>
-                  <td class="px-4 py-3">
-                    <div class="flex items-center gap-2">
-                      <button
-                        type="button"
-                        class="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
-                        title="Modifica"
-                        @click="editRecord(r)"
-                      >
-                        <i class="fas fa-edit"></i>
-                      </button>
-                      <button
-                        type="button"
-                        class="inline-flex items-center justify-center w-8 h-8 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                        title="Esporta PDF"
-                        @click="window.open('/api/v1/tma/sites/' + siteId + '/records/' + r.id + '/export-pdf', '_blank')"
-                      >
-                        <i class="fas fa-file-pdf"></i>
-                      </button>
-                      <button
-                        type="button"
-                        class="inline-flex items-center justify-center w-8 h-8 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded"
-                        title="Esporta Word"
-                        @click="window.open('/api/v1/tma/sites/' + siteId + '/records/' + r.id + '/export-word', '_blank')"
-                      >
-                        <i class="fas fa-file-word"></i>
-                      </button>
-                      <span
-                        x-show="isEditingRecord(r.id)"
-                        class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
-                      >in modifica</span>
-                    </div>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
+        <!-- Empty State -->
+        <div x-show="!listLoading && filteredRecords.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
+            <i class="fas fa-search text-4xl mb-4"></i>
+            <p>Nessuna scheda TMA trovata. Prova a modificare i filtri o crea una nuova scheda.</p>
         </div>
-      </div>
+
+        <!-- Loading State -->
+        <div x-show="listLoading" class="p-8 text-center text-gray-500 dark:text-gray-400">
+            <svg class="animate-spin h-8 w-8 mx-auto mb-4 text-blue-500" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p>Caricamento elenco in corso...</p>
+        </div>
+
+        <!-- Records List -->
+        <ul x-show="!listLoading && filteredRecords.length > 0" class="divide-y divide-gray-200 dark:divide-gray-700">
+            <template x-for="r in filteredRecords" :key="r.id">
+                <li class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <div class="px-4 py-4 sm:px-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                                    <span class="text-blue-600 dark:text-blue-300 font-bold text-xs" x-text="recordNct(r).substring(0, 6)"></span>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900 dark:text-white" x-text="recordNct(r)"></div>
+                                    <div class="text-sm text-gray-500 dark:text-gray-400" x-text="r.ogtd || 'Nessun OGTD'"></div>
+                                    <div class="text-sm text-gray-500 dark:text-gray-400" x-text="r.pvcc || ''"></div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span x-show="r.dtzg"
+                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100"
+                                    x-text="r.dtzg">
+                                </span>
+                                <span
+                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100"
+                                    x-text="(r.materiali || []).length + ' materiali'">
+                                </span>
+                                <button @click="editRecord(r)"
+                                    class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                                    title="Modifica">
+                                    <i class="fas fa-edit mr-1"></i>
+                                    Modifica
+                                </button>
+                                <button @click="window.open('/api/v1/tma/sites/' + siteId + '/records/' + r.id + '/export-pdf', '_blank')"
+                                    class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center"
+                                    title="Esporta PDF">
+                                    <i class="fas fa-file-pdf mr-1"></i>
+                                    PDF
+                                </button>
+                                <button @click="window.open('/api/v1/tma/sites/' + siteId + '/records/' + r.id + '/export-word', '_blank')"
+                                    class="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center"
+                                    title="Esporta Word">
+                                    <i class="fas fa-file-word mr-1"></i>
+                                    Word
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2 sm:flex sm:justify-between">
+                            <div class="sm:flex">
+                                <div class="mr-6">
+                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Cronologia</p>
+                                    <p class="text-sm text-gray-900 dark:text-white" x-text="r.dtzg || '-'"></p>
+                                </div>
+                                <div class="mr-6">
+                                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Comune</p>
+                                    <p class="text-sm text-gray-900 dark:text-white" x-text="r.pvcc || '-'"></p>
+                                </div>
+                            </div>
+                            <div class="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
+                                <p>
+                                    Aggiornato il <span x-text="formatDate(r.updated_at || r.created_at)"></span>
+                                </p>
+                                <span x-show="isEditingRecord(r.id)"
+                                    class="ml-3 text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+                                    in modifica
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            </template>
+        </ul>
     </div>
+  </div><!-- end mx-auto p-6 inner container -->
 
-  <template x-if="successMessage">
-    <div class="rounded border border-emerald-300 bg-emerald-50 text-emerald-700 px-3 py-2 text-sm" x-text="successMessage"></div>
-  </template>
-  <template x-if="warningMessage">
-    <div class="rounded border border-amber-300 bg-amber-50 text-amber-700 px-3 py-2 text-sm" x-text="warningMessage"></div>
-  </template>
-  <template x-if="errorMessage">
-    <div class="rounded border border-red-300 bg-red-50 text-red-700 px-3 py-2 text-sm" x-text="errorMessage"></div>
-  </template>
+  <!-- TMA Form Modal -->
+  <div x-show="showTMAModal" x-cloak class="fixed !m-0 !p-0 inset-0 bg-black bg-opacity-50 z-50" @click.self="closeTMAModal()">
+    <div class="bg-white dark:bg-gray-800 absolute inset-0 flex flex-col overflow-hidden shadow-2xl border-4 border-blue-500">
 
-  <div id="tma-form-anchor" class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-4">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="formMode === 'edit' ? 'Modifica Scheda TMA' : 'Nuova Scheda TMA'"></h2>
-      <div class="flex items-center gap-2">
-        <span class="text-xs px-2 py-1 rounded"
-          :class="formMode === 'edit' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200'"
-          x-text="formMode === 'edit' ? 'Modalità modifica' : 'Modalità creazione'"
-        ></span>
-        <button type="button" class="text-sm text-gray-700 dark:text-gray-300 hover:underline" @click="beginNewRecord()">Reset / Nuova</button>
+      <!-- Modal Header -->
+      <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-500 px-6 py-4 flex justify-between items-center z-10">
+        <div>
+          <h3 class="text-2xl font-bold text-white"
+              x-text="formMode === 'edit' ? 'Modifica Scheda TMA' : 'Nuova Scheda TMA'"></h3>
+          <p class="text-blue-100 text-sm mt-1">Scheda standard ICCD - Tabella Materiali Archeologici</p>
+        </div>
+        <button @click="closeTMAModal()"
+            class="text-white hover:text-blue-200 transition p-2 rounded-full hover:bg-blue-700">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
       </div>
-    </div>
-  </div>
 
-  <form @submit.prevent="submitForm" novalidate class="space-y-4">
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <div class="bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm">CD - CODICI</div>
-      <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Modal Body -->
+      <div class="flex-1 overflow-y-auto dark:bg-gray-800">
+        <form @submit.prevent="submitForm" novalidate class="p-6 dark:bg-gray-800">
+
+          <!-- Alert Messages -->
+          <div x-show="successMessage" class="rounded border-l-4 border-emerald-500 bg-emerald-50 text-emerald-700 px-4 py-3 text-sm mb-6 flex items-center shadow-sm">
+             <i class="fas fa-check-circle text-emerald-500 mr-3 text-lg"></i>
+             <span x-text="successMessage"></span>
+          </div>
+          <div x-show="warningMessage" class="rounded border-l-4 border-amber-500 bg-amber-50 text-amber-700 px-4 py-3 text-sm mb-6 flex items-center shadow-sm">
+             <i class="fas fa-exclamation-circle text-amber-500 mr-3 text-lg"></i>
+             <span x-text="warningMessage"></span>
+          </div>
+          <div x-show="errorMessage" class="rounded border-l-4 border-red-500 bg-red-50 text-red-700 px-4 py-3 text-sm mb-6 flex items-center shadow-sm">
+             <i class="fas fa-exclamation-triangle text-red-500 mr-3 text-lg"></i>
+             <span x-text="errorMessage"></span>
+          </div>
+
+          <div class="space-y-6">
+            <!-- CD CODICI -->
+            <div class="bg-gray-50 dark:bg-gray-700 border-l-4 border-gray-500 dark:border-gray-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('cd')">
+                <i class="fas fa-barcode mr-3"></i> CD - Codici
+                <i class="fas ml-auto" :class="sections.cd ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.cd" x-transition>
         <label class="block">
           <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">TSK</span>Tipo Scheda<span class="text-red-500 ml-1">*</span></span>
           <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.tsk" readonly maxlength="4" required>
@@ -233,15 +298,16 @@
           <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">NCT</span>Codice univoco calcolato</span>
           <input class="w-full border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded bg-gray-50 dark:bg-gray-700 px-3 py-2 outline-none" :value="nct" readonly>
         </label>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('og')">
-        <span>OG - OGGETTO</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.og ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.og">
+            <!-- OG OGGETTO -->
+            <div class="bg-orange-50 dark:bg-gray-700 border-l-4 border-orange-500 dark:border-orange-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-orange-900 dark:text-orange-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('og')">
+                <i class="fas fa-box-open mr-3"></i> OG - Oggetto
+                <i class="fas ml-auto" :class="sections.og ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.og" x-transition>
         <label>
           <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">OGTD</span>Definizione<span class="text-red-500 ml-1">*</span></span>
           <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ogtd" list="ogtd-list" maxlength="100" required>
@@ -251,16 +317,16 @@
           <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">OGTM</span>Definizione materiale componente<span class="text-red-500 ml-1">*</span></span>
           <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ogtm" @blur="detectOgtmWarning" list="ogtm-list" maxlength="250" required>
           <datalist id="ogtm-list"><template x-for="v in ogtmSuggestions" :key="v"><option :value="v"></option></template></datalist>
-        </label>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('lc')">
-        <span>LC - LOCALIZZAZIONE GEOGRAFICO-AMMINISTRATIVA</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.lc ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4 space-y-4" x-show="sections.lc">
+            <!-- LC LOCALIZZAZIONE -->
+            <div class="bg-blue-50 dark:bg-gray-700 border-l-4 border-blue-500 dark:border-blue-400 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-blue-900 dark:text-blue-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('lc')">
+                <i class="fas fa-map-marker-alt mr-3 text-blue-600 dark:text-blue-400"></i> LC - Localizzazione Geografico-Amministrativa
+                <i class="fas ml-auto" :class="sections.lc ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="space-y-4" x-show="sections.lc" x-transition>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCS</span>Stato<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcs" maxlength="50" required></label>
           <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCR</span>Regione<span class="text-red-500 ml-1">*</span></span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcr" @change="onPvcrChange" required><option value="">Seleziona...</option><template x-for="r in regioni" :key="r.code"><option :value="r.name" x-text="r.name"></option></template></select></label>
@@ -272,16 +338,16 @@
           <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">LDCN</span>Denominazione attuale</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ldcn" maxlength="250"></label>
           <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">LDCU</span>Indirizzo</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ldcu" maxlength="250"></label>
           <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">LDCS</span>Specifiche e note</span><textarea class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ldcs" maxlength="500"></textarea></label>
-        </div>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('la')">
-        <span>LA - ALTRE LOCALIZZAZIONI</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.la ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4 space-y-3" x-show="sections.la">
+            <!-- LA ALTRE LOCALIZZAZIONI -->
+            <div class="bg-cyan-50 dark:bg-gray-700 border-l-4 border-cyan-500 dark:border-cyan-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-cyan-900 dark:text-cyan-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('la')">
+                <i class="fas fa-map mr-3"></i> LA - Altre Localizzazioni
+                <i class="fas ml-auto" :class="sections.la ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="space-y-4" x-show="sections.la" x-transition>
         <template x-for="(la, i) in form.altre_localizzazioni" :key="i">
           <div class="border border-gray-300 dark:border-gray-700 dark:bg-gray-800/50 rounded p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
             <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">TCL</span>Tipo localizzazione</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.tcl" maxlength="100"></label>
@@ -294,15 +360,16 @@
           </div>
         </template>
         <button type="button" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" @click="addAltraLocalizzazione">+ Aggiungi</button>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('re')">
-        <span>RE / DSC - MODALITÀ DI REPERIMENTO / DATI DI SCAVO</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.re ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.re">
+            <!-- RE DATI SCAVO -->
+            <div class="bg-teal-50 dark:bg-gray-700 border-l-4 border-teal-500 dark:border-teal-400 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-teal-900 dark:text-teal-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('re')">
+                <i class="fas fa-tools mr-3 text-teal-600 dark:text-teal-400"></i> RE/DSC - DATI DI SCAVO
+                <i class="fas ml-auto" :class="sections.re ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.re" x-transition>
         <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">SCAN</span>Denominazione dello scavo</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.scan"></label>
         <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCF</span>Ente responsabile</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dscf"></label>
         <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCA</span>Responsabile scientifico</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dsca"></label>
@@ -311,15 +378,16 @@
         <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCD</span>Data (anno)</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dscd" maxlength="4"></label>
         <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCU</span>Unità Stratigrafica</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dscu"></label>
         <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCN</span>Specifiche</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dscn"></label>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('dt')">
-        <span>DT - CRONOLOGIA</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.dt ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4 space-y-3" x-show="sections.dt">
+            <!-- DT CRONOLOGIA -->
+            <div class="bg-amber-50 dark:bg-gray-700 border-l-4 border-amber-500 dark:border-amber-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-amber-900 dark:text-amber-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('dt')">
+                <i class="fas fa-clock mr-3 text-amber-600"></i> DT - CRONOLOGIA
+                <i class="fas ml-auto" :class="sections.dt ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="space-y-4" x-show="sections.dt" x-transition>
         <label class="block"><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DTZG</span>Fascia cronologica<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dtzg" maxlength="50" required></label>
         <div>
           <div class="text-sm mb-1"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DTM</span>Motivazione cronologia<span class="text-red-500 ml-1">*</span></div>
@@ -328,26 +396,27 @@
               <label class="text-sm flex items-center gap-2"><input type="checkbox" :checked="hasDtm(m)" @change="toggleDtm(m)"><span x-text="m"></span></label>
             </template>
           </div>
-        </div>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('da')">
-        <span>DA - DATI ANALITICI</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.da ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4" x-show="sections.da">
+            <!-- DA DATI ANALITICI -->
+            <div class="bg-indigo-50 dark:bg-gray-700 border-l-4 border-indigo-500 dark:border-indigo-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-indigo-900 dark:text-indigo-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('da')">
+                <i class="fas fa-file-alt mr-3 text-indigo-500"></i> DA - DATI ANALITICI
+                <i class="fas ml-auto" :class="sections.da ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div x-show="sections.da" x-transition>
         <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">NSC</span>Notizie storico-critiche</span><textarea class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" rows="5" maxlength="4000" x-model="form.nsc"></textarea></label>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('ma')">
-        <span>MA - MATERIALE</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.ma ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4" x-show="sections.ma">
+            <!-- MA MATERIALE -->
+            <div class="bg-green-50 dark:bg-gray-700 border-l-4 border-green-500 dark:border-green-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-green-900 dark:text-green-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('ma')">
+                <i class="fas fa-shapes mr-3 text-green-600"></i> MA - MATERIALE
+                <i class="fas ml-auto" :class="sections.ma ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="space-y-4" x-show="sections.ma" x-transition>
         <template x-for="(m, i) in form.materiali" :key="i">
           <div class="border-l-4 border-l-amber-500 border-y border-r border-gray-300 dark:border-gray-700 dark:bg-gray-800/50 rounded-r p-3 mb-4">
             <div class="flex items-center justify-between mb-2">
@@ -365,25 +434,27 @@
           </div>
         </template>
         <button type="button" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" @click="addMateriale">+ Aggiungi Materiale</button>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('tu')">
-        <span>TU - CONDIZIONE GIURIDICA E VINCOLI</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.tu ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4" x-show="sections.tu">
+            <!-- TU CONDIZIONE GIURIDICA -->
+            <div class="bg-purple-50 dark:bg-gray-700 border-l-4 border-purple-500 dark:border-purple-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-purple-900 dark:text-purple-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('tu')">
+                <i class="fas fa-balance-scale mr-3 text-purple-600"></i> TU - CONDIZIONE GIURIDICA E VINCOLI
+                <i class="fas ml-auto" :class="sections.tu ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div x-show="sections.tu" x-transition>
         <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">CDGG</span>Indicazione generica<span class="text-red-500 ml-1">*</span></span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.cdgg" required><option value="">Seleziona...</option><optgroup label="Proprietà"><template x-for="v in cdggGruppi.proprieta" :key="`p-${v}`"><option :value="v" x-text="v"></option></template></optgroup><optgroup label="Detenzione"><template x-for="v in cdggGruppi.detenzione" :key="`d-${v}`"><option :value="v" x-text="v"></option></template></optgroup><optgroup label="Non rilevato"><template x-for="v in cdggGruppi.nonRilevato" :key="`n-${v}`"><option :value="v" x-text="v"></option></template></optgroup></select></label>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('do_section')">
-        <span>DO - FONTI E DOCUMENTI DI RIFERIMENTO</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.do_section ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4 space-y-3" x-show="sections.do_section">
+            <!-- DO FONTI E DOCUMENTI -->
+            <div class="bg-pink-50 dark:bg-gray-700 border-l-4 border-pink-500 dark:border-pink-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-pink-900 dark:text-pink-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('do_section')">
+                <i class="fas fa-camera mr-3 text-pink-500"></i> DO - FONTI E DOCUMENTI DI RIFERIMENTO
+                <i class="fas ml-auto" :class="sections.do_section ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="space-y-4" x-show="sections.do_section" x-transition>
         <template x-for="(f, i) in form.fotografie" :key="i">
           <div class="border border-gray-300 dark:border-gray-700 dark:bg-gray-800/50 rounded p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
             <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">FTAX</span>Genere</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="f.ftax" maxlength="100"></label>
@@ -394,26 +465,28 @@
           </div>
         </template>
         <button type="button" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" @click="addFoto">+ Aggiungi Foto</button>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('ad')">
-        <span>AD - ACCESSO AI DATI</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.ad ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.ad">
+            <!-- AD ACCESSO AI DATI -->
+            <div class="bg-yellow-50 dark:bg-gray-700 border-l-4 border-yellow-500 dark:border-yellow-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-yellow-900 dark:text-yellow-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('ad')">
+                <i class="fas fa-lock mr-3 text-yellow-600"></i> AD - ACCESSO AI DATI
+                <i class="fas ml-auto" :class="sections.ad ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.ad" x-transition>
         <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">ADSP</span>Profilo accesso</span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.adsp"><option :value="1">1 - intera scheda visibile</option><option :value="2">2 - limitazione privacy</option></select></label>
         <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">ADSM</span>Motivazione</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.adsm" maxlength="70"></label>
-      </div>
-    </section>
+              </div>
+            </div>
 
-    <section class="border border-gray-300 dark:border-gray-700 rounded overflow-hidden">
-      <button type="button" class="w-full text-left bg-stone-700 dark:bg-stone-800 text-white px-4 py-2 font-mono text-sm flex items-center justify-between" @click="toggleSection('cm')">
-        <span>CM - COMPILAZIONE</span>
-        <svg class="w-4 h-4 transition-transform" :class="sections.cm ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
-      </button>
-      <div class="p-4 space-y-3" x-show="sections.cm">
+            <!-- CM COMPILAZIONE -->
+            <div class="bg-gray-100 dark:bg-gray-700 border-l-4 border-gray-500 dark:border-gray-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('cm')">
+                <i class="fas fa-user-edit mr-3"></i> CM - COMPILAZIONE
+                <i class="fas ml-auto" :class="sections.cm ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="space-y-4" x-show="sections.cm" x-transition>
         <label class="block md:w-1/3"><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">CMPD</span>Data (anno)<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.cmpd" maxlength="4" required></label>
         <div>
           <div class="text-sm mb-2"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">CMPN</span>Nome compilatore<span class="text-red-500 ml-1">*</span></div>
@@ -429,28 +502,37 @@
           </template>
           <button type="button" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" @click="addFunzionario">+ Aggiungi Funzionario</button>
         </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div><!-- end modal body -->
+
+      <!-- Sticky Footer (Save Actions) -->
+      <div class="sticky bottom-0 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+          <div class="hidden sm:block">
+              <span class="text-sm text-gray-500 dark:text-gray-400">
+                  Assicurati di compilare tutti i campi obbligatori <span class="text-red-500">*</span>
+              </span>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <button type="button" @click="closeTMAModal()"
+                  class="w-full sm:w-auto px-6 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 font-medium transition-colors shadow-sm">
+                  <i class="fas fa-times mr-2"></i> Annulla
+              </button>
+              <button type="button" @click="submitForm()" :disabled="saving"
+                  class="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed">
+                  <span x-show="saving" class="mr-2">
+                     <i class="fas fa-spinner fa-spin"></i>
+                  </span>
+                  <i x-show="!saving" class="fas fa-save mr-2"></i>
+                  <span x-text="saving ? 'Salvataggio...' : (formMode === 'edit' ? 'Aggiorna Scheda TMA' : 'Salva Scheda TMA')"></span>
+              </button>
       </div>
-    </section>
+    </div><!-- end modal container -->
+  </div><!-- end modal overlay -->
 
-    <div id="tma-feedback-anchor" class="space-y-2">
-      <template x-if="errorMessage">
-        <div class="rounded border border-red-300 bg-red-50 text-red-700 px-3 py-2 text-sm" x-text="errorMessage"></div>
-      </template>
-      <template x-if="warningMessage">
-        <div class="rounded border border-amber-300 bg-amber-50 text-amber-700 px-3 py-2 text-sm" x-text="warningMessage"></div>
-      </template>
-      <template x-if="successMessage">
-        <div class="rounded border border-emerald-300 bg-emerald-50 text-emerald-700 px-3 py-2 text-sm" x-text="successMessage"></div>
-      </template>
-    </div>
-
-    <div class="flex justify-end gap-2">
-      <button type="button" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm" @click="beginNewRecord()">Annulla</button>
-      <button type="submit" class="px-4 py-2 bg-orange-600 text-white rounded disabled:opacity-50" :disabled="saving" x-text="saving ? 'Salvataggio...' : (formMode === 'edit' ? 'Aggiorna Scheda TMA' : 'Salva Scheda TMA')"></button>
-    </div>
-  </form>
-    </div>
-</div>
+</div><!-- end root x-data container -->
 
 {% include "pages/tma/tma_alpine_script.html" %}
 {% endblock %}
