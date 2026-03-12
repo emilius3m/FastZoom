@@ -6,8 +6,8 @@ services:
     working_dir: /app
     volumes:
       - .:/app
-    env_file:
-      - .env
+#    env_file:
+#      - .env
     environment:
       DATABASE_URL: sqlite+aiosqlite:///./archaeological_catalog.db
       MINIO_CONFIG_PROFILE: local
