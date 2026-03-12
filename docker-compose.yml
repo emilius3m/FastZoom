@@ -14,6 +14,9 @@ services:
       MINIO_LOCAL_SECRET_KEY: minioadmin
       MINIO_LOCAL_BUCKET: archaeological-photos
       MINIO_LOCAL_SECURE: "false"
+      CSRF_SECRET_KEY: "cambia-con-una-stringa-segreta-lunga"
+      COOKIE_SAMESITE: "lax"
+      COOKIE_SECURE: "false"
     ports:
       - "8000:8000"
     depends_on:
