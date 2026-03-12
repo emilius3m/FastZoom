@@ -2,9 +2,74 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+import unicodedata
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from app.utils.vocabolari_iccd import (
+    CDGG_CONDIZIONE_GIURIDICA,
+    CDGG_DEFAULT,
+    CODICI_REGIONE,
+    DENOMINAZIONI_REGIONE,
+    DTM_MOTIVAZIONI_TMA_EXTENDED,
+    LIVELLI_RICERCA,
+    PROVINCE_PER_REGIONE,
+    SIGLE_PROVINCE_VALIDE,
+)
+
+
+_DENOMINAZIONI_REGIONE_VALORI = set(DENOMINAZIONI_REGIONE.values())
+_DTM_MOTIVAZIONI_TMA_EXTENDED_VALORI = set(DTM_MOTIVAZIONI_TMA_EXTENDED)
+_CDGG_CONDIZIONE_GIURIDICA_VALORI = set(CDGG_CONDIZIONE_GIURIDICA)
+_DENOMINAZIONI_REGIONE_ALIAS = {
+    "Estero": "00",
+    "Valle d'Aosta": "Valle d'Aosta/Vallée d'Aoste",
+    "Trentino-Alto Adige": "Trentino-Alto Adige/Südtirol",
+}
+
+
+def _normalize_denominazione_regione(value: str, field_name: str) -> str:
+    raw = (value or "").strip()
+    raw = _DENOMINAZIONI_REGIONE_ALIAS.get(raw, raw)
+    if raw not in _DENOMINAZIONI_REGIONE_VALORI:
+        raise ValueError(f"{field_name} non valido secondo Lista Regioni ICCD")
+    return raw
+
+
+def _normalize_sigla_provincia(value: str, field_name: str) -> str:
+    raw = (value or "").strip().upper()
+    if raw not in SIGLE_PROVINCE_VALIDE:
+        raise ValueError(f"{field_name} non valido secondo Lista Province ICCD")
+    return raw
+
+
+def _normalize_loose_text(value: str) -> str:
+    raw = " ".join((value or "").strip().split())
+    raw = "".join(
+        c for c in unicodedata.normalize("NFD", raw)
+        if unicodedata.category(c) != "Mn"
+    )
+    return raw.casefold()
+
+
+_CDGG_CONDIZIONE_GIURIDICA_LOOKUP = {
+    _normalize_loose_text(v): v for v in CDGG_CONDIZIONE_GIURIDICA
+}
+
+
+def _normalize_cdgg(value: str, field_name: str) -> str:
+    raw = " ".join((value or "").strip().split())
+    if raw in _CDGG_CONDIZIONE_GIURIDICA_VALORI:
+        return raw
+
+    normalized_key = _normalize_loose_text(raw)
+    canonical = _CDGG_CONDIZIONE_GIURIDICA_LOOKUP.get(normalized_key)
+    if canonical:
+        return canonical
+
+    if raw not in _CDGG_CONDIZIONE_GIURIDICA_VALORI:
+        raise ValueError(f"{field_name} non valido secondo vocabolario chiuso TMA")
+    return raw
 
 
 class LIREnum(str, Enum):
@@ -46,12 +111,35 @@ class FTAItem(BaseModel):
 class LAItem(BaseModel):
     tcl: Optional[str] = Field(None, max_length=100)
     prvs: Optional[str] = Field(None, max_length=50)
-    prvr: Optional[str] = Field(None, max_length=25)
+    prvr: Optional[str] = Field(None, max_length=50)
     prvp: Optional[str] = Field(None, max_length=3)
     prvc: Optional[str] = Field(None, max_length=50)
     prcu: Optional[str] = Field(None, max_length=250)
 
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("prvr")
+    @classmethod
+    def validate_prvr(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or value == "":
+            return None
+        return _normalize_denominazione_regione(value, "PRVR")
+
+    @field_validator("prvp")
+    @classmethod
+    def validate_prvp(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or value == "":
+            return None
+        return _normalize_sigla_provincia(value, "PRVP")
+
+    @model_validator(mode="after")
+    def validate_prvr_prvp_consistency(self) -> "LAItem":
+        if not self.prvr or not self.prvp:
+            return self
+        expected = PROVINCE_PER_REGIONE.get(self.prvr)
+        if expected and self.prvp not in expected:
+            raise ValueError("PRVP non coerente con PRVR secondo Lista Province ICCD")
+        return self
 
 
 class SchedaTMABase(BaseModel):
@@ -69,7 +157,7 @@ class SchedaTMABase(BaseModel):
 
     # LC - PVC
     pvcs: str = Field(default="ITALIA", max_length=50)
-    pvcr: str = Field(..., max_length=25)
+    pvcr: str = Field(..., max_length=50)
     pvcp: str = Field(..., max_length=3)
     pvcc: str = Field(..., max_length=50)
 
@@ -103,7 +191,7 @@ class SchedaTMABase(BaseModel):
     materiali: List[MACItem] = Field(..., min_length=1)
 
     # TU
-    cdgg: str = Field(..., max_length=120)
+    cdgg: str = Field(default=CDGG_DEFAULT, max_length=120)
 
     # DO
     fotografie: List[FTAItem] = Field(default_factory=list)
@@ -127,6 +215,9 @@ class SchedaTMABase(BaseModel):
     @field_validator("lir", mode="before")
     @classmethod
     def force_lir(cls, _value) -> str:
+        # TMA-3.00_INV_01 supporta il livello Inventario (I) come valore operativo.
+        # Manteniamo il vocabolario completo in LIVELLI_RICERCA per riuso cross-scheda.
+        _ = LIVELLI_RICERCA
         return LIREnum.inventario.value
 
     @field_validator("pvcs", mode="before")
@@ -151,7 +242,26 @@ class SchedaTMABase(BaseModel):
         raw = (value or "").strip()
         if not raw.isdigit() or len(raw) != 2:
             raise ValueError("NCTR deve essere composto da 2 cifre")
+        if raw not in CODICI_REGIONE:
+            raise ValueError("NCTR non valido secondo codifica ICCD/ISTAT")
         return raw
+
+    @field_validator("pvcr")
+    @classmethod
+    def validate_pvcr(cls, value: str) -> str:
+        return _normalize_denominazione_regione(value, "PVCR")
+
+    @field_validator("pvcp")
+    @classmethod
+    def validate_pvcp(cls, value: str) -> str:
+        return _normalize_sigla_provincia(value, "PVCP")
+
+    @model_validator(mode="after")
+    def validate_pvcr_pvcp_consistency(self) -> "SchedaTMABase":
+        expected = PROVINCE_PER_REGIONE.get(self.pvcr)
+        if expected and self.pvcp not in expected:
+            raise ValueError("PVCP non coerente con PVCR secondo Lista Province ICCD")
+        return self
 
     @field_validator("dscd")
     @classmethod
@@ -186,7 +296,19 @@ class SchedaTMABase(BaseModel):
             if cls.__name__ == "SchedaTMARead":
                 return []
             raise ValueError("DTM richiede almeno una motivazione")
+
+        invalid = [v for v in normalized if v not in _DTM_MOTIVAZIONI_TMA_EXTENDED_VALORI]
+        if invalid:
+            raise ValueError(
+                "DTM contiene valori non ammessi dal vocabolario chiuso TMA: "
+                + ", ".join(invalid)
+            )
         return normalized
+
+    @field_validator("cdgg")
+    @classmethod
+    def validate_cdgg(cls, value: str) -> str:
+        return _normalize_cdgg(value, "CDGG")
 
     @field_validator("cmpn", "fur")
     @classmethod
@@ -241,7 +363,7 @@ class SchedaTMAUpdate(BaseModel):
 
     # LC - PVC
     pvcs: Optional[str] = Field(default=None, max_length=50)
-    pvcr: Optional[str] = Field(default=None, max_length=25)
+    pvcr: Optional[str] = Field(default=None, max_length=50)
     pvcp: Optional[str] = Field(default=None, max_length=3)
     pvcc: Optional[str] = Field(default=None, max_length=50)
 
@@ -290,6 +412,41 @@ class SchedaTMAUpdate(BaseModel):
     fur: Optional[List[str]] = None
 
     model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+    @field_validator("pvcr")
+    @classmethod
+    def validate_pvcr(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or value == "":
+            return value
+        return _normalize_denominazione_regione(value, "PVCR")
+
+    @field_validator("pvcp")
+    @classmethod
+    def validate_pvcp(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or value == "":
+            return value
+        return _normalize_sigla_provincia(value, "PVCP")
+
+    @field_validator("dtm")
+    @classmethod
+    def validate_dtm(cls, values: Optional[List[str]]) -> Optional[List[str]]:
+        if values is None:
+            return values
+        normalized = [v.strip() for v in values if v and v.strip()]
+        invalid = [v for v in normalized if v not in _DTM_MOTIVAZIONI_TMA_EXTENDED_VALORI]
+        if invalid:
+            raise ValueError(
+                "DTM contiene valori non ammessi dal vocabolario chiuso TMA: "
+                + ", ".join(invalid)
+            )
+        return normalized
+
+    @field_validator("cdgg")
+    @classmethod
+    def validate_cdgg(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or value == "":
+            return value
+        return _normalize_cdgg(value, "CDGG")
 
 
 class MACItemRead(MACItem):

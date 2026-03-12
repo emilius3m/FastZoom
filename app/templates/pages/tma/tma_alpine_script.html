@@ -68,10 +68,11 @@ function schedaTMAForm() {
     form: JSON.parse(JSON.stringify(defaultForm)),
 
     regioni: [
+      { code: '00', name: '00' },
       { code: '01', name: 'Piemonte' },
-      { code: '02', name: "Valle d'Aosta" },
+      { code: '02', name: "Valle d'Aosta/Vallée d'Aoste" },
       { code: '03', name: 'Lombardia' },
-      { code: '04', name: 'Trentino-Alto Adige' },
+      { code: '04', name: 'Trentino-Alto Adige/Südtirol' },
       { code: '05', name: 'Veneto' },
       { code: '06', name: 'Friuli-Venezia Giulia' },
       { code: '07', name: 'Liguria' },
@@ -89,6 +90,66 @@ function schedaTMAForm() {
       { code: '19', name: 'Sicilia' },
       { code: '20', name: 'Sardegna' }
     ],
+
+    sigleProvince: {
+      AL: 'Alessandria', AT: 'Asti', BI: 'Biella', CN: 'Cuneo',
+      NO: 'Novara', TO: 'Torino', VB: 'Verbano-Cusio-Ossola', VC: 'Vercelli',
+      AO: 'Aosta',
+      BG: 'Bergamo', BS: 'Brescia', CO: 'Como', CR: 'Cremona',
+      LC: 'Lecco', LO: 'Lodi', MB: 'Monza-Brianza', MI: 'Milano',
+      MN: 'Mantova', PV: 'Pavia', SO: 'Sondrio', VA: 'Varese',
+      BZ: 'Bolzano', TN: 'Trento',
+      BL: 'Belluno', PD: 'Padova', RO: 'Rovigo', TV: 'Treviso',
+      VE: 'Venezia', VI: 'Vicenza', VR: 'Verona',
+      GO: 'Gorizia', PN: 'Pordenone', TS: 'Trieste', UD: 'Udine',
+      GE: 'Genova', IM: 'Imperia', SP: 'La Spezia', SV: 'Savona',
+      BO: 'Bologna', FC: 'Forlì-Cesena', FE: 'Ferrara', MO: 'Modena',
+      PC: 'Piacenza', PR: 'Parma', RA: 'Ravenna', RE: "Reggio nell'Emilia",
+      RN: 'Rimini',
+      AR: 'Arezzo', FI: 'Firenze', GR: 'Grosseto', LI: 'Livorno',
+      LU: 'Lucca', MS: 'Massa-Carrara', PI: 'Pisa', PO: 'Prato',
+      PT: 'Pistoia', SI: 'Siena',
+      PG: 'Perugia', TR: 'Terni',
+      AN: 'Ancona', AP: 'Ascoli Piceno', FM: 'Fermo',
+      MC: 'Macerata', PU: 'Pesaro-Urbino',
+      FR: 'Frosinone', LT: 'Latina', RI: 'Rieti', RM: 'Roma', VT: 'Viterbo',
+      AQ: "L'Aquila", CH: 'Chieti', PE: 'Pescara', TE: 'Teramo',
+      CB: 'Campobasso', IS: 'Isernia',
+      AV: 'Avellino', BN: 'Benevento', CE: 'Caserta', NA: 'Napoli', SA: 'Salerno',
+      BA: 'Bari', BR: 'Brindisi', BT: 'Barletta-Andria-Trani',
+      FG: 'Foggia', LE: 'Lecce', TA: 'Taranto',
+      MT: 'Matera', PZ: 'Potenza',
+      CS: 'Cosenza', CZ: 'Catanzaro', KR: 'Crotone',
+      RC: 'Reggio Calabria', VV: 'Vibo Valentia',
+      AG: 'Agrigento', CL: 'Caltanissetta', CT: 'Catania', EN: 'Enna',
+      ME: 'Messina', PA: 'Palermo', RG: 'Ragusa', SR: 'Siracusa', TP: 'Trapani',
+      CA: 'Cagliari', NU: 'Nuoro', OR: 'Oristano', SS: 'Sassari', SU: 'Sud Sardegna',
+      '00': "Bene situato all'estero"
+    },
+
+    provincePerRegione: {
+      Piemonte: ['AL', 'AT', 'BI', 'CN', 'NO', 'TO', 'VB', 'VC'],
+      "Valle d'Aosta/Vallée d'Aoste": ['AO'],
+      Lombardia: ['BG', 'BS', 'CO', 'CR', 'LC', 'LO', 'MB', 'MI', 'MN', 'PV', 'SO', 'VA'],
+      'Trentino-Alto Adige/Südtirol': ['BZ', 'TN'],
+      Veneto: ['BL', 'PD', 'RO', 'TV', 'VE', 'VI', 'VR'],
+      'Friuli-Venezia Giulia': ['GO', 'PN', 'TS', 'UD'],
+      Liguria: ['GE', 'IM', 'SP', 'SV'],
+      'Emilia-Romagna': ['BO', 'FC', 'FE', 'MO', 'PC', 'PR', 'RA', 'RE', 'RN'],
+      Toscana: ['AR', 'FI', 'GR', 'LI', 'LU', 'MS', 'PI', 'PO', 'PT', 'SI'],
+      Umbria: ['PG', 'TR'],
+      Marche: ['AN', 'AP', 'FM', 'MC', 'PU'],
+      Lazio: ['FR', 'LT', 'RI', 'RM', 'VT'],
+      Abruzzo: ['AQ', 'CH', 'PE', 'TE'],
+      Molise: ['CB', 'IS'],
+      Campania: ['AV', 'BN', 'CE', 'NA', 'SA'],
+      Puglia: ['BA', 'BR', 'BT', 'FG', 'LE', 'TA'],
+      Basilicata: ['MT', 'PZ'],
+      Calabria: ['CS', 'CZ', 'KR', 'RC', 'VV'],
+      Sicilia: ['AG', 'CL', 'CT', 'EN', 'ME', 'PA', 'RG', 'SR', 'TP'],
+      Sardegna: ['CA', 'NU', 'OR', 'SS', 'SU'],
+      '00': ['00']
+    },
 
     ogtdSuggestions: [
       'materiale proveniente da Unità Stratigrafica',
@@ -111,24 +172,67 @@ function schedaTMAForm() {
     ],
 
     dtmVocabolario: [
-      'analisi dei materiali', 'analisi chimico-fisica', 'analisi stilistica', 'analisi tipologica',
+      'analisi dei materiali', 'analisi chimico-fisica', 'analisi stilistica',
       'bibliografia', 'bollo', 'contesto', 'data', 'dati epigrafici', 'documentazione',
-      'tradizione orale', 'NR (recupero pregresso)'
+      'tradizione orale', 'NR (recupero pregresso)', 'analisi tipologica'
     ],
 
     cdggVocabolario: [
-      'proprietà Stato', 'proprietà Ente pubblico territoriale', 'proprietà Ente pubblico non territoriale',
-      'proprietà privata', 'proprietà Ente religioso cattolico', 'proprietà Ente religioso non cattolico',
-      'proprietà Ente straniero in Italia', 'proprietà mista pubblica/privata',
-      'proprietà mista pubblica/ecclesiastica', 'proprietà mista privata/ecclesiastica', 'detenzione Stato',
-      'detenzione Ente pubblico territoriale', 'detenzione Ente pubblico non territoriale', 'detenzione privata',
-      'detenzione Ente religioso cattolico', 'detenzione Ente religioso non cattolico',
-      'detenzione Ente straniero in Italia', 'detenzione mista pubblica/privata',
-      'detenzione mista pubblica/ecclesiastica', 'detenzione mista privata/ecclesiastica',
+      'proprietà Stato',
+      'proprietà Ente pubblico territoriale',
+      'proprietà Ente pubblico non territoriale',
+      'proprietà privata',
+      'proprietà Ente religioso cattolico',
+      'proprietà Ente religioso non cattolico',
+      'proprietà Ente straniero in Italia',
+      'proprietà mista pubblica/privata',
+      'proprietà mista pubblica/ecclesiastica',
+      'proprietà mista privata/ecclesiastica',
+      'detenzione Stato',
+      'detenzione Ente pubblico territoriale',
+      'detenzione Ente pubblico non territoriale',
+      'detenzione privata',
+      'detenzione Ente religioso cattolico',
+      'detenzione Ente religioso non cattolico',
+      'detenzione Ente straniero in Italia',
+      'detenzione mista pubblica/privata',
+      'detenzione mista pubblica/ecclesiastica',
+      'detenzione mista privata/ecclesiastica',
       'NR (recupero pregresso)'
     ],
 
+    cdggGruppi: {
+      proprieta: [
+        'proprietà Stato',
+        'proprietà Ente pubblico territoriale',
+        'proprietà Ente pubblico non territoriale',
+        'proprietà privata',
+        'proprietà Ente religioso cattolico',
+        'proprietà Ente religioso non cattolico',
+        'proprietà Ente straniero in Italia',
+        'proprietà mista pubblica/privata',
+        'proprietà mista pubblica/ecclesiastica',
+        'proprietà mista privata/ecclesiastica'
+      ],
+      detenzione: [
+        'detenzione Stato',
+        'detenzione Ente pubblico territoriale',
+        'detenzione Ente pubblico non territoriale',
+        'detenzione privata',
+        'detenzione Ente religioso cattolico',
+        'detenzione Ente religioso non cattolico',
+        'detenzione Ente straniero in Italia',
+        'detenzione mista pubblica/privata',
+        'detenzione mista pubblica/ecclesiastica',
+        'detenzione mista privata/ecclesiastica'
+      ],
+      nonRilevato: ['NR (recupero pregresso)']
+    },
+
     async init() {
+      if (!this.form.cdgg) {
+        this.form.cdgg = 'proprietà Stato'
+      }
       await this.fetchRecords()
     },
 
@@ -202,7 +306,7 @@ function schedaTMAForm() {
         ogtm: record?.ogtm || '',
         pvcs: record?.pvcs || 'ITALIA',
         pvcr: record?.pvcr || '',
-        pvcp: record?.pvcp || '',
+        pvcp: String(record?.pvcp || '').toUpperCase(),
         pvcc: record?.pvcc || '',
         ldct: record?.ldct || '',
         ldcn: record?.ldcn || '',
@@ -228,7 +332,7 @@ function schedaTMAForm() {
               tcl: a?.tcl || '',
               prvs: a?.prvs || '',
               prvr: a?.prvr || '',
-              prvp: a?.prvp || '',
+              prvp: String(a?.prvp || '').toUpperCase(),
               prvc: a?.prvc || '',
               prcu: a?.prcu || ''
             }))
@@ -283,6 +387,32 @@ function schedaTMAForm() {
     normalizeNctn() {
       const digits = (this.form.nctn || '').replace(/\D/g, '')
       this.form.nctn = digits.padStart(8, '0').slice(0, 8)
+    },
+
+    getProvinceOptions(regionName) {
+      const key = (regionName || '').trim()
+      const sigle = this.provincePerRegione[key] || []
+      return sigle.map((code) => ({
+        code,
+        name: this.sigleProvince[code] || code
+      }))
+    },
+
+    onPvcrChange() {
+      const allowed = this.getProvinceOptions(this.form.pvcr).map((p) => p.code)
+      this.form.pvcp = String(this.form.pvcp || '').toUpperCase()
+      if (!allowed.includes(this.form.pvcp)) {
+        this.form.pvcp = ''
+      }
+    },
+
+    onPrvrChange(la) {
+      if (!la) return
+      const allowed = this.getProvinceOptions(la.prvr).map((p) => p.code)
+      la.prvp = String(la.prvp || '').toUpperCase()
+      if (!allowed.includes(la.prvp)) {
+        la.prvp = ''
+      }
     },
 
     addMateriale() {
@@ -436,7 +566,7 @@ function schedaTMAForm() {
         tcl: (a.tcl || '').trim() || null,
         prvs: (a.prvs || '').trim() || null,
         prvr: (a.prvr || '').trim() || null,
-        prvp: (a.prvp || '').trim() || null,
+        prvp: (a.prvp || '').trim().toUpperCase() || null,
         prvc: (a.prvc || '').trim() || null,
         prcu: (a.prcu || '').trim() || null
       })).filter(a => a.tcl || a.prvs || a.prvr || a.prvp || a.prvc || a.prcu)
@@ -454,7 +584,7 @@ function schedaTMAForm() {
 
         pvcs: (this.form.pvcs || 'ITALIA').trim(),
         pvcr: (this.form.pvcr || '').trim(),
-        pvcp: (this.form.pvcp || '').trim(),
+        pvcp: (this.form.pvcp || '').trim().toUpperCase(),
         pvcc: (this.form.pvcc || '').trim(),
 
         ldct: (this.form.ldct || '').trim() || null,

@@ -3,48 +3,48 @@
 {% block title %}TMA{% endblock %}
 
 {% block content %}
-<div class="w-full px-4 pt-8 sm:px-6 lg:px-8">
-  <nav class="flex mb-4" aria-label="Breadcrumb">
-    <ol class="inline-flex items-center space-x-1 md:space-x-3">
-      <li class="inline-flex items-center">
-        <a href="/dashboard" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-          <i class="fas fa-home mr-2"></i>Dashboard
-        </a>
-      </li>
-      <li>
-        <div class="flex items-center">
-          <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-          <a href="/view/{{ site_id }}/dashboard" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-            {{ site.name if site is defined else site_id }}
-          </a>
-        </div>
-      </li>
-      <li aria-current="page">
-        <div class="flex items-center">
-          <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-          <span class="text-gray-500 dark:text-gray-400">TMA</span>
-        </div>
-      </li>
-    </ol>
-  </nav>
-</div>
+<div class=" mx-auto p-6" x-data="schedaTMAForm()" x-init="init()">
 
-<div x-data="schedaTMAForm()" x-init="init()" class="w-full px-4 pb-8 sm:px-6 lg:px-8 space-y-6 dark:text-gray-100">
-  <div class="mb-2">
-    <div class="flex justify-between items-center mb-4">
-      <div>
-        <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-2">Schede TMA (ICCD 3.00)</h1>
-        <p class="text-gray-600 dark:text-gray-400">Gestione e aggiornamento schede materiali archeologici</p>
-      </div>
-      <button
-        type="button"
-        class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-        @click="beginNewRecord()"
-      >
-        <i class="fas fa-plus mr-2"></i>Nuova Scheda
-      </button>
+    <!-- Header -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <div>
+                    <!-- Breadcrumb Navigation -->
+                    <nav class="flex items-center space-x-4 text-sm mb-2">
+                        <i class="fas fa-home text-gray-500 text-lg"></i>
+                        <div class="flex items-center space-x-4">
+                            <span class="text-gray-400 text-lg">→</span>
+                            <a href="/view/{{ site_id }}/dashboard"
+                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
+                                {{ site.name if site is defined else site_id }}
+                            </a>
+                            <span class="text-gray-400 text-lg">→</span>
+                            <span class="text-gray-700 dark:text-gray-300 font-semibold px-2 py-1">Schede TMA (ICCD 3.00)</span>
+                        </div>
+                    </nav>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                        Gestione e aggiornamento schede materiali archeologici - {{ site.name if site is defined else site_id }}
+                    </p>
+                </div>
+                <div class="flex items-center space-x-3 mt-4 sm:mt-0">
+                    <button
+                        type="button"
+                        class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800"
+                        @click="beginNewRecord()"
+                    >
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        Nuova Scheda
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
+
+    <div class="space-y-6 dark:text-gray-100">
 
   <section class="bg-white dark:bg-gray-800 rounded-lg shadow">
     <div class="px-4 py-4 border-b dark:border-gray-700 flex items-center justify-between gap-3">
@@ -119,7 +119,7 @@
                       type="button"
                       class="inline-flex items-center justify-center w-8 h-8 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                       title="Esporta PDF"
-                      @click="errorMessage='Export PDF non disponibile al momento'; scrollToFeedback()"
+                      @click="window.open('/api/v1/tma/sites/' + siteId + '/records/' + r.id + '/export-pdf', '_blank')"
                     >
                       <i class="fas fa-file-pdf"></i>
                     </button>
@@ -127,7 +127,7 @@
                       type="button"
                       class="inline-flex items-center justify-center w-8 h-8 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded"
                       title="Esporta Word"
-                      @click="errorMessage='Export Word non disponibile al momento'; scrollToFeedback()"
+                      @click="window.open('/api/v1/tma/sites/' + siteId + '/records/' + r.id + '/export-word', '_blank')"
                     >
                       <i class="fas fa-file-word"></i>
                     </button>
@@ -235,8 +235,8 @@
       <div class="p-4 space-y-4" x-show="sections.lc">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCS</span>Stato<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcs" maxlength="50" required></label>
-          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCR</span>Regione<span class="text-red-500 ml-1">*</span></span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcr" required><option value="">Seleziona...</option><template x-for="r in regioni" :key="r.code"><option :value="r.name" x-text="r.name"></option></template></select></label>
-          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCP</span>Provincia<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcp" maxlength="3" required></label>
+          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCR</span>Regione<span class="text-red-500 ml-1">*</span></span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcr" @change="onPvcrChange" required><option value="">Seleziona...</option><template x-for="r in regioni" :key="r.code"><option :value="r.name" x-text="r.name"></option></template></select></label>
+          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCP</span>Provincia<span class="text-red-500 ml-1">*</span></span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcp" required><option value="">Seleziona...</option><template x-for="p in getProvinceOptions(form.pvcr)" :key="p.code"><option :value="p.code" x-text="`${p.code} - ${p.name}`"></option></template></select></label>
           <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCC</span>Comune<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcc" maxlength="50" required></label>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -258,8 +258,8 @@
           <div class="border border-gray-300 dark:border-gray-700 dark:bg-gray-800/50 rounded p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
             <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">TCL</span>Tipo localizzazione</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.tcl" maxlength="100"></label>
             <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRVS</span>Stato</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prvs" maxlength="50"></label>
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRVR</span>Regione</span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prvr"><option value="">Seleziona...</option><template x-for="r in regioni" :key="r.code"><option :value="r.name" x-text="r.name"></option></template></select></label>
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRVP</span>Provincia</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prvp" maxlength="3"></label>
+            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRVR</span>Regione</span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prvr" @change="onPrvrChange(la)"><option value="">Seleziona...</option><template x-for="r in regioni" :key="r.code"><option :value="r.name" x-text="r.name"></option></template></select></label>
+            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRVP</span>Provincia</span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prvp"><option value="">Seleziona...</option><template x-for="p in getProvinceOptions(la.prvr)" :key="p.code"><option :value="p.code" x-text="`${p.code} - ${p.name}`"></option></template></select></label>
             <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRVC</span>Comune</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prvc" maxlength="50"></label>
             <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRCU</span>Denominazione</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prcu" maxlength="250"></label>
             <button type="button" class="text-red-600 text-sm" @click="removeAltraLocalizzazione(i)">🗑 Rimuovi</button>
@@ -346,7 +346,7 @@
         <svg class="w-4 h-4 transition-transform" :class="sections.tu ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
       </button>
       <div class="p-4" x-show="sections.tu">
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">CDGG</span>Indicazione generica<span class="text-red-500 ml-1">*</span></span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.cdgg" required><option value="">Seleziona...</option><template x-for="v in cdggVocabolario" :key="v"><option :value="v" x-text="v"></option></template></select></label>
+        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">CDGG</span>Indicazione generica<span class="text-red-500 ml-1">*</span></span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.cdgg" required><option value="">Seleziona...</option><optgroup label="Proprietà"><template x-for="v in cdggGruppi.proprieta" :key="`p-${v}`"><option :value="v" x-text="v"></option></template></optgroup><optgroup label="Detenzione"><template x-for="v in cdggGruppi.detenzione" :key="`d-${v}`"><option :value="v" x-text="v"></option></template></optgroup><optgroup label="Non rilevato"><template x-for="v in cdggGruppi.nonRilevato" :key="`n-${v}`"><option :value="v" x-text="v"></option></template></optgroup></select></label>
       </div>
     </section>
 
@@ -421,6 +421,7 @@
       <button type="submit" class="px-4 py-2 bg-orange-600 text-white rounded disabled:opacity-50" :disabled="saving" x-text="saving ? 'Salvataggio...' : (formMode === 'edit' ? 'Aggiorna Scheda TMA' : 'Salva Scheda TMA')"></button>
     </div>
   </form>
+    </div>
 </div>
 
 {% include "pages/tma/tma_alpine_script.html" %}

@@ -1,9 +1,17 @@
 <!-- Navbar top fixed -->
 <nav
   class="fixed top-0 z-50 w-full bg-white border-b border-gray-200 px-4 lg:px-6 py-2.5 dark:bg-gray-800 dark:border-gray-700">
+  {% set current_site_id = none %}
+  {% if site %}
+    {% if site.id is defined and site.id %}
+      {% set current_site_id = site.id %}
+    {% elif site.site_id is defined and site.site_id %}
+      {% set current_site_id = site.site_id %}
+    {% endif %}
+  {% endif %}
   <div class="flex flex-wrap items-center justify-between">
     <div class="flex justify-start items-center">
-      {% if site and site.id %}
+      {% if current_site_id %}
       <!-- Sidebar menu button (now visible on all screen sizes) -->
       <button data-drawer-target="logo-sidebar" data-drawer-toggle="logo-sidebar" aria-controls="logo-sidebar"
         type="button"
@@ -307,7 +315,7 @@
   </ul>
 </div>
 
-{% if site and site.id %}
+{% if current_site_id %}
 <!-- Sidebar verticale a scomparsa (collapsible anche su desktop) -->
 <aside id="logo-sidebar"
   class="fixed top-0 left-0 z-40 w-64 h-screen pt-20 transition-transform -translate-x-full bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700"
@@ -326,7 +334,7 @@
 
       <!-- Giornale di Cantiere -->
       <li>
-        <a href="{% if site and site.id %}/view/{{ site.id }}/giornale-cantiere{% else %}/giornale-cantiere/{% endif %}"
+        <a href="{% if current_site_id %}/view/{{ current_site_id }}/giornale{% else %}/giornale/{% endif %}"
           class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
           <i
             class="fas fa-book w-5 h-5 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white"></i>
@@ -351,20 +359,20 @@
           </svg>
         </button>
         <ul id="dropdown-archeo" class="hidden py-2 space-y-2">
-          <li><a href="{% if site and site.id %}/view/{{ site.id }}/us{% else %}/catalog/us/{% endif %}"
+          <li><a href="{% if current_site_id %}/view/{{ current_site_id }}/us{% else %}/catalog/us/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
                 class="fas fa-layer-group me-2 text-orange-600"></i>US/USM</a></li>
-          <li><a href="{% if site and site.id %}/view/{{ site.id }}/tma{% else %}/dashboard/{% endif %}"
+          <li><a href="{% if current_site_id %}/view/{{ current_site_id }}/tma{% else %}/dashboard/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
                 class="fas fa-boxes-stacked me-2 text-amber-600"></i>TMA Inventariale</a></li>
-          <li><a href="{% if site and site.id %}/sites/{{ site.id }}/iccd/records{% else %}/catalog/iccd/{% endif %}"
+          <li><a href="{% if current_site_id %}/sites/{{ current_site_id }}/iccd/records{% else %}/catalog/iccd/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
                 class="fas fa-file-invoice me-2 text-red-600"></i>Schede ICCD</a></li>
-          <li><a href="{% if site and site.id %}/sites/{{ site.id }}/iccd/hierarchy{% else %}/catalog/iccd/{% endif %}"
+          <li><a href="{% if current_site_id %}/sites/{{ current_site_id }}/iccd/hierarchy{% else %}/catalog/iccd/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
                 class="fas fa-sitemap me-2 text-red-500"></i>Gerarchia ICCD</a></li>
           <li><a
-              href="{% if site and site.id %}/sites/{{ site.id }}/harris-matrix/editor{% else %}/catalog/harris-matrix/{% endif %}"
+              href="{% if current_site_id %}/sites/{{ current_site_id }}/harris-matrix/editor{% else %}/catalog/harris-matrix/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
                 class="fas fa-project-diagram me-2 text-indigo-600"></i>Matrix Harris</a></li>
         </ul>
@@ -386,10 +394,10 @@
           </svg>
         </button>
         <ul id="dropdown-media" class="hidden py-2 space-y-2">
-          <li><a href="{% if site and site.id %}/view/{{ site.id }}/photos{% else %}/catalog/photos/{% endif %}"
+          <li><a href="{% if current_site_id %}/view/{{ current_site_id }}/photos{% else %}/catalog/photos/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
                 class="fas fa-camera me-2 text-blue-600"></i>Fotografie</a></li>
-          <li><a href="{% if site and site.id %}/view/{{ site.id }}/documentation{% else %}/dashboard/{% endif %}"
+          <li><a href="{% if current_site_id %}/view/{{ current_site_id }}/documentation{% else %}/dashboard/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
                 class="fas fa-file-pdf me-2 text-yellow-600"></i>Documenti</a></li>
         </ul>
@@ -412,11 +420,11 @@
         </button>
         <ul id="dropdown-maps" class="hidden py-2 space-y-2">
           <li><a
-              href="{% if site and site.id %}/view/{{ site.id }}/geographic-map{% else %}/sites/geographic-map/{% endif %}"
+              href="{% if current_site_id %}/view/{{ current_site_id }}/geographic-map{% else %}/sites/geographic-map/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
                 class="fas fa-globe-europe me-2 text-green-600"></i>Mappa Geografica</a></li>
           <li><a
-              href="{% if site and site.id %}/plans/view/{{ site.id }}/archaeological-plans{% else %}/plans/view/archaeological-plans/{% endif %}"
+              href="{% if current_site_id %}/plans/view/{{ current_site_id }}/archaeological-plans{% else %}/plans/view/archaeological-plans/{% endif %}"
               class="flex items-center w-full p-2 text-gray-900 transition duration-75 rounded-lg pl-11 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"><i
                 class="fas fa-draw-polygon me-2 text-teal-600"></i>Piante Archeologiche</a></li>
         </ul>

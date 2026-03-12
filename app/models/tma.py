@@ -39,7 +39,7 @@ class SchedaTMA(Base, SiteMixin, UserMixin, SoftDeleteMixin):
 
     # LC - Localizzazione attuale
     pvcs = Column(String(50), nullable=False, default="ITALIA")
-    pvcr = Column(String(25), nullable=False)
+    pvcr = Column(String(50), nullable=False)
     pvcp = Column(String(3), nullable=False)
     pvcc = Column(String(50), nullable=False)
 

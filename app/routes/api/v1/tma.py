@@ -1,10 +1,13 @@
 from typing import List, Dict, Any, Optional
 from uuid import UUID
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import select, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from loguru import logger
 
 from app.core.dependencies import get_database_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
@@ -362,3 +365,90 @@ async def delete_tma_record(
     await db.commit()
     return
 
+
+# ===== EXPORT ENDPOINTS =====
+
+@router.get(
+    "/sites/{site_id}/records/{record_id}/export-pdf",
+    summary="Export TMA record as PDF",
+    tags=["TMA"],
+)
+async def export_tma_pdf(
+    site_id: UUID,
+    record_id: str,
+    db: AsyncSession = Depends(get_database_session),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+):
+    """Esporta una singola scheda TMA in formato PDF (ICCD 3.00)."""
+    if not await verify_site_access(site_id, user_sites):
+        raise HTTPException(status_code=403, detail="Accesso negato al sito")
+
+    row = await load_scheda_with_children(db, record_id)
+    if not row or row.site_id != str(site_id):
+        raise HTTPException(status_code=404, detail="Record TMA non trovato")
+
+    try:
+        scheda_dict = serialize_scheda_tma(row).model_dump()
+        from app.services.tma_export_service import generate_tma_pdf
+        pdf_bytes = generate_tma_pdf(scheda_dict)
+
+        nct = f"{row.nctr or ''}{row.nctn or ''}"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"TMA_{nct}_{timestamp}.pdf"
+
+        logger.info(f"✓ Export PDF TMA {record_id}: {filename} ({len(pdf_bytes)} bytes)")
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(pdf_bytes)),
+            },
+        )
+    except Exception as e:
+        logger.error(f"Errore export PDF TMA {record_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore generazione PDF: {str(e)}")
+
+
+@router.get(
+    "/sites/{site_id}/records/{record_id}/export-word",
+    summary="Export TMA record as Word",
+    tags=["TMA"],
+)
+async def export_tma_word(
+    site_id: UUID,
+    record_id: str,
+    db: AsyncSession = Depends(get_database_session),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+):
+    """Esporta una singola scheda TMA in formato Word (.docx) conforme ICCD 3.00."""
+    if not await verify_site_access(site_id, user_sites):
+        raise HTTPException(status_code=403, detail="Accesso negato al sito")
+
+    row = await load_scheda_with_children(db, record_id)
+    if not row or row.site_id != str(site_id):
+        raise HTTPException(status_code=404, detail="Record TMA non trovato")
+
+    try:
+        scheda_dict = serialize_scheda_tma(row).model_dump()
+        from app.services.tma_export_service import generate_tma_word
+        word_bytes = generate_tma_word(scheda_dict)
+
+        nct = f"{row.nctr or ''}{row.nctn or ''}"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"TMA_{nct}_{timestamp}.docx"
+
+        logger.info(f"✓ Export Word TMA {record_id}: {filename} ({len(word_bytes)} bytes)")
+
+        return Response(
+            content=word_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(word_bytes)),
+            },
+        )
+    except Exception as e:
+        logger.error(f"Errore export Word TMA {record_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore generazione Word: {str(e)}")
