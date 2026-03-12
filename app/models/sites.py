@@ -142,7 +142,10 @@ class ArchaeologicalSite(Base, UserMixin, SoftDeleteMixin):
     unita_stratigrafiche = relationship("UnitaStratigrafica", back_populates="site", cascade="all, delete-orphan")
     unita_stratigrafiche_murarie = relationship("UnitaStratigraficaMuraria", back_populates="site",
                                                 cascade="all, delete-orphan")
+    # Legacy TMA relation (deprecated)
     tma_records = relationship("TabellaMaterialiArcheologici", back_populates="site", cascade="all, delete-orphan")
+    # ICCD 3.00 normalized TMA relation
+    tma_schede = relationship("SchedaTMA", back_populates="site", cascade="all, delete-orphan")
 
 
 

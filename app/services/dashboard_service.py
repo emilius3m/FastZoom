@@ -20,7 +20,8 @@ from app.models import (
     User,
 )
 from app.models.giornale_cantiere import GiornaleCantiere
-from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria, TabellaMaterialiArcheologici
+from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.models.tma import SchedaTMA
 
 
 class DashboardService:
@@ -125,8 +126,8 @@ class DashboardService:
 
             # Count TMA records
             tma_count = await db.scalar(
-                select(func.count(TabellaMaterialiArcheologici.id))
-                .where(TabellaMaterialiArcheologici.site_id == site_id_str)
+                select(func.count(SchedaTMA.id))
+                .where(SchedaTMA.site_id == site_id_str)
             ) or 0
 
             return {

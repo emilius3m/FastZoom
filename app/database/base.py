@@ -105,7 +105,8 @@ def init_models():
     from ..models.geographic_maps import GeographicMap # noqa: F401
     from ..models import Photo # noqa: F401
     from ..models.iccd_records import ICCDRecord, ICCDBaseRecord, ICCDSchemaTemplate # noqa: F401
-    from ..models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria, TabellaMaterialiArcheologici, USFile # noqa: F401
+    from ..models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria, USFile # noqa: F401
+    from ..models.tma import SchedaTMA, TMAMateriale, TMAFotografia, TMACompilatore, TMAFunzionario, TMAMotivazioneCronologia # noqa: F401
     # Import cantiere model
     from ..models.cantiere import Cantiere  # noqa: F401
     

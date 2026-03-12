@@ -1,497 +1,432 @@
 <script>
-    function tmaManagerApp() {
-        return {
-            siteId: '{{ site_id }}',
-            records: [],
-            totalRecords: 0,
-            totalPages: 0,
-            pagination: {
-                page: 1,
-                per_page: 10
-            },
-            showModal: false,
-            editing: null,
-            viewMode: false,
-            saving: false,
-            errorMessage: '',
-            showAdvancedSearch: false,
-            filters: {
-                search: '',
-                nct: '',
-                ogtd: '',
-                pvcc: '',
-                // advanced
-                code: '',
-                periodo: '',
-                fase: '',
-                definizione: '',
-                localita: '',
-                affidabilita: '',
-                tipo: ''
-            },
-            form: {},
+function schedaTMAForm() {
+  return {
+    siteId: '{{ site_id }}',
+    records: [],
+    listLoading: false,
+    listError: '',
+    sections: {
+      og: true, lc: false, la: false, re: false,
+      dt: true, da: false, ma: true, tu: false,
+      do_section: false, ad: false, cm: true
+    },
+    saving: false,
+    successMessage: '',
+    errorMessage: '',
+    warningMessage: '',
 
-            defaultMaItem() {
-                return {
-                    macc: '',
-                    macq: '',
-                    macl: '',
-                    macd: '',
-                    macp: '',
-                    mas: ''
-                };
-            },
+    regioni: [
+      { code: '01', name: 'Piemonte' },
+      { code: '02', name: "Valle d'Aosta" },
+      { code: '03', name: 'Lombardia' },
+      { code: '04', name: 'Trentino-Alto Adige' },
+      { code: '05', name: 'Veneto' },
+      { code: '06', name: 'Friuli-Venezia Giulia' },
+      { code: '07', name: 'Liguria' },
+      { code: '08', name: 'Emilia-Romagna' },
+      { code: '09', name: 'Toscana' },
+      { code: '10', name: 'Umbria' },
+      { code: '11', name: 'Marche' },
+      { code: '12', name: 'Lazio' },
+      { code: '13', name: 'Abruzzo' },
+      { code: '14', name: 'Molise' },
+      { code: '15', name: 'Campania' },
+      { code: '16', name: 'Puglia' },
+      { code: '17', name: 'Basilicata' },
+      { code: '18', name: 'Calabria' },
+      { code: '19', name: 'Sicilia' },
+      { code: '20', name: 'Sardegna' }
+    ],
 
-            defaultProvenienza() {
-                return {
-                    tcl: '',
-                    prvs: '',
-                    prvr: '',
-                    prvp: '',
-                    prvc: '',
-                    prcu: ''
-                };
-            },
+    ogtdSuggestions: [
+      'materiale proveniente da Unità Stratigrafica',
+      'materiale proveniente da ricognizione',
+      'materiale conservato in deposito',
+      'materiale di collezione museale',
+      'materiale di collezione privata'
+    ],
 
-            defaultFoto() {
-                return {
-                    ftax: '',
-                    ftap: '',
-                    ftan: ''
-                };
-            },
+    ogtmSuggestions: [
+      'ceramica', 'vetro', 'legno', 'metallo', 'materiale fittile', 'materiale litico',
+      'materiale per edilizia', 'materiale organico', 'osso', 'campionature',
+      'reperti fittili', 'reperti archeozoologici', 'reperti archeobotanici', 'monete'
+    ],
 
-            defaultEntitaMultimediale() {
-                return {
-                    ftap: '',
-                    ftan: '',
-                    mmto: ''
-                };
-            },
+    maccSuggestions: [
+      'CERAMICA', 'VETRO', 'LEGNO', 'METALLO', 'MATERIALE FITTILE', 'MATERIALE LITICO',
+      'MATERIALE PER EDILIZIA', 'MATERIALE ORGANICO', 'OSSO', 'CAMPIONATURE',
+      'REPERTI FITTILI', 'REPERTI ARCHEOZOOLOGICI', 'REPERTI ARCHEOBOTANICI', 'MONETE'
+    ],
 
-            formatDate(dateString) {
-                if (!dateString) return '';
-                const date = new Date(dateString);
-                return date.toLocaleDateString('it-IT', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            },
+    dtmVocabolario: [
+      'analisi dei materiali', 'analisi chimico-fisica', 'analisi stilistica', 'analisi tipologica',
+      'bibliografia', 'bollo', 'contesto', 'data', 'dati epigrafici', 'documentazione',
+      'tradizione orale', 'NR (recupero pregresso)'
+    ],
 
-            getActiveFiltersCount() {
-                let count = 0;
-                for (const key in this.filters) {
-                    if (this.filters[key] !== '' && this.filters[key] !== null) {
-                        count++;
-                    }
-                }
-                return count;
-            },
+    cdggVocabolario: [
+      'proprietà Stato', 'proprietà Ente pubblico territoriale', 'proprietà Ente pubblico non territoriale',
+      'proprietà privata', 'proprietà Ente religioso cattolico', 'proprietà Ente religioso non cattolico',
+      'proprietà Ente straniero in Italia', 'proprietà mista pubblica/privata',
+      'proprietà mista pubblica/ecclesiastica', 'proprietà mista privata/ecclesiastica', 'detenzione Stato',
+      'detenzione Ente pubblico territoriale', 'detenzione Ente pubblico non territoriale', 'detenzione privata',
+      'detenzione Ente religioso cattolico', 'detenzione Ente religioso non cattolico',
+      'detenzione Ente straniero in Italia', 'detenzione mista pubblica/privata',
+      'detenzione mista pubblica/ecclesiastica', 'detenzione mista privata/ecclesiastica',
+      'NR (recupero pregresso)'
+    ],
 
-            resetAllFilters() {
-                this.filters = {
-                    search: '',
-                    nct: '',
-                    ogtd: '',
-                    pvcc: '',
-                    code: '',
-                    periodo: '',
-                    fase: '',
-                    definizione: '',
-                    localita: '',
-                    affidabilita: '',
-                    tipo: ''
-                };
-                this.pagination.page = 1;
-                this.loadList();
-            },
+    form: {
+      tsk: 'TMA',
+      lir: 'I',
+      nctr: '',
+      nctn: '',
+      esc: '',
+      ecp: '',
 
-            getPaginationPages() {
-                const current = this.pagination.page;
-                const last = this.totalPages;
-                const delta = 2;
-                const left = current - delta;
-                const right = current + delta + 1;
-                const range = [];
-                const rangeWithDots = [];
-                let l;
+      ogtd: '',
+      ogtm: '',
 
-                for (let i = 1; i <= last; i++) {
-                    if (i === 1 || i === last || i >= left && i < right) {
-                        range.push(i);
-                    }
-                }
+      pvcs: 'ITALIA',
+      pvcr: '',
+      pvcp: '',
+      pvcc: '',
 
-                for (let i of range) {
-                    if (l) {
-                        if (i - l === 2) {
-                            rangeWithDots.push(l + 1);
-                        } else if (i - l !== 1) {
-                            rangeWithDots.push('...');
-                        }
-                    }
-                    rangeWithDots.push(i);
-                    l = i;
-                }
+      ldct: '',
+      ldcn: '',
+      ldcu: '',
+      ldcs: '',
 
-                return rangeWithDots;
-            },
+      scan: '',
+      dscf: '',
+      dsca: '',
+      dsct: '',
+      dscm: '',
+      dscd: '',
+      dscu: '',
+      dscn: '',
 
-            changePage(page) {
-                if (page < 1 || page > this.totalPages) return;
-                this.pagination.page = page;
-                this.loadList();
-            },
+      dtzg: '',
+      nsc: '',
+      cdgg: '',
+      adsp: 2,
+      adsm: '',
+      cmpd: '',
 
-            async init() {
-                this.resetForm();
-                await this.loadList();
-            },
+      dtm: [],
+      altre_localizzazioni: [],
+      materiali: [
+        { macc: '', macl: '', macd: '', macp: '', macq: null, mas: '' }
+      ],
+      fotografie: [],
+      cmpn: [''],
+      fur: ['']
+    },
 
-            getCSRFToken() {
-                return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-            },
+    async init() {
+      await this.fetchRecords()
+    },
 
-            buildQuery() {
-                const q = new URLSearchParams();
-                if (this.filters.search) q.append('search', this.filters.search);
-                if (this.filters.nct) q.append('nct', this.filters.nct);
-                if (this.filters.ogtd) q.append('ogtd', this.filters.ogtd);
-                if (this.filters.pvcc) q.append('pvcc', this.filters.pvcc);
-                
-                // Advanced search fields can be added here if the API supports them for TMA
-                
-                q.append('skip', ((this.pagination.page - 1) * this.pagination.per_page).toString());
-                q.append('limit', this.pagination.per_page.toString());
-                
-                return q.toString();
-            },
-
-            async loadList() {
-                try {
-                    const resp = await fetch(`/api/v1/tma/sites/${this.siteId}/records?${this.buildQuery()}`, {
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': this.getCSRFToken()
-                        }
-                    });
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        // Assume the API might return either an array directly, or an object { items: [], total: X }
-                        // For ICCD endpoints, it's often an array directly unless pagination is fully implemented on backend.
-                        // Let's handle both.
-                        if (Array.isArray(data)) {
-                            this.records = data;
-                            this.totalRecords = data.length; // Actually should be total from DB, but if backend doesn't return it...
-                            this.totalPages = 1;
-                        } else {
-                            this.records = data.items || [];
-                            this.totalRecords = data.total || 0;
-                            this.totalPages = Math.ceil(this.totalRecords / this.pagination.per_page) || 1;
-                        }
-                    }
-                } catch (err) {
-                    console.error("Errore caricamento lista TMA", err);
-                }
-            },
-
-            async exportData() {
-                try {
-                    // Costruiamo una query senza limiti per l'export o usiamo l'endpoint di export se esiste
-                    const exportQuery = new URLSearchParams();
-                    if (this.filters.search) exportQuery.append('search', this.filters.search);
-                    if (this.filters.nct) exportQuery.append('nct', this.filters.nct);
-                    // ... altri filtri ...
-                    
-                    exportQuery.append('format', 'csv'); // Esempio
-                    
-                    const url = `/api/v1/tma/sites/${this.siteId}/export?${exportQuery.toString()}`;
-                    window.open(url, '_blank');
-                } catch(e) {
-                    console.error("Errore export", e);
-                    alert("Funzionalità di esportazione non ancora implementata sul server per TMA.");
-                }
-            },
-
-            resetForm() {
-                this.form = {
-                    tsk: 'TMA',
-                    lir: 'I',
-                    nctr: '',
-                    nctn: '',
-                    esc: '',
-                    ecp: '',
-                    ogtd: '',
-                    ogtm: '',
-                    pvcs: '',
-                    pvcr: '',
-                    pvcp: '',
-                    pvcc: '',
-                    dtzg: '',
-                    dtm_text: '',
-
-                    macc: '',
-                    macq: '',
-                    ma_items: [this.defaultMaItem()],
-
-                    cdgg: '',
-                    adsp: '2',
-                    adsm: '',
-                    cmpd: '',
-                    cmpn_text: '',
-                    fur_text: '',
-
-                    ldc: {
-                        ldct: '',
-                        ldcn: '',
-                        ldcu: '',
-                        ldcs: ''
-                    },
-                    provenienze: [],
-                    scavo: {
-                        scan: '',
-                        dscf: '',
-                        dsca: '',
-                        dsct: '',
-                        dscm: '',
-                        dscd: '',
-                        dscu: '',
-                        dscn: ''
-                    },
-                    nsc: '',
-                    fta: [],
-                    entita_multimediali: [],
-
-                    notes: ''
-                };
-            },
-
-            addMaItem() {
-                this.form.ma_items.push(this.defaultMaItem());
-            },
-
-            removeMaItem(index) {
-                if (this.form.ma_items.length <= 1) return;
-                this.form.ma_items.splice(index, 1);
-            },
-
-            addProvenienza() {
-                this.form.provenienze.push(this.defaultProvenienza());
-            },
-
-            removeProvenienza(index) {
-                this.form.provenienze.splice(index, 1);
-            },
-
-            addFoto() {
-                this.form.fta.push(this.defaultFoto());
-            },
-
-            removeFoto(index) {
-                this.form.fta.splice(index, 1);
-            },
-
-            addEntitaMultimediale() {
-                this.form.entita_multimediali.push(this.defaultEntitaMultimediale());
-            },
-
-            removeEntitaMultimediale(index) {
-                this.form.entita_multimediali.splice(index, 1);
-            },
-
-            openCreate() {
-                this.editing = null;
-                this.viewMode = false;
-                this.errorMessage = '';
-                this.resetForm();
-                this.showModal = true;
-            },
-
-            openEdit(row) {
-                this.editing = row;
-                this.viewMode = false;
-                this.errorMessage = '';
-
-                const maItems = Array.isArray(row.ma_items) && row.ma_items.length > 0
-                    ? row.ma_items
-                    : [{
-                        macc: row.macc || '',
-                        macq: row.macq || '',
-                        macl: '',
-                        macd: '',
-                        macp: '',
-                        mas: ''
-                    }];
-
-                this.form = {
-                    tsk: row.tsk || 'TMA',
-                    lir: row.lir || 'I',
-                    nctr: row.nctr || '',
-                    nctn: row.nctn || '',
-                    esc: row.esc || '',
-                    ecp: row.ecp || '',
-                    ogtd: row.ogtd || '',
-                    ogtm: row.ogtm || '',
-                    pvcs: row.pvcs || '',
-                    pvcr: row.pvcr || '',
-                    pvcp: row.pvcp || '',
-                    pvcc: row.pvcc || '',
-                    dtzg: row.dtzg || '',
-                    dtm_text: Array.isArray(row.dtm) ? row.dtm.join(', ') : '',
-
-                    macc: row.macc || '',
-                    macq: row.macq || '',
-                    ma_items: maItems,
-
-                    cdgg: row.cdgg || '',
-                    adsp: row.adsp || '2',
-                    adsm: row.adsm || '',
-                    cmpd: row.cmpd || '',
-                    cmpn_text: Array.isArray(row.cmpn) ? row.cmpn.join(', ') : '',
-                    fur_text: Array.isArray(row.fur) ? row.fur.join(', ') : '',
-
-                    ldc: {
-                        ldct: row.ldc?.ldct || '',
-                        ldcn: row.ldc?.ldcn || '',
-                        ldcu: row.ldc?.ldcu || '',
-                        ldcs: row.ldc?.ldcs || ''
-                    },
-                    provenienze: Array.isArray(row.provenienze) ? row.provenienze : [],
-                    scavo: {
-                        scan: row.scavo?.scan || '',
-                        dscf: row.scavo?.dscf || '',
-                        dsca: row.scavo?.dsca || '',
-                        dsct: row.scavo?.dsct || '',
-                        dscm: row.scavo?.dscm || '',
-                        dscd: row.scavo?.dscd || '',
-                        dscu: row.scavo?.dscu || '',
-                        dscn: row.scavo?.dscn || ''
-                    },
-                    nsc: row.nsc || '',
-                    fta: Array.isArray(row.fta) ? row.fta : [],
-                    entita_multimediali: Array.isArray(row.entita_multimediali) ? row.entita_multimediali : [],
-
-                    notes: row.notes || ''
-                };
-
-                this.showModal = true;
-            },
-
-            openView(row) {
-                this.openEdit(row);
-                this.viewMode = true;
-            },
-
-            closeModal() {
-                this.showModal = false;
-                this.editing = null;
-                this.viewMode = false;
-                this.errorMessage = '';
-            },
-
-            toArray(textValue) {
-                if (!textValue || !textValue.trim()) return [];
-                return textValue.split(',').map(s => s.trim()).filter(Boolean);
-            },
-
-            cleanArrayObjects(items) {
-                return (items || []).filter(item => item && Object.values(item).some(v => String(v || '').trim() !== ''));
-            },
-
-            buildPayload() {
-                const cleanedMaItems = this.cleanArrayObjects(this.form.ma_items);
-                const firstMa = cleanedMaItems[0] || { macc: '', macq: '' };
-
-                return {
-                    site_id: this.siteId,
-                    tsk: this.form.tsk,
-                    lir: this.form.lir,
-                    nctr: this.form.nctr,
-                    nctn: this.form.nctn,
-                    esc: this.form.esc,
-                    ecp: this.form.ecp,
-                    ogtd: this.form.ogtd,
-                    ogtm: this.form.ogtm,
-                    pvcs: this.form.pvcs,
-                    pvcr: this.form.pvcr,
-                    pvcp: this.form.pvcp,
-                    pvcc: this.form.pvcc,
-                    dtzg: this.form.dtzg,
-                    dtm: this.toArray(this.form.dtm_text),
-
-                    macc: firstMa.macc || this.form.macc,
-                    macq: firstMa.macq || this.form.macq,
-                    ma_items: cleanedMaItems,
-
-                    cdgg: this.form.cdgg,
-                    adsp: this.form.adsp || '2',
-                    adsm: this.form.adsm,
-                    cmpd: this.form.cmpd,
-                    cmpn: this.toArray(this.form.cmpn_text),
-                    fur: this.toArray(this.form.fur_text),
-
-                    ldc: this.form.ldc,
-                    provenienze: this.cleanArrayObjects(this.form.provenienze),
-                    scavo: this.form.scavo,
-                    nsc: this.form.nsc,
-                    fta: this.cleanArrayObjects(this.form.fta),
-                    entita_multimediali: this.cleanArrayObjects(this.form.entita_multimediali),
-
-                    notes: this.form.notes
-                };
-            },
-
-            async save() {
-                this.saving = true;
-                this.errorMessage = '';
-
-                try {
-                    const payload = this.buildPayload();
-                    const url = this.editing
-                        ? `/api/v1/tma/sites/${this.siteId}/records/${this.editing.id}`
-                        : `/api/v1/tma/sites/${this.siteId}/records`;
-                    const method = this.editing ? 'PUT' : 'POST';
-
-                    const resp = await fetch(url, {
-                        method,
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': this.getCSRFToken()
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!resp.ok) {
-                        const err = await resp.json();
-                        throw new Error(err.detail || 'Errore salvataggio TMA');
-                    }
-
-                    await this.loadList();
-                    this.closeModal();
-                } catch (e) {
-                    this.errorMessage = e.message || 'Errore salvataggio TMA';
-                } finally {
-                    this.saving = false;
-                }
-            },
-
-            async deleteRow(id) {
-                if (!confirm('Eliminare questo record TMA?')) return;
-
-                const resp = await fetch(`/api/v1/tma/sites/${this.siteId}/records/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRFToken': this.getCSRFToken()
-                    }
-                });
-                if (resp.ok) {
-                    await this.loadList();
-                }
-            }
+    async fetchRecords() {
+      this.listError = ''
+      this.listLoading = true
+      try {
+        const response = await fetch(`/api/v1/tma/sites/${this.siteId}/records?limit=200`)
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}))
+          throw new Error(err.detail || 'Errore caricamento elenco TMA')
         }
+        this.records = await response.json()
+      } catch (e) {
+        this.listError = e.message || 'Errore caricamento elenco TMA'
+      } finally {
+        this.listLoading = false
+      }
+    },
+
+    recordNct(record) {
+      const nctr = (record?.nctr || '').trim()
+      const nctn = String(record?.nctn || '').padStart(8, '0')
+      return `${nctr}${nctn}` || '-'
+    },
+
+    formatDate(value) {
+      if (!value) return '-'
+      const d = new Date(value)
+      if (Number.isNaN(d.getTime())) return '-'
+      return d.toLocaleString('it-IT')
+    },
+
+    toggleSection(name) {
+      this.sections[name] = !this.sections[name]
+    },
+
+    get nct() {
+      const nctr = (this.form.nctr || '').trim()
+      const nctnRaw = (this.form.nctn || '').replace(/\D/g, '')
+      const nctnPadded = nctnRaw.padStart(8, '0').slice(0, 8)
+      return `${nctr}${nctnPadded}`
+    },
+
+    normalizeNctn() {
+      const digits = (this.form.nctn || '').replace(/\D/g, '')
+      this.form.nctn = digits.padStart(8, '0').slice(0, 8)
+    },
+
+    addMateriale() {
+      this.form.materiali.push({ macc: '', macl: '', macd: '', macp: '', macq: null, mas: '' })
+    },
+    removeMateriale(index) {
+      if (this.form.materiali.length <= 1) return
+      this.form.materiali.splice(index, 1)
+    },
+
+    addAltraLocalizzazione() {
+      this.form.altre_localizzazioni.push({ tcl: '', prvs: '', prvr: '', prvp: '', prvc: '', prcu: '' })
+    },
+    removeAltraLocalizzazione(index) {
+      this.form.altre_localizzazioni.splice(index, 1)
+    },
+
+    addFoto() {
+      this.form.fotografie.push({ ftax: 'documentazione allegata', ftap: 'fotografia digitale (file)', ftan: '', file_path: '' })
+    },
+    removeFoto(index) {
+      this.form.fotografie.splice(index, 1)
+    },
+
+    addCompilatore() { this.form.cmpn.push('') },
+    removeCompilatore(i) {
+      if (this.form.cmpn.length <= 1) return
+      this.form.cmpn.splice(i, 1)
+    },
+
+    addFunzionario() { this.form.fur.push('') },
+    removeFunzionario(i) {
+      if (this.form.fur.length <= 1) return
+      this.form.fur.splice(i, 1)
+    },
+
+    toggleDtm(value) {
+      const idx = this.form.dtm.indexOf(value)
+      if (idx >= 0) this.form.dtm.splice(idx, 1)
+      else this.form.dtm.push(value)
+    },
+    hasDtm(value) {
+      return this.form.dtm.includes(value)
+    },
+
+    detectOgtmWarning() {
+      const ogtm = (this.form.ogtm || '').toLowerCase()
+      const missing = []
+      for (const m of this.form.materiali) {
+        const c = (m.macc || '').trim()
+        if (!c) continue
+        if (!ogtm.includes(c.toLowerCase())) missing.push(c)
+      }
+      if (missing.length) {
+        this.warningMessage = `OGTM non include alcune categorie materiali: ${missing.join(', ')}`
+      } else {
+        this.warningMessage = ''
+      }
+    },
+
+    cleanStringArray(values) {
+      return (values || []).map(v => (v || '').trim()).filter(Boolean)
+    },
+
+    validatePayload(payload) {
+      const errors = []
+
+      const requiredScalar = [
+        ['nctr', 'NCTR'],
+        ['nctn', 'NCTN'],
+        ['esc', 'ESC'],
+        ['ecp', 'ECP'],
+        ['ogtd', 'OGTD'],
+        ['ogtm', 'OGTM'],
+        ['pvcs', 'PVCS'],
+        ['pvcr', 'PVCR'],
+        ['pvcp', 'PVCP'],
+        ['pvcc', 'PVCC'],
+        ['dtzg', 'DTZG'],
+        ['cdgg', 'CDGG'],
+        ['cmpd', 'CMPD']
+      ]
+
+      for (const [key, label] of requiredScalar) {
+        if (!String(payload[key] || '').trim()) errors.push(label)
+      }
+
+      if (!/^\d{8}$/.test(String(payload.nctn || ''))) errors.push('NCTN(8 cifre)')
+      if (!Array.isArray(payload.dtm) || payload.dtm.length === 0) errors.push('DTM')
+      if (!Array.isArray(payload.cmpn) || payload.cmpn.length === 0) errors.push('CMPN')
+      if (!Array.isArray(payload.fur) || payload.fur.length === 0) errors.push('FUR')
+
+      if (!Array.isArray(payload.materiali) || payload.materiali.length === 0) {
+        errors.push('MA')
+      } else {
+        const invalidMateriale = payload.materiali.some(m => !String(m.macc || '').trim() || Number(m.macq || 0) < 1)
+        if (invalidMateriale) errors.push('MACC/MACQ')
+      }
+
+      return [...new Set(errors)]
+    },
+
+    formatApiError(err) {
+      const detail = err?.detail
+      if (Array.isArray(detail)) {
+        return detail
+          .map((d) => {
+            const loc = Array.isArray(d?.loc) ? d.loc.join('.') : ''
+            const msg = d?.msg || 'errore di validazione'
+            return loc ? `${loc}: ${msg}` : msg
+          })
+          .join(' | ')
+      }
+      if (typeof detail === 'object' && detail !== null) return JSON.stringify(detail)
+      if (typeof detail === 'string' && detail.trim()) return detail
+      return ''
+    },
+
+    scrollToFeedback() {
+      const el = document.getElementById('tma-feedback-anchor')
+      if (el?.scrollIntoView) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    },
+
+    buildPayload() {
+      const materiali = (this.form.materiali || []).map(m => ({
+        macc: (m.macc || '').trim(),
+        macl: (m.macl || '').trim() || null,
+        macd: (m.macd || '').trim() || null,
+        macp: (m.macp || '').trim() || null,
+        macq: Number(m.macq || 0),
+        mas: (m.mas || '').trim() || null
+      })).filter(m => m.macc || m.macq > 0)
+
+      const fotografie = (this.form.fotografie || []).map(f => ({
+        ftax: (f.ftax || '').trim() || null,
+        ftap: (f.ftap || '').trim() || null,
+        ftan: (f.ftan || '').trim() || null,
+        file_path: (f.file_path || '').trim() || null
+      })).filter(f => f.ftax || f.ftap || f.ftan || f.file_path)
+
+      const altre_localizzazioni = (this.form.altre_localizzazioni || []).map(a => ({
+        tcl: (a.tcl || '').trim() || null,
+        prvs: (a.prvs || '').trim() || null,
+        prvr: (a.prvr || '').trim() || null,
+        prvp: (a.prvp || '').trim() || null,
+        prvc: (a.prvc || '').trim() || null,
+        prcu: (a.prcu || '').trim() || null
+      })).filter(a => a.tcl || a.prvs || a.prvr || a.prvp || a.prvc || a.prcu)
+
+      return {
+        tsk: 'TMA',
+        lir: 'I',
+        nctr: (this.form.nctr || '').trim(),
+        nctn: (this.form.nctn || '').trim(),
+        esc: (this.form.esc || '').trim(),
+        ecp: (this.form.ecp || '').trim(),
+
+        ogtd: (this.form.ogtd || '').trim(),
+        ogtm: (this.form.ogtm || '').trim(),
+
+        pvcs: (this.form.pvcs || 'ITALIA').trim(),
+        pvcr: (this.form.pvcr || '').trim(),
+        pvcp: (this.form.pvcp || '').trim(),
+        pvcc: (this.form.pvcc || '').trim(),
+
+        ldct: (this.form.ldct || '').trim() || null,
+        ldcn: (this.form.ldcn || '').trim() || null,
+        ldcu: (this.form.ldcu || '').trim() || null,
+        ldcs: (this.form.ldcs || '').trim() || null,
+
+        altre_localizzazioni,
+
+        scan: (this.form.scan || '').trim() || null,
+        dscf: (this.form.dscf || '').trim() || null,
+        dsca: (this.form.dsca || '').trim() || null,
+        dsct: (this.form.dsct || '').trim() || null,
+        dscm: (this.form.dscm || '').trim() || null,
+        dscd: (this.form.dscd || '').trim() || null,
+        dscu: (this.form.dscu || '').trim() || null,
+        dscn: (this.form.dscn || '').trim() || null,
+
+        dtzg: (this.form.dtzg || '').trim(),
+        dtm: this.cleanStringArray(this.form.dtm),
+
+        nsc: (this.form.nsc || '').trim() || null,
+
+        materiali,
+
+        cdgg: (this.form.cdgg || '').trim(),
+
+        fotografie,
+
+        adsp: this.form.adsp ? Number(this.form.adsp) : 2,
+        adsm: (this.form.adsm || '').trim() || null,
+
+        cmpd: (this.form.cmpd || '').trim(),
+        cmpn: this.cleanStringArray(this.form.cmpn),
+        fur: this.cleanStringArray(this.form.fur)
+      }
+    },
+
+    getCSRFToken() {
+      return document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+    },
+
+    async submitForm(event) {
+      this.errorMessage = ''
+      this.successMessage = ''
+      this.warningMessage = ''
+      this.normalizeNctn()
+      this.detectOgtmWarning()
+
+      const payload = this.buildPayload()
+      const validationErrors = this.validatePayload(payload)
+      if (validationErrors.length) {
+        this.errorMessage = `Compilare i campi obbligatori: ${validationErrors.join(', ')}`
+        this.scrollToFeedback()
+        return
+      }
+
+      this.saving = true
+      try {
+        const response = await fetch(`/api/v1/tma/sites/${this.siteId}/records`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': this.getCSRFToken()
+          },
+          body: JSON.stringify(payload)
+        })
+
+        if (!response.ok) {
+          const raw = await response.text().catch(() => '')
+          let err = {}
+          try {
+            err = raw ? JSON.parse(raw) : {}
+          } catch (_) {
+            err = {}
+          }
+          const backendMessage = this.formatApiError(err) || raw
+          throw new Error((backendMessage || 'Errore salvataggio scheda TMA').trim())
+        }
+
+        this.successMessage = 'Scheda TMA salvata correttamente.'
+        await this.fetchRecords()
+        this.scrollToFeedback()
+      } catch (e) {
+        this.errorMessage = e.message || 'Errore salvataggio scheda TMA'
+        this.scrollToFeedback()
+      } finally {
+        this.saving = false
+      }
     }
+  }
+}
 </script>
 

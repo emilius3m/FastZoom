@@ -4,11 +4,19 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_database_session
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
-from app.models.stratigraphy import TabellaMaterialiArcheologici
-from app.schemas.tma import TMACreate, TMAUpdate, TMAOut
+from app.models.tma import (
+    SchedaTMA,
+    TMAMateriale,
+    TMAFotografia,
+    TMACompilatore,
+    TMAFunzionario,
+    TMAMotivazioneCronologia,
+)
+from app.schemas.tma import SchedaTMACreate, SchedaTMAUpdate, SchedaTMARead
 
 
 router = APIRouter()
@@ -18,50 +26,101 @@ async def verify_site_access(site_id: UUID, user_sites: List[Dict[str, Any]]) ->
     return any(s["site_id"] == str(site_id) for s in user_sites)
 
 
-def normalize_tma_payload(payload_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Normalize extended TMA payload while keeping backward compatibility columns."""
-    normalized = dict(payload_dict)
+def serialize_scheda_tma(row: SchedaTMA) -> SchedaTMARead:
+    payload = {
+        "id": row.id,
+        "site_id": row.site_id,
+        "created_by": row.created_by,
+        "updated_by": row.updated_by,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+        "tsk": row.tsk,
+        "lir": row.lir,
+        "nctr": row.nctr,
+        "nctn": row.nctn,
+        "esc": row.esc,
+        "ecp": row.ecp,
+        "ogtd": row.ogtd,
+        "ogtm": row.ogtm,
+        "pvcs": row.pvcs,
+        "pvcr": row.pvcr,
+        "pvcp": row.pvcp,
+        "pvcc": row.pvcc,
+        "ldct": row.ldct,
+        "ldcn": row.ldcn,
+        "ldcu": row.ldcu,
+        "ldcs": row.ldcs,
+        "altre_localizzazioni": row.altre_localizzazioni or [],
+        "scan": row.scan,
+        "dscf": row.dscf,
+        "dsca": row.dsca,
+        "dsct": row.dsct,
+        "dscm": row.dscm,
+        "dscd": row.dscd,
+        "dscu": row.dscu,
+        "dscn": row.dscn,
+        "dtzg": row.dtzg,
+        "dtm": [m.motivazione for m in (row.motivazioni_cronologia or [])],
+        "nsc": row.nsc,
+        "materiali": [
+            {
+                "id": item.id,
+                "ordine": item.ordine,
+                "macc": item.macc,
+                "macl": item.macl,
+                "macd": item.macd,
+                "macp": item.macp,
+                "macq": item.macq,
+                "mas": item.mas,
+            }
+            for item in (row.materiali or [])
+        ],
+        "cdgg": row.cdgg,
+        "fotografie": [
+            {
+                "id": foto.id,
+                "ordine": foto.ordine,
+                "ftax": foto.ftax,
+                "ftap": foto.ftap,
+                "ftan": foto.ftan,
+                "file_path": foto.file_path,
+            }
+            for foto in (row.fotografie or [])
+        ],
+        "adsp": row.adsp,
+        "adsm": row.adsm,
+        "cmpd": row.cmpd,
+        "cmpn": [c.nome for c in (row.compilatori or [])],
+        "fur": [f.nome for f in (row.funzionari or [])],
+    }
+    return SchedaTMARead.model_validate(payload)
 
-    # MA repeatable block (required operationally)
-    ma_items = normalized.get("ma_items") or []
-    if not ma_items:
-        # backward compatibility: derive from legacy mandatory single MA fields
-        if normalized.get("macc") and normalized.get("macq"):
-            ma_items = [{
-                "macc": normalized.get("macc"),
-                "macq": normalized.get("macq"),
-                "macl": None,
-                "macd": None,
-                "macp": None,
-                "mas": None,
-            }]
-    if not ma_items:
-        raise HTTPException(status_code=422, detail="È necessario inserire almeno un blocco MA (categoria + quantità)")
 
-    normalized["ma_items"] = ma_items
-    normalized["macc"] = ma_items[0].get("macc", "")
-    normalized["macq"] = ma_items[0].get("macq", "")
-
-    # Optional extended structures defaults
-    normalized["ldc"] = normalized.get("ldc") or {}
-    normalized["provenienze"] = normalized.get("provenienze") or []
-    normalized["scavo"] = normalized.get("scavo") or {}
-    normalized["fta"] = normalized.get("fta") or []
-    normalized["entita_multimediali"] = normalized.get("entita_multimediali") or []
-
-    return normalized
+async def load_scheda_with_children(db: AsyncSession, record_id: str) -> Optional[SchedaTMA]:
+    result = await db.execute(
+        select(SchedaTMA)
+        .options(
+            selectinload(SchedaTMA.materiali),
+            selectinload(SchedaTMA.fotografie),
+            selectinload(SchedaTMA.compilatori),
+            selectinload(SchedaTMA.funzionari),
+            selectinload(SchedaTMA.motivazioni_cronologia),
+        )
+        .where(SchedaTMA.id == record_id)
+    )
+    return result.scalar_one_or_none()
 
 
 @router.post(
     "/sites/{site_id}/records",
-    response_model=TMAOut,
+    response_model=SchedaTMARead,
     status_code=status.HTTP_201_CREATED,
     summary="Create TMA record",
-    tags=["TMA"]
+    tags=["TMA"],
 )
 async def create_tma_record(
     site_id: UUID,
-    payload: TMACreate,
+    payload: SchedaTMACreate,
     db: AsyncSession = Depends(get_database_session),
     user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
@@ -69,30 +128,55 @@ async def create_tma_record(
     if not await verify_site_access(site_id, user_sites):
         raise HTTPException(status_code=403, detail="Accesso negato al sito")
 
-    payload_dict = payload.model_dump(exclude_unset=True)
-    payload_dict = normalize_tma_payload(payload_dict)
-    payload_dict["site_id"] = str(site_id)
-    payload_dict["created_by"] = str(user_id)
-    payload_dict["updated_by"] = str(user_id)
+    payload_dict = payload.model_dump()
+    materiali = payload_dict.pop("materiali", [])
+    fotografie = payload_dict.pop("fotografie", [])
+    motivazioni = payload_dict.pop("dtm", [])
+    compilatori = payload_dict.pop("cmpn", [])
+    funzionari = payload_dict.pop("fur", [])
 
-    row = TabellaMaterialiArcheologici(**payload_dict)
-    db.add(row)
+    scheda = SchedaTMA(
+        **payload_dict,
+        site_id=str(site_id),
+        created_by=str(user_id),
+        updated_by=str(user_id),
+    )
+    db.add(scheda)
 
     try:
-        await db.commit()
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=422, detail=f"Errore validazione/salvataggio TMA: {str(e)}")
+        await db.flush()
 
-    await db.refresh(row)
-    return row
+        for idx, item in enumerate(materiali):
+            db.add(TMAMateriale(scheda_id=scheda.id, ordine=idx, **item))
+
+        for idx, item in enumerate(fotografie):
+            db.add(TMAFotografia(scheda_id=scheda.id, ordine=idx, **item))
+
+        for idx, item in enumerate(motivazioni):
+            db.add(TMAMotivazioneCronologia(scheda_id=scheda.id, ordine=idx, motivazione=item))
+
+        for idx, item in enumerate(compilatori):
+            db.add(TMACompilatore(scheda_id=scheda.id, ordine=idx, nome=item))
+
+        for idx, item in enumerate(funzionari):
+            db.add(TMAFunzionario(scheda_id=scheda.id, ordine=idx, nome=item))
+
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(status_code=422, detail=f"Errore validazione/salvataggio TMA: {str(exc)}")
+
+    stored = await load_scheda_with_children(db, scheda.id)
+    if not stored:
+        raise HTTPException(status_code=500, detail="Errore interno durante il caricamento della scheda")
+    return serialize_scheda_tma(stored)
 
 
 @router.get(
     "/sites/{site_id}/records",
-    response_model=List[TMAOut],
+    response_model=List[SchedaTMARead],
     summary="List TMA records",
-    tags=["TMA"]
+    tags=["TMA"],
 )
 async def list_tma_records(
     site_id: UUID,
@@ -109,46 +193,52 @@ async def list_tma_records(
     if not await verify_site_access(site_id, user_sites):
         raise HTTPException(status_code=403, detail="Accesso negato al sito")
 
-    q = select(TabellaMaterialiArcheologici).where(
-        TabellaMaterialiArcheologici.site_id == str(site_id)
+    query = (
+        select(SchedaTMA)
+        .options(
+            selectinload(SchedaTMA.materiali),
+            selectinload(SchedaTMA.fotografie),
+            selectinload(SchedaTMA.compilatori),
+            selectinload(SchedaTMA.funzionari),
+            selectinload(SchedaTMA.motivazioni_cronologia),
+        )
+        .where(SchedaTMA.site_id == str(site_id))
     )
 
     if search:
         like = f"%{search}%"
-        q = q.where(or_(
-            TabellaMaterialiArcheologici.nctr.ilike(like),
-            TabellaMaterialiArcheologici.nctn.ilike(like),
-            TabellaMaterialiArcheologici.ogtd.ilike(like),
-            TabellaMaterialiArcheologici.ogtm.ilike(like),
-            TabellaMaterialiArcheologici.pvcc.ilike(like),
-        ))
+        query = query.where(
+            or_(
+                SchedaTMA.nctr.ilike(like),
+                SchedaTMA.nctn.ilike(like),
+                SchedaTMA.ogtd.ilike(like),
+                SchedaTMA.ogtm.ilike(like),
+                SchedaTMA.pvcc.ilike(like),
+            )
+        )
 
     if nct:
-        # split fallback: search on both pieces
-        q = q.where(or_(
-            TabellaMaterialiArcheologici.nctr.ilike(f"%{nct}%"),
-            TabellaMaterialiArcheologici.nctn.ilike(f"%{nct}%")
-        ))
+        query = query.where(or_(SchedaTMA.nctr.ilike(f"%{nct}%"), SchedaTMA.nctn.ilike(f"%{nct}%")))
 
     if ogtd:
-        q = q.where(TabellaMaterialiArcheologici.ogtd.ilike(f"%{ogtd}%"))
+        query = query.where(SchedaTMA.ogtd.ilike(f"%{ogtd}%"))
 
     if pvcc:
-        q = q.where(TabellaMaterialiArcheologici.pvcc.ilike(f"%{pvcc}%"))
+        query = query.where(SchedaTMA.pvcc.ilike(f"%{pvcc}%"))
 
     if dtzg:
-        q = q.where(TabellaMaterialiArcheologici.dtzg.ilike(f"%{dtzg}%"))
+        query = query.where(SchedaTMA.dtzg.ilike(f"%{dtzg}%"))
 
-    q = q.order_by(desc(TabellaMaterialiArcheologici.created_at)).offset(skip).limit(limit)
-    rows = (await db.execute(q)).scalars().all()
-    return list(rows)
+    query = query.order_by(desc(SchedaTMA.created_at)).offset(skip).limit(limit)
+    rows = (await db.execute(query)).scalars().all()
+    return [serialize_scheda_tma(row) for row in rows]
 
 
 @router.get(
     "/sites/{site_id}/records/{record_id}",
-    response_model=TMAOut,
+    response_model=SchedaTMARead,
     summary="Get TMA record",
-    tags=["TMA"]
+    tags=["TMA"],
 )
 async def get_tma_record(
     site_id: UUID,
@@ -159,26 +249,23 @@ async def get_tma_record(
     if not await verify_site_access(site_id, user_sites):
         raise HTTPException(status_code=403, detail="Accesso negato al sito")
 
-    row = (await db.execute(
-        select(TabellaMaterialiArcheologici).where(TabellaMaterialiArcheologici.id == record_id)
-    )).scalar_one_or_none()
-
+    row = await load_scheda_with_children(db, record_id)
     if not row or row.site_id != str(site_id):
         raise HTTPException(status_code=404, detail="Record TMA non trovato")
 
-    return row
+    return serialize_scheda_tma(row)
 
 
 @router.put(
     "/sites/{site_id}/records/{record_id}",
-    response_model=TMAOut,
+    response_model=SchedaTMARead,
     summary="Update TMA record",
-    tags=["TMA"]
+    tags=["TMA"],
 )
 async def update_tma_record(
     site_id: UUID,
     record_id: str,
-    payload: TMAUpdate,
+    payload: SchedaTMAUpdate,
     db: AsyncSession = Depends(get_database_session),
     user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
@@ -186,47 +273,77 @@ async def update_tma_record(
     if not await verify_site_access(site_id, user_sites):
         raise HTTPException(status_code=403, detail="Accesso negato al sito")
 
-    row = (await db.execute(
-        select(TabellaMaterialiArcheologici).where(TabellaMaterialiArcheologici.id == record_id)
-    )).scalar_one_or_none()
-
+    row = await load_scheda_with_children(db, record_id)
     if not row or row.site_id != str(site_id):
         raise HTTPException(status_code=404, detail="Record TMA non trovato")
 
     payload_dict = payload.model_dump(exclude_unset=True)
 
-    merged_payload = {
-        "macc": row.macc,
-        "macq": row.macq,
-        "ma_items": row.ma_items or [],
-        "ldc": row.ldc or {},
-        "provenienze": row.provenienze or [],
-        "scavo": row.scavo or {},
-        "fta": row.fta or [],
-        "entita_multimediali": row.entita_multimediali or [],
-        **payload_dict,
-    }
-    merged_payload = normalize_tma_payload(merged_payload)
-    merged_payload["updated_by"] = str(user_id)
+    materiali = payload_dict.pop("materiali", None)
+    fotografie = payload_dict.pop("fotografie", None)
+    motivazioni = payload_dict.pop("dtm", None)
+    compilatori = payload_dict.pop("cmpn", None)
+    funzionari = payload_dict.pop("fur", None)
 
-    for k, v in merged_payload.items():
-        setattr(row, k, v)
+    for key, value in payload_dict.items():
+        setattr(row, key, value)
+    row.updated_by = str(user_id)
+
+    if materiali is not None:
+        row.materiali = [
+            TMAMateriale(
+                ordine=idx,
+                macc=item["macc"],
+                macl=item.get("macl"),
+                macd=item.get("macd"),
+                macp=item.get("macp"),
+                macq=item["macq"],
+                mas=item.get("mas"),
+            )
+            for idx, item in enumerate(materiali)
+        ]
+
+    if fotografie is not None:
+        row.fotografie = [
+            TMAFotografia(
+                ordine=idx,
+                ftax=item.get("ftax"),
+                ftap=item.get("ftap"),
+                ftan=item.get("ftan"),
+                file_path=item.get("file_path"),
+            )
+            for idx, item in enumerate(fotografie)
+        ]
+
+    if motivazioni is not None:
+        row.motivazioni_cronologia = [
+            TMAMotivazioneCronologia(ordine=idx, motivazione=item)
+            for idx, item in enumerate(motivazioni)
+        ]
+
+    if compilatori is not None:
+        row.compilatori = [TMACompilatore(ordine=idx, nome=item) for idx, item in enumerate(compilatori)]
+
+    if funzionari is not None:
+        row.funzionari = [TMAFunzionario(ordine=idx, nome=item) for idx, item in enumerate(funzionari)]
 
     try:
         await db.commit()
-    except Exception as e:
+    except Exception as exc:
         await db.rollback()
-        raise HTTPException(status_code=422, detail=f"Errore aggiornamento TMA: {str(e)}")
+        raise HTTPException(status_code=422, detail=f"Errore aggiornamento TMA: {str(exc)}")
 
-    await db.refresh(row)
-    return row
+    stored = await load_scheda_with_children(db, record_id)
+    if not stored:
+        raise HTTPException(status_code=500, detail="Errore interno durante il caricamento della scheda")
+    return serialize_scheda_tma(stored)
 
 
 @router.delete(
     "/sites/{site_id}/records/{record_id}",
     status_code=204,
     summary="Delete TMA record",
-    tags=["TMA"]
+    tags=["TMA"],
 )
 async def delete_tma_record(
     site_id: UUID,
@@ -237,10 +354,7 @@ async def delete_tma_record(
     if not await verify_site_access(site_id, user_sites):
         raise HTTPException(status_code=403, detail="Accesso negato al sito")
 
-    row = (await db.execute(
-        select(TabellaMaterialiArcheologici).where(TabellaMaterialiArcheologici.id == record_id)
-    )).scalar_one_or_none()
-
+    row = await load_scheda_with_children(db, record_id)
     if not row or row.site_id != str(site_id):
         raise HTTPException(status_code=404, detail="Record TMA non trovato")
 

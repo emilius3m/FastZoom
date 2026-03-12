@@ -148,13 +148,21 @@ from app.models.geographic_maps import (
 from app.models.stratigraphy import (
     UnitaStratigrafica,
     UnitaStratigraficaMuraria,
-    TabellaMaterialiArcheologici,
     USFile,
     us_files_association,
     usm_files_association,
     ConsistenzaEnum,
     AffidabilitaEnum,
     TecnicaCostruttiva
+)
+
+from app.models.tma import (
+    SchedaTMA,
+    TMAMateriale,
+    TMAFotografia,
+    TMACompilatore,
+    TMAFunzionario,
+    TMAMotivazioneCronologia,
 )
 
 
@@ -298,13 +306,20 @@ __all__ = [
     # Stratigraphy
     'UnitaStratigrafica',
     'UnitaStratigraficaMuraria',
-    'TabellaMaterialiArcheologici',
     'USFile',
     'us_files_association',
     'usm_files_association',
     'ConsistenzaEnum',
     'AffidabilitaEnum',
     'TecnicaCostruttiva',
+
+    # TMA ICCD 3.00
+    'SchedaTMA',
+    'TMAMateriale',
+    'TMAFotografia',
+    'TMACompilatore',
+    'TMAFunzionario',
+    'TMAMotivazioneCronologia',
     
 
     # Documentation & Field
