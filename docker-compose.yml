@@ -2,12 +2,8 @@ version: "3.9"
 
 services:
   app:
-    image: python:3.12
+    build: .
     working_dir: /app
-    volumes:
-      - .:/app
-#    env_file:
-#      - .env
     environment:
       DATABASE_URL: sqlite+aiosqlite:///./archaeological_catalog.db
       MINIO_CONFIG_PROFILE: local
@@ -17,12 +13,9 @@ services:
       MINIO_LOCAL_BUCKET: archaeological-photos
       MINIO_LOCAL_SECURE: "false"
     ports:
-      - "8000:8000"
+      - "8080:8000"
     depends_on:
       - minio
-    command: >
-      sh -c "python -m pip install --no-cache-dir -r requirements.txt &&
-      python -m uvicorn app.app:app --host 0.0.0.0 --port 8000 --reload"
 
   minio:
     image: minio/minio:latest
