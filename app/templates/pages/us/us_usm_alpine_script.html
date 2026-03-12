@@ -3,7 +3,7 @@
     function usUSMManagerApp() {
         return {
             // ===== STATE MANAGEMENT =====
-            currentSiteId: '{{ site.id if site else "" }}',
+            currentSiteId: '{{ current_site_id if current_site_id is defined and current_site_id else (site.id if site and site.id is defined else (site.site_id if site and site.site_id is defined else (site_id if site_id is defined else ""))) }}',
             activeTab: 'us',  // 'us', 'usm', or 'harris-matrix'
 
             // US State

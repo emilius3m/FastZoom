@@ -115,7 +115,7 @@
                 </svg>
             </button>
             <!-- Edit button -->
-            <a href="{{ url_for('harris_matrix_editor', site_id=site.id) }}"
+            <a href="{{ url_for('harris_matrix_editor', site_id=(current_site_id if current_site_id is defined and current_site_id else site.id)) }}"
                 class="inline-flex items-center px-3 py-1.5 bg-blue-600 border border-transparent rounded-md text-xs font-medium text-white hover:bg-blue-700 transition-colors">
                 <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -260,7 +260,7 @@
                 showEdgeLabels: true,
                 animateLayout: true
             },
-            siteId: '{{ site.id }}',
+            siteId: '{{ current_site_id if current_site_id is defined and current_site_id else site.id }}',
 
             async init() {
                 // Load only when tab becomes active (lazy loading)

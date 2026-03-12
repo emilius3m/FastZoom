@@ -7,9 +7,9 @@
 
     <!-- Header -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                <div>
+        <div class="px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex flex-col">
                     <!-- Breadcrumb Navigation -->
                     <nav class="flex items-center space-x-4 text-sm mb-2">
                         <i class="fas fa-home text-gray-500 text-lg"></i>
@@ -17,17 +17,19 @@
                             <span class="text-gray-400 text-lg">→</span>
                             <a href="/view/{{ site_id }}/dashboard"
                                 class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
-                                {{ site.name if site is defined else site_id }}
+                                {{ site.name if site is defined else site_id }} ({{ site.code if site is defined else '' }})
                             </a>
                             <span class="text-gray-400 text-lg">→</span>
                             <span class="text-gray-700 dark:text-gray-300 font-semibold px-2 py-1">Schede TMA (ICCD 3.00)</span>
                         </div>
                     </nav>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gestione Schede TMA</h1>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                        Gestione e aggiornamento schede materiali archeologici - {{ site.name if site is defined else site_id }}
+                        Gestione e aggiornamento schede materiali archeologici
                     </p>
                 </div>
-                <div class="flex items-center space-x-3 mt-4 sm:mt-0">
+
+                <div class="flex items-center space-x-3">
                     <button
                         type="button"
                         class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800"
@@ -46,104 +48,130 @@
 
     <div class="space-y-6 dark:text-gray-100">
 
-  <section class="bg-white dark:bg-gray-800 rounded-lg shadow">
-    <div class="px-4 py-4 border-b dark:border-gray-700 flex items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Elenco schede TMA</h2>
-      <div class="flex items-center gap-2">
-        <input
-          type="text"
-          x-model="listSearch"
-          placeholder="Cerca per NCT, OGTD, Comune..."
-          class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        >
-        <button
-          type="button"
-          class="text-gray-700 bg-gray-100 hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 py-2 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
-          @click="fetchRecords"
-          :disabled="listLoading"
-        >
-          <span x-text="listLoading ? 'Aggiornamento...' : 'Aggiorna'"></span>
-        </button>
+    <!-- Filters Panel -->
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Search -->
+                <div>
+                    <label for="tma-search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        Ricerca Rapida
+                    </label>
+                    <input type="text"
+                           id="tma-search"
+                           x-model="listSearch"
+                           placeholder="NCT, OGTD, Comune..."
+                           class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm">
+                </div>
+
+                <!-- Refresh -->
+                <div class="flex items-end">
+                    <button
+                        type="button"
+                        class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+                        @click="fetchRecords"
+                        :disabled="listLoading"
+                    >
+                        <svg class="w-4 h-4 mr-2" :class="listLoading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        <span x-text="listLoading ? 'Aggiornamento...' : 'Aggiorna'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Count Bar -->
+    <div class="flex justify-between items-center mb-6">
+        <div class="text-sm text-gray-600 dark:text-gray-400">
+            <span x-text="filteredRecords.length"></span> di <span x-text="records.length"></span> schede
+        </div>
+    </div>
+
+    <!-- Table Card -->
+    <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
+      <div class="p-4 space-y-3">
+        <template x-if="listError">
+          <div class="rounded border border-red-300 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-3 py-2 text-sm" x-text="listError"></div>
+        </template>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+            <thead class="bg-gray-50 dark:bg-gray-700 text-xs uppercase">
+              <tr>
+                <th class="text-left px-4 py-3">NCT</th>
+                <th class="text-left px-4 py-3">OGTD</th>
+                <th class="text-left px-4 py-3">Comune</th>
+                <th class="text-left px-4 py-3">Cronologia</th>
+                <th class="text-left px-4 py-3">Materiali</th>
+                <th class="text-left px-4 py-3">Ultimo aggiornamento</th>
+                <th class="text-left px-4 py-3">Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-if="listLoading">
+                <tr>
+                  <td colspan="7" class="px-4 py-3 text-gray-500 dark:text-gray-400">Caricamento elenco in corso...</td>
+                </tr>
+              </template>
+
+              <template x-if="!listLoading && filteredRecords.length === 0">
+                <tr>
+                  <td colspan="7" class="px-4 py-3 text-gray-500 dark:text-gray-400">Nessuna scheda TMA presente per questo sito.</td>
+                </tr>
+              </template>
+
+              <template x-for="r in filteredRecords" :key="r.id">
+                <tr class="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <td class="px-4 py-3 font-mono" x-text="recordNct(r)"></td>
+                  <td class="px-4 py-3" x-text="r.ogtd || '-' "></td>
+                  <td class="px-4 py-3" x-text="r.pvcc || '-' "></td>
+                  <td class="px-4 py-3" x-text="r.dtzg || '-' "></td>
+                  <td class="px-4 py-3" x-text="(r.materiali || []).length"></td>
+                  <td class="px-4 py-3" x-text="formatDate(r.updated_at || r.created_at)"></td>
+                  <td class="px-4 py-3">
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        class="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                        title="Modifica"
+                        @click="editRecord(r)"
+                      >
+                        <i class="fas fa-edit"></i>
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex items-center justify-center w-8 h-8 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                        title="Esporta PDF"
+                        @click="window.open('/api/v1/tma/sites/' + siteId + '/records/' + r.id + '/export-pdf', '_blank')"
+                      >
+                        <i class="fas fa-file-pdf"></i>
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex items-center justify-center w-8 h-8 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded"
+                        title="Esporta Word"
+                        @click="window.open('/api/v1/tma/sites/' + siteId + '/records/' + r.id + '/export-word', '_blank')"
+                      >
+                        <i class="fas fa-file-word"></i>
+                      </button>
+                      <span
+                        x-show="isEditingRecord(r.id)"
+                        class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                      >in modifica</span>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
-    <div class="p-4 space-y-3">
-      <template x-if="listError">
-        <div class="rounded border border-red-300 bg-red-50 text-red-700 px-3 py-2 text-sm" x-text="listError"></div>
-      </template>
-
-      <div class="overflow-x-auto border border-gray-300 dark:border-gray-700 rounded">
-        <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
-          <thead class="bg-gray-50 dark:bg-gray-700 text-xs uppercase">
-            <tr>
-              <th class="text-left p-2">NCT</th>
-              <th class="text-left p-2">OGTD</th>
-              <th class="text-left p-2">Comune</th>
-              <th class="text-left p-2">Cronologia</th>
-              <th class="text-left p-2">Materiali</th>
-              <th class="text-left p-2">Ultimo aggiornamento</th>
-              <th class="text-left p-2">Azioni</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template x-if="listLoading">
-              <tr>
-                <td colspan="7" class="p-3 text-gray-500">Caricamento elenco in corso...</td>
-              </tr>
-            </template>
-
-            <template x-if="!listLoading && filteredRecords.length === 0">
-              <tr>
-                <td colspan="7" class="p-3 text-gray-500">Nessuna scheda TMA presente per questo sito.</td>
-              </tr>
-            </template>
-
-            <template x-for="r in filteredRecords" :key="r.id">
-              <tr class="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                <td class="p-2 font-mono" x-text="recordNct(r)"></td>
-                <td class="p-2" x-text="r.ogtd || '-' "></td>
-                <td class="p-2" x-text="r.pvcc || '-' "></td>
-                <td class="p-2" x-text="r.dtzg || '-' "></td>
-                <td class="p-2" x-text="(r.materiali || []).length"></td>
-                <td class="p-2" x-text="formatDate(r.updated_at || r.created_at)"></td>
-                <td class="p-2">
-                  <div class="flex items-center gap-2">
-                    <button
-                      type="button"
-                      class="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
-                      title="Modifica"
-                      @click="editRecord(r)"
-                    >
-                      <i class="fas fa-edit"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="inline-flex items-center justify-center w-8 h-8 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                      title="Esporta PDF"
-                      @click="window.open('/api/v1/tma/sites/' + siteId + '/records/' + r.id + '/export-pdf', '_blank')"
-                    >
-                      <i class="fas fa-file-pdf"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="inline-flex items-center justify-center w-8 h-8 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded"
-                      title="Esporta Word"
-                      @click="window.open('/api/v1/tma/sites/' + siteId + '/records/' + r.id + '/export-word', '_blank')"
-                    >
-                      <i class="fas fa-file-word"></i>
-                    </button>
-                    <span
-                      x-show="isEditingRecord(r.id)"
-                      class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
-                    >in modifica</span>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
 
   <template x-if="successMessage">
     <div class="rounded border border-emerald-300 bg-emerald-50 text-emerald-700 px-3 py-2 text-sm" x-text="successMessage"></div>
