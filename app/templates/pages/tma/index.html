@@ -98,7 +98,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
                         Ricerca Rapida
-                    </label>
+
                     <input type="text"
                            id="tma-search"
                            x-model="listSearch"
@@ -106,7 +106,7 @@
                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ordinamento</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ordinamento</div>
                     <select x-model="listSort"
                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
                         <option value="newest">Più recenti</option>
@@ -169,7 +169,7 @@
                                     x-text="r.dtzg">
                                 </span>
                                 <span
-                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100"
+                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-emerald-100 text-emerald-900 ring-1 ring-emerald-300/70 dark:bg-emerald-700 dark:text-emerald-50 dark:ring-emerald-400/40"
                                     x-text="(r.materiali || []).length + ' materiali'">
                                 </span>
                                 <button @click="editRecord(r)"
@@ -265,39 +265,39 @@
                 <i class="fas ml-auto" :class="sections.cd ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
               </h4>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.cd" x-transition>
-        <label class="block">
-          <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">TSK</span>Tipo Scheda<span class="text-red-500 ml-1">*</span></span>
-          <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.tsk" readonly maxlength="4" required>
-        </label>
-        <label class="block">
-          <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">LIR</span>Livello ricerca<span class="text-red-500 ml-1">*</span></span>
-          <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.lir" readonly maxlength="5" required>
-        </label>
-        <label class="block">
-          <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">NCTR</span>Codice regione<span class="text-red-500 ml-1">*</span></span>
-          <select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.nctr" required>
+        <div class="block">
+          <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">TSK - Tipo Scheda <span class="text-red-500 ml-1">*</span></span>
+          <input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.tsk" readonly maxlength="4" required>
+        </div>
+        <div class="block">
+          <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">LIR - Livello ricerca <span class="text-red-500 ml-1">*</span></span>
+          <input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.lir" readonly maxlength="5" required>
+        </div>
+        <div class="block">
+          <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">NCTR - Codice regione <span class="text-red-500 ml-1">*</span></span>
+          <select class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.nctr" required>
             <option value="">Seleziona...</option>
             <template x-for="r in regioni" :key="r.code">
               <option :value="r.code" x-text="`${r.code} - ${r.name}`"></option>
             </template>
           </select>
-        </label>
-        <label class="block">
-          <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">NCTN</span>Numero catalogo generale<span class="text-red-500 ml-1">*</span></span>
-          <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.nctn" @blur="normalizeNctn" inputmode="numeric" maxlength="8" required>
-        </label>
-        <label class="block">
-          <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">ESC</span>Ente schedatore<span class="text-red-500 ml-1">*</span></span>
-          <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.esc" maxlength="25" required>
-        </label>
-        <label class="block">
-          <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">ECP</span>Ente competente<span class="text-red-500 ml-1">*</span></span>
-          <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ecp" maxlength="25" required>
-        </label>
+        </div>
+        <div class="block">
+          <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">NCTN - Numero catalogo generale <span class="text-red-500 ml-1">*</span></span>
+          <input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.nctn" @blur="normalizeNctn" inputmode="numeric" maxlength="8" required>
+        </div>
+        <div class="block">
+          <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">ESC - Ente schedatore <span class="text-red-500 ml-1">*</span></span>
+          <input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.esc" maxlength="25" required>
+        </div>
+        <div class="block">
+          <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">ECP - Ente competente <span class="text-red-500 ml-1">*</span></span>
+          <input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.ecp" maxlength="25" required>
+        </div>
         <label class="block md:col-span-2">
-          <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">NCT</span>Codice univoco calcolato</span>
-          <input class="w-full border border-gray-300 dark:border-gray-600 dark:text-gray-400 rounded bg-gray-50 dark:bg-gray-700 px-3 py-2 outline-none" :value="nct" readonly>
-        </label>
+          <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">NCT - Codice univoco calcolato </span>
+          <input class="w-full border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-600 bg-gray-100 dark:text-gray-400 rounded-lg px-4 py-2 outline-none cursor-not-allowed" :value="nct" readonly>
+        </div>
               </div>
             </div>
 
@@ -308,14 +308,14 @@
                 <i class="fas ml-auto" :class="sections.og ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
               </h4>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.og" x-transition>
-        <label>
-          <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">OGTD</span>Definizione<span class="text-red-500 ml-1">*</span></span>
-          <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ogtd" list="ogtd-list" maxlength="100" required>
+        <div class="block">
+          <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">OGTD - Definizione <span class="text-red-500 ml-1">*</span></span>
+          <input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.ogtd" list="ogtd-list" maxlength="100" required>
           <datalist id="ogtd-list"><template x-for="v in ogtdSuggestions" :key="v"><option :value="v"></option></template></datalist>
-        </label>
-        <label>
-          <span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">OGTM</span>Definizione materiale componente<span class="text-red-500 ml-1">*</span></span>
-          <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ogtm" @blur="detectOgtmWarning" list="ogtm-list" maxlength="250" required>
+        </div>
+        <div class="block">
+          <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">OGTM - Definizione materiale componente <span class="text-red-500 ml-1">*</span></span>
+          <input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.ogtm" @blur="detectOgtmWarning" list="ogtm-list" maxlength="250" required>
           <datalist id="ogtm-list"><template x-for="v in ogtmSuggestions" :key="v"><option :value="v"></option></template></datalist>
               </div>
             </div>
@@ -328,16 +328,16 @@
               </h4>
               <div class="space-y-4" x-show="sections.lc" x-transition>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCS</span>Stato<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcs" maxlength="50" required></label>
-          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCR</span>Regione<span class="text-red-500 ml-1">*</span></span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcr" @change="onPvcrChange" required><option value="">Seleziona...</option><template x-for="r in regioni" :key="r.code"><option :value="r.name" x-text="r.name"></option></template></select></label>
-          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCP</span>Provincia<span class="text-red-500 ml-1">*</span></span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcp" required><option value="">Seleziona...</option><template x-for="p in getProvinceOptions(form.pvcr)" :key="p.code"><option :value="p.code" x-text="`${p.code} - ${p.name}`"></option></template></select></label>
-          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PVCC</span>Comune<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.pvcc" maxlength="50" required></label>
+          <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">PVCS - Stato <span class="text-red-500 ml-1">*</span></span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.pvcs" maxlength="50" required></div>
+          <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">PVCR - Regione <span class="text-red-500 ml-1">*</span></span><select class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.pvcr" @change="onPvcrChange" required><option value="">Seleziona...</option><template x-for="r in regioni" :key="r.code"><option :value="r.name" x-text="r.name"></option></template></select></div>
+          <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">PVCP - Provincia <span class="text-red-500 ml-1">*</span></span><select class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.pvcp" required><option value="">Seleziona...</option><template x-for="p in getProvinceOptions(form.pvcr)" :key="p.code"><option :value="p.code" x-text="`${p.code} - ${p.name}`"></option></template></select></div>
+          <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">PVCC - Comune <span class="text-red-500 ml-1">*</span></span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.pvcc" maxlength="50" required></div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">LDCT</span>Tipologia</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ldct" maxlength="100"></label>
-          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">LDCN</span>Denominazione attuale</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ldcn" maxlength="250"></label>
-          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">LDCU</span>Indirizzo</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ldcu" maxlength="250"></label>
-          <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">LDCS</span>Specifiche e note</span><textarea class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.ldcs" maxlength="500"></textarea></label>
+          <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">LDCT - Tipologia </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.ldct" maxlength="100"></div>
+          <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">LDCN - Denominazione attuale </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.ldcn" maxlength="250"></div>
+          <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">LDCU - Indirizzo </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.ldcu" maxlength="250"></div>
+          <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">LDCS - Specifiche e note </span><textarea class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.ldcs" maxlength="500"></textarea></div>
               </div>
             </div>
 
@@ -350,16 +350,16 @@
               <div class="space-y-4" x-show="sections.la" x-transition>
         <template x-for="(la, i) in form.altre_localizzazioni" :key="i">
           <div class="border border-gray-300 dark:border-gray-700 dark:bg-gray-800/50 rounded p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">TCL</span>Tipo localizzazione</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.tcl" maxlength="100"></label>
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRVS</span>Stato</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prvs" maxlength="50"></label>
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRVR</span>Regione</span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prvr" @change="onPrvrChange(la)"><option value="">Seleziona...</option><template x-for="r in regioni" :key="r.code"><option :value="r.name" x-text="r.name"></option></template></select></label>
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRVP</span>Provincia</span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prvp"><option value="">Seleziona...</option><template x-for="p in getProvinceOptions(la.prvr)" :key="p.code"><option :value="p.code" x-text="`${p.code} - ${p.name}`"></option></template></select></label>
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRVC</span>Comune</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prvc" maxlength="50"></label>
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">PRCU</span>Denominazione</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="la.prcu" maxlength="250"></label>
+            <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">TCL - Tipo localizzazione </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="la.tcl" maxlength="100"></div>
+            <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">PRVS - Stato </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="la.prvs" maxlength="50"></div>
+            <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">PRVR - Regione </span><select class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="la.prvr" @change="onPrvrChange(la)"><option value="">Seleziona...</option><template x-for="r in regioni" :key="r.code"><option :value="r.name" x-text="r.name"></option></template></select></div>
+            <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">PRVP - Provincia </span><select class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="la.prvp"><option value="">Seleziona...</option><template x-for="p in getProvinceOptions(la.prvr)" :key="p.code"><option :value="p.code" x-text="`${p.code} - ${p.name}`"></option></template></select></div>
+            <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">PRVC - Comune </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="la.prvc" maxlength="50"></div>
+            <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">PRCU - Denominazione </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="la.prcu" maxlength="250"></div>
             <button type="button" class="text-red-600 text-sm" @click="removeAltraLocalizzazione(i)">🗑 Rimuovi</button>
           </div>
         </template>
-        <button type="button" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" @click="addAltraLocalizzazione">+ Aggiungi</button>
+        <button type="button" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-blue-600 dark:text-blue-400" @click="addAltraLocalizzazione">+ Aggiungi</button>
               </div>
             </div>
 
@@ -370,14 +370,14 @@
                 <i class="fas ml-auto" :class="sections.re ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
               </h4>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.re" x-transition>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">SCAN</span>Denominazione dello scavo</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.scan"></label>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCF</span>Ente responsabile</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dscf"></label>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCA</span>Responsabile scientifico</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dsca"></label>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCT</span>Motivo</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dsct"></label>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCM</span>Metodo</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dscm"></label>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCD</span>Data (anno)</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dscd" maxlength="4"></label>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCU</span>Unità Stratigrafica</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dscu"></label>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DSCN</span>Specifiche</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dscn"></label>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">SCAN - Denominazione dello scavo </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.scan"></div>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">DSCF - Ente responsabile </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.dscf"></div>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">DSCA - Responsabile scientifico </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.dsca"></div>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">DSCT - Motivo </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.dsct"></div>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">DSCM - Metodo </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.dscm"></div>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">DSCD - Data (anno) </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.dscd" maxlength="4"></div>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">DSCU - Unità Stratigrafica </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.dscu"></div>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">DSCN - Specifiche </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.dscn"></div>
               </div>
             </div>
 
@@ -388,12 +388,12 @@
                 <i class="fas ml-auto" :class="sections.dt ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
               </h4>
               <div class="space-y-4" x-show="sections.dt" x-transition>
-        <label class="block"><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DTZG</span>Fascia cronologica<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.dtzg" maxlength="50" required></label>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">DTZG - Fascia cronologica <span class="text-red-500 ml-1">*</span></span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.dtzg" maxlength="50" required></div>
         <div>
-          <div class="text-sm mb-1"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">DTM</span>Motivazione cronologia<span class="text-red-500 ml-1">*</span></div>
+          <div class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">DTM - Motivazione cronologia <span class="text-red-500 ml-1">*</span></div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
             <template x-for="m in dtmVocabolario" :key="m">
-              <label class="text-sm flex items-center gap-2"><input type="checkbox" :checked="hasDtm(m)" @change="toggleDtm(m)"><span x-text="m"></span></label>
+              <label class="text-sm flex items-center gap-2"><input type="checkbox" :checked="hasDtm(m)" @change="toggleDtm(m)"><span x-text="m"></span></div>
             </template>
           </div>
               </div>
@@ -406,7 +406,7 @@
                 <i class="fas ml-auto" :class="sections.da ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
               </h4>
               <div x-show="sections.da" x-transition>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">NSC</span>Notizie storico-critiche</span><textarea class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" rows="5" maxlength="4000" x-model="form.nsc"></textarea></label>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">NSC - Notizie storico-critiche </span><textarea class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" rows="5" maxlength="4000" x-model="form.nsc"></textarea></div>
               </div>
             </div>
 
@@ -424,16 +424,16 @@
               <button type="button" class="text-red-600" @click="removeMateriale(i)">🗑</button>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">MACC</span>Categoria<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="m.macc" list="macc-list" maxlength="100" required><datalist id="macc-list"><template x-for="v in maccSuggestions" :key="v"><option :value="v"></option></template></datalist></label>
-              <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">MACQ</span>Quantità<span class="text-red-500 ml-1">*</span></span><input type="number" min="1" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="m.macq" required></label>
-              <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">MACL</span>Classe</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="m.macl" maxlength="150"></label>
-              <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">MACD</span>Definizione</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="m.macd" maxlength="150"></label>
-              <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">MACP</span>Precisazione tipologica</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="m.macp" maxlength="150"></label>
-              <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">MAS</span>Specifiche</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="m.mas" maxlength="250"></label>
+              <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">MACC - Categoria <span class="text-red-500 ml-1">*</span></span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="m.macc" list="macc-list" maxlength="100" required><datalist id="macc-list"><template x-for="v in maccSuggestions" :key="v"><option :value="v"></option></template></datalist></div>
+              <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">MACQ - Quantità <span class="text-red-500 ml-1">*</span></span><input type="number" min="1" class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="m.macq" required></div>
+              <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">MACL - Classe </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="m.macl" maxlength="150"></div>
+              <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">MACD - Definizione </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="m.macd" maxlength="150"></div>
+              <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">MACP - Precisazione tipologica </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="m.macp" maxlength="150"></div>
+              <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">MAS - Specifiche </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="m.mas" maxlength="250"></div>
             </div>
           </div>
         </template>
-        <button type="button" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" @click="addMateriale">+ Aggiungi Materiale</button>
+        <button type="button" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-blue-600 dark:text-blue-400" @click="addMateriale">+ Aggiungi Materiale</button>
               </div>
             </div>
 
@@ -444,39 +444,90 @@
                 <i class="fas ml-auto" :class="sections.tu ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
               </h4>
               <div x-show="sections.tu" x-transition>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">CDGG</span>Indicazione generica<span class="text-red-500 ml-1">*</span></span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.cdgg" required><option value="">Seleziona...</option><optgroup label="Proprietà"><template x-for="v in cdggGruppi.proprieta" :key="`p-${v}`"><option :value="v" x-text="v"></option></template></optgroup><optgroup label="Detenzione"><template x-for="v in cdggGruppi.detenzione" :key="`d-${v}`"><option :value="v" x-text="v"></option></template></optgroup><optgroup label="Non rilevato"><template x-for="v in cdggGruppi.nonRilevato" :key="`n-${v}`"><option :value="v" x-text="v"></option></template></optgroup></select></label>
+        <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">CDGG - Indicazione generica <span class="text-red-500 ml-1">*</span></span><select class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.cdgg" required><option value="">Seleziona...</option><optgroup label="Proprietà"><template x-for="v in cdggGruppi.proprieta" :key="`p-${v}`"><option :value="v" x-text="v"></option></template></optgroup><optgroup label="Detenzione"><template x-for="v in cdggGruppi.detenzione" :key="`d-${v}`"><option :value="v" x-text="v"></option></template></optgroup><optgroup label="Non rilevato"><template x-for="v in cdggGruppi.nonRilevato" :key="`n-${v}`"><option :value="v" x-text="v"></option></template></optgroup></select></div>
               </div>
-            </div>
-
-            <!-- DO FONTI E DOCUMENTI -->
-            <div class="bg-pink-50 dark:bg-gray-700 border-l-4 border-pink-500 dark:border-pink-600 p-6 rounded-lg">
-              <h4 class="text-xl font-bold text-pink-900 dark:text-pink-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('do_section')">
-                <i class="fas fa-camera mr-3 text-pink-500"></i> DO - FONTI E DOCUMENTI DI RIFERIMENTO
-                <i class="fas ml-auto" :class="sections.do_section ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-              </h4>
-              <div class="space-y-4" x-show="sections.do_section" x-transition>
-        <template x-for="(f, i) in form.fotografie" :key="i">
-          <div class="border border-gray-300 dark:border-gray-700 dark:bg-gray-800/50 rounded p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">FTAX</span>Genere</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="f.ftax" maxlength="100"></label>
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">FTAP</span>Tipo</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="f.ftap" maxlength="100"></label>
-            <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">FTAN</span>Codice identificativo</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="f.ftan" maxlength="200"></label>
-            <label><span class="text-sm">File (MinIO/OpenSeadragon)</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="f.file_path" maxlength="500" placeholder="Percorso file"></label>
-            <button type="button" class="text-red-600 text-sm" @click="removeFoto(i)">🗑 Rimuovi</button>
-          </div>
-        </template>
-        <button type="button" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" @click="addFoto">+ Aggiungi Foto</button>
-              </div>
-            </div>
-
-            <!-- AD ACCESSO AI DATI -->
+            </div>            <!-- AD ACCESSO AI DATI -->
             <div class="bg-yellow-50 dark:bg-gray-700 border-l-4 border-yellow-500 dark:border-yellow-600 p-6 rounded-lg">
               <h4 class="text-xl font-bold text-yellow-900 dark:text-yellow-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('ad')">
                 <i class="fas fa-lock mr-3 text-yellow-600"></i> AD - ACCESSO AI DATI
                 <i class="fas ml-auto" :class="sections.ad ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
               </h4>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4" x-show="sections.ad" x-transition>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">ADSP</span>Profilo accesso</span><select class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.adsp"><option :value="1">1 - intera scheda visibile</option><option :value="2">2 - limitazione privacy</option></select></label>
-        <label><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">ADSM</span>Motivazione</span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.adsm" maxlength="70"></label>
+                <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">ADSP - Profilo accesso </span><select class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.adsp"><option :value="1">1 - intera scheda visibile</option><option :value="2">2 - limitazione privacy</option></select></div>
+                <div class="block"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">ADSM - Motivazione </span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.adsm" maxlength="70"></div>
+              </div>
+            </div>
+
+            <!-- DO FONTI E DOCUMENTI DI RIFERIMENTO -->
+            <div class="bg-gray-100 dark:bg-gray-700 border-l-4 border-gray-500 dark:border-gray-600 p-6 rounded-lg">
+              <h4 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center cursor-pointer select-none" @click="toggleSection('do_section')">
+                <i class="fas fa-file-alt mr-3"></i> DO - FONTI E DOCUMENTI DI RIFERIMENTO
+                <i class="fas ml-auto" :class="sections.do_section ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+              </h4>
+              <div class="space-y-4" x-show="sections.do_section" x-transition>
+                
+                <div class="mb-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="block text-sm font-semibold text-gray-700 dark:text-gray-300">FTA - Fotografie</span>
+                    <button type="button" @click="openPhotoUploadModal()"
+                      class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors flex items-center">
+                      <i class="fas fa-camera mr-2"></i> Carica Foto
+                    </button>
+                  </div>
+                  
+                  <div class="space-y-3">
+                    <template x-for="(f, i) in form.fotografie" :key="i">
+                      <div class="flex flex-col sm:flex-row gap-3 p-4 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600 shadow-sm relative group">
+                        <!-- Preview Thumbnail -->
+                        <div class="w-24 h-24 bg-gray-100 dark:bg-gray-700 rounded overflow-hidden flex-shrink-0 flex items-center justify-center relative">
+                            <template x-if="getPhotoPreviewUrl(f)">
+                                <img
+                                  :src="getPhotoPreviewUrl(f)"
+                                  class="w-full h-full object-cover"
+                                  loading="lazy"
+                                  @error="onPhotoPreviewError(i)">
+                            </template>
+                            <template x-if="!getPhotoPreviewUrl(f)">
+                                <i class="fas fa-image text-4xl text-gray-300 dark:text-gray-500"></i>
+                            </template>
+                            
+                            <!-- Delete button (absolute over thumbnail on hover for mobile/small screens) -->
+                            <button type="button" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" @click="removeFoto(i)">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                        </div>
+
+                        <!-- Fields -->
+                        <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">FTAX - Tipo</label>
+                                <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded px-2 py-1.5 text-sm" x-model="form.fotografie[i].ftax" placeholder="es. documentazione allegata">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">FTAP - Posizione</label>
+                                <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded px-2 py-1.5 text-sm" x-model="form.fotografie[i].ftap" placeholder="es. fotografia digitale">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">FTAN - Note</label>
+                                <input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded px-2 py-1.5 text-sm" x-model="form.fotografie[i].ftan" placeholder="Note sulla foto">
+                            </div>
+                             <div class="md:col-span-2">
+                                <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">File Path (Automatico)</label>
+                                <div class="flex">
+                                    <input class="w-full bg-gray-50 text-gray-500 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400 rounded-l px-2 py-1.5 text-sm" x-model="form.fotografie[i].file_path" readonly>
+                                </div>
+                            </div>
+                        </div>
+                      </div>
+                    </template>
+                    
+                    <div x-show="form.fotografie.length === 0" class="text-center py-6 bg-gray-50 dark:bg-gray-800 rounded border border-dashed border-gray-300 dark:border-gray-600">
+                        <i class="fas fa-images text-gray-400 text-3xl mb-2"></i>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Nessuna fotografia allegata</p>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
 
@@ -487,20 +538,20 @@
                 <i class="fas ml-auto" :class="sections.cm ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
               </h4>
               <div class="space-y-4" x-show="sections.cm" x-transition>
-        <label class="block md:w-1/3"><span class="text-sm"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">CMPD</span>Data (anno)<span class="text-red-500 ml-1">*</span></span><input class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.cmpd" maxlength="4" required></label>
+        <div class="block md:w-1/3"><span class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">CMPD - Data (anno) <span class="text-red-500 ml-1">*</span></span><input class="w-full bg-white text-gray-900 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" x-model="form.cmpd" maxlength="4" required></div>
         <div>
-          <div class="text-sm mb-2"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">CMPN</span>Nome compilatore<span class="text-red-500 ml-1">*</span></div>
+          <div class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">CMPN - Nome compilatore <span class="text-red-500 ml-1">*</span></div>
           <template x-for="(c, i) in form.cmpn" :key="i">
             <div class="flex gap-2 mb-2"><input class="flex-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.cmpn[i]" maxlength="70" placeholder="cognome, nome" required><button type="button" class="text-red-600" @click="removeCompilatore(i)">🗑</button></div>
           </template>
-          <button type="button" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" @click="addCompilatore">+ Aggiungi Compilatore</button>
+          <button type="button" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-blue-600 dark:text-blue-400" @click="addCompilatore">+ Aggiungi Compilatore</button>
         </div>
         <div>
-          <div class="text-sm mb-2"><span class="text-xs font-mono bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded mr-2">FUR</span>Funzionario responsabile<span class="text-red-500 ml-1">*</span></div>
+          <div class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">FUR - Funzionario responsabile <span class="text-red-500 ml-1">*</span></div>
           <template x-for="(f, i) in form.fur" :key="i">
             <div class="flex gap-2 mb-2"><input class="flex-1 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded bg-white px-3 py-2 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none" x-model="form.fur[i]" maxlength="70" placeholder="cognome, nome" required><button type="button" class="text-red-600" @click="removeFunzionario(i)">🗑</button></div>
           </template>
-          <button type="button" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" @click="addFunzionario">+ Aggiungi Funzionario</button>
+          <button type="button" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-blue-600 dark:text-blue-400" @click="addFunzionario">+ Aggiungi Funzionario</button>
         </div>
               </div>
             </div>
@@ -532,8 +583,14 @@
     </div><!-- end modal container -->
   </div><!-- end modal overlay -->
 
+  <!-- Photo Upload Component (Componente Riutilizzabile) -->
+  {% include 'sites/photos/_photo_upload.html' %}
+
 </div><!-- end root x-data container -->
 
 {% include "pages/tma/tma_alpine_script.html" %}
+
+<!-- TUS Uploader Client (required for the upload component) -->
+<script src="/static/js/tus-uploader.js"></script>
 {% endblock %}
 

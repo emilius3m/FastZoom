@@ -1,6 +1,11 @@
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from datetime import datetime
+import mimetypes
+import asyncio
+from pathlib import Path
+import re
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
@@ -19,7 +24,10 @@ from app.models.tma import (
     TMAFunzionario,
     TMAMotivazioneCronologia,
 )
+from app.models.documentation_and_field import Photo
 from app.schemas.tma import SchedaTMACreate, SchedaTMAUpdate, SchedaTMARead
+from app.services.photo_serving_service import photo_serving_service
+from app.services.archaeological_minio_service import archaeological_minio_service
 
 
 router = APIRouter()
@@ -97,6 +105,76 @@ def serialize_scheda_tma(row: SchedaTMA) -> SchedaTMARead:
         "fur": [f.nome for f in (row.funzionari or [])],
     }
     return SchedaTMARead.model_validate(payload)
+
+
+def _extract_photo_api_info(file_path: str) -> tuple[Optional[str], Optional[str]]:
+    """
+    Estrae (photo_id, variant) da URL/path API foto.
+    Supporta sia path relativi che URL assoluti.
+    """
+    raw = (file_path or "").strip()
+    if not raw:
+        return None, None
+
+    parsed_path = urlparse(raw).path if (raw.startswith("http://") or raw.startswith("https://")) else raw
+    match = re.match(r"^/api/v1/photos/([0-9a-fA-F-]{36})/(thumbnail|view|full|download)$", parsed_path)
+    if not match:
+        return None, None
+    return match.group(1), match.group(2)
+
+
+async def _load_tma_photo_bytes(file_path: str, db: AsyncSession) -> Optional[bytes]:
+    path = (file_path or "").strip()
+    if not path:
+        return None
+
+    # API URL/path (es: /api/v1/photos/{id}/view): risolvi verso filepath reale in DB
+    photo_id, variant = _extract_photo_api_info(path)
+    if photo_id:
+        result = await db.execute(select(Photo).where(Photo.id == photo_id))
+        photo = result.scalar_one_or_none()
+        if photo:
+            source_path = photo.thumbnail_path if variant == "thumbnail" else photo.filepath
+            if source_path:
+                try:
+                    content = await archaeological_minio_service.get_file(str(source_path))
+                    return content if isinstance(content, (bytes, bytearray)) and len(content) > 0 else None
+                except Exception:
+                    return None
+        return None
+
+    # Local fallback storage
+    if path.startswith("storage/") or path.startswith("app/static/"):
+        local_path = Path(path)
+        if local_path.exists() and local_path.is_file():
+            return await asyncio.to_thread(local_path.read_bytes)
+
+    # MinIO / URL / object path (service handles legacy formats)
+    try:
+        content = await archaeological_minio_service.get_file(path)
+        return content if isinstance(content, (bytes, bytearray)) and len(content) > 0 else None
+    except Exception:
+        return None
+
+
+async def _enrich_tma_fotografie_for_export(scheda_dict: Dict[str, Any], db: AsyncSession) -> Dict[str, Any]:
+    fotografie = scheda_dict.get("fotografie") or []
+    if not fotografie:
+        return scheda_dict
+
+    enriched: List[Dict[str, Any]] = []
+    for foto in fotografie:
+        item = dict(foto)
+        item["image_bytes"] = None
+
+        file_path = item.get("file_path")
+        if file_path:
+            item["image_bytes"] = await _load_tma_photo_bytes(str(file_path), db)
+
+        enriched.append(item)
+
+    scheda_dict["fotografie"] = enriched
+    return scheda_dict
 
 
 async def load_scheda_with_children(db: AsyncSession, record_id: str) -> Optional[SchedaTMA]:
@@ -259,6 +337,31 @@ async def get_tma_record(
     return serialize_scheda_tma(row)
 
 
+@router.get(
+    "/sites/{site_id}/foto-preview",
+    summary="Preview TMA photo by file path",
+    tags=["TMA"],
+)
+async def preview_tma_photo_by_file_path(
+    site_id: UUID,
+    file_path: str = Query(..., description="Percorso file immagine (MinIO object path o storage path)"),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+):
+    if not await verify_site_access(site_id, user_sites):
+        raise HTTPException(status_code=403, detail="Accesso negato al sito")
+
+    cleaned_path = (file_path or "").strip()
+    if not cleaned_path:
+        raise HTTPException(status_code=404, detail="Percorso immagine non valido")
+
+    mime_type = mimetypes.guess_type(cleaned_path)[0] or "image/jpeg"
+
+    if cleaned_path.startswith("storage/") or cleaned_path.startswith("app/static/"):
+        return photo_serving_service.serve_file_from_local(cleaned_path, mime_type)
+
+    return await photo_serving_service.serve_file_from_minio(cleaned_path, mime_type)
+
+
 @router.put(
     "/sites/{site_id}/records/{record_id}",
     response_model=SchedaTMARead,
@@ -389,6 +492,7 @@ async def export_tma_pdf(
 
     try:
         scheda_dict = serialize_scheda_tma(row).model_dump()
+        scheda_dict = await _enrich_tma_fotografie_for_export(scheda_dict, db)
         from app.services.tma_export_service import generate_tma_pdf
         pdf_bytes = generate_tma_pdf(scheda_dict)
 
@@ -432,6 +536,7 @@ async def export_tma_word(
 
     try:
         scheda_dict = serialize_scheda_tma(row).model_dump()
+        scheda_dict = await _enrich_tma_fotografie_for_export(scheda_dict, db)
         from app.services.tma_export_service import generate_tma_word
         word_bytes = generate_tma_word(scheda_dict)
 

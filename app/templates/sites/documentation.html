@@ -57,13 +57,14 @@
         </div>
 
         <!-- Form Builder Tab -->
-        <div class="border-b border-gray-200 dark:border-gray-700">
+        <div class="border-b border-gray-200 dark:border-gray-700 hidden">
             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                 <button @click="activeTab = 'documents'"
                     :class="(activeTab || 'documents') === 'documents' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
                     class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
                     📄 Documenti
                 </button>
+                {% if enable_form_builder_tabs and false %}
                 <button @click="activeTab = 'formBuilder'"
                     :class="(activeTab || 'documents') === 'formBuilder' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
                     class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
@@ -74,6 +75,7 @@
                     class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
                     📊 Dati Raccolti
                 </button>
+                {% endif %}
             </nav>
         </div>
     </div>
@@ -221,7 +223,7 @@
             <div class="divide-y divide-gray-200 dark:divide-gray-700">
                 <!-- Document Items -->
                 <template x-for="document in paginatedDocuments" :key="document.id">
-                    <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <div class="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group">
                         <div class="flex items-start space-x-4">
                             <!-- Icon -->
                             <div class="flex-shrink-0 pt-1">
@@ -236,10 +238,11 @@
                             </div>
 
                             <!-- Content -->
-                            <div class="flex-1 min-w-0 grid grid-cols-1 lg:grid-cols-12 gap-4">
-                                <div class="lg:col-span-9">
+                            <div class="flex-1 min-w-0 grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                                <!-- Title and Description (Left Column) -->
+                                <div class="lg:col-span-5">
                                     <div class="flex items-center space-x-2 mb-1">
-                                        <h3 class="text-base font-semibold text-gray-900 dark:text-white truncate"
+                                        <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate"
                                             x-text="document ? document.title : ''"></h3>
                                         <span
                                             class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
@@ -249,45 +252,6 @@
                                     <p x-show="document && document.description"
                                         class="text-sm text-gray-500 dark:text-gray-400 line-clamp-1 mb-2"
                                         x-text="document.description"></p>
-
-                                    <!-- Meta Grid -->
-                                    <div
-                                        class="flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-500 dark:text-gray-400">
-                                        <div x-show="document && document.author" class="flex items-center">
-                                            <svg class="w-3.5 h-3.5 mr-1.5 text-gray-400" fill="none"
-                                                stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
-                                                </path>
-                                            </svg>
-                                            <span x-text="document.author"></span>
-                                        </div>
-                                        <div x-show="document && document.year" class="flex items-center">
-                                            <svg class="w-3.5 h-3.5 mr-1.5 text-gray-400" fill="none"
-                                                stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
-                                                </path>
-                                            </svg>
-                                            <span x-text="document.year"></span>
-                                        </div>
-                                        <div x-show="document && document.us_reference" class="flex items-center">
-                                            <span class="mr-1.5 font-bold text-xsl text-purple-600">US</span>
-                                            <span x-text="document.us_reference"></span>
-                                        </div>
-                                        <div x-show="document && document.usm_reference" class="flex items-center">
-                                            <span class="mr-1.5 font-bold text-xs text-indigo-600">USM</span>
-                                            <span x-text="document.usm_reference"></span>
-                                        </div>
-                                        <div class="flex items-center">
-                                            <svg class="w-3.5 h-3.5 mr-1.5 text-gray-400" fill="none"
-                                                stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                            </svg>
-                                            <span x-text="formatDate(document ? document.created_at : null)"></span>
-                                        </div>
-                                    </div>
 
                                     <!-- Tags -->
                                     <div x-show="document && document.tags && document.tags.length > 0"
@@ -300,10 +264,48 @@
                                     </div>
                                 </div>
 
+                                <!-- Metadata (Middle Column) -->
+                                <div class="lg:col-span-5 grid grid-cols-2 gap-y-2 gap-x-4 text-sm text-gray-600 dark:text-gray-400">
+                                    <div x-show="document && document.author" class="flex items-center truncate" :title="document.author">
+                                        <svg class="flex-shrink-0 w-4 h-4 mr-2 text-gray-400" fill="none"
+                                            stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z">
+                                            </path>
+                                        </svg>
+                                        <span class="truncate" x-text="document.author"></span>
+                                    </div>
+                                    <div x-show="document && document.year" class="flex items-center">
+                                        <svg class="flex-shrink-0 w-4 h-4 mr-2 text-gray-400" fill="none"
+                                            stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                                            </path>
+                                        </svg>
+                                        <span x-text="document.year"></span>
+                                    </div>
+                                    <div x-show="document && document.us_reference" class="flex items-center">
+                                        <span class="flex-shrink-0 w-4 h-4 mr-2 font-bold text-xs text-purple-600 flex items-center justify-center">US</span>
+                                        <span class="truncate" x-text="document.us_reference"></span>
+                                    </div>
+                                    <div x-show="document && document.usm_reference" class="flex items-center">
+                                        <span class="flex-shrink-0 w-4 h-4 mr-2 font-bold text-[10px] text-indigo-600 flex items-center justify-center">USM</span>
+                                        <span class="truncate" x-text="document.usm_reference"></span>
+                                    </div>
+                                    <div class="flex items-center col-span-2 text-xs mt-1">
+                                        <svg class="flex-shrink-0 w-3.5 h-3.5 mr-1.5 text-gray-400" fill="none"
+                                            stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <span x-text="'Caricato il ' + formatDate(document ? document.created_at : null)"></span>
+                                    </div>
+                                </div>
+
                                 <!-- Actions -->
-                                <div class="lg:col-span-3 flex items-center lg:justify-end space-x-2">
+                                <div class="lg:col-span-2 flex items-center lg:justify-end space-x-2">
                                     <button @click="document && previewDocument(document)"
-                                        class="p-1.5 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-gray-600 transition-colors"
+                                        class="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-gray-700 transition-colors"
                                         title="Anteprima">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -315,7 +317,7 @@
                                     </button>
 
                                     <a :href="getDownloadUrl(document)"
-                                        class="p-1.5 rounded-md text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-gray-600 transition-colors"
+                                        class="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:text-green-400 dark:hover:bg-gray-700 transition-colors"
                                         title="Scarica">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -326,7 +328,7 @@
 
                                     {% if can_write %}
                                     <button @click="document && openEditDocumentModal(document)"
-                                        class="p-1.5 rounded-md text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-gray-600 transition-colors"
+                                        class="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:text-orange-400 dark:hover:bg-gray-700 transition-colors"
                                         title="Modifica">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -335,7 +337,7 @@
                                         </svg>
                                     </button>
                                     <button @click="document && deleteDocument(document.id)"
-                                        class="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-gray-600 transition-colors"
+                                        class="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-gray-700 transition-colors"
                                         title="Elimina">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -416,6 +418,7 @@
         {% include 'sites/components/_document_preview_modal.html' %}
     </div>
 
+    {% if enable_form_builder_tabs and false %}
     <!-- Form Builder Tab Content -->
     <div x-show="(activeTab || 'documents') === 'formBuilder'" x-data="formBuilder()" style="display: none;">
         {% include 'sites/components/_form_builder.html' %}
@@ -630,6 +633,7 @@
             </div>
         </template>
     </div>
+    {% endif %}
 
     {% include 'sites/components/_form_builder_script.html' %}
 
@@ -757,7 +761,15 @@
         // Document actions
         previewDocument(document) {
             if (!document) return;
-            this.selectedDocument = document;
+
+            const canInlinePreview = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
+                .includes((document.mime_type || '').toLowerCase());
+
+            this.selectedDocument = {
+                ...document,
+                preview_url: `/api/v1/documents/sites/${this.siteId}/documents/${document.id}/preview?inline=true`,
+                can_inline_preview: canInlinePreview
+            };
             this.showPreviewModal = true;
         },
 

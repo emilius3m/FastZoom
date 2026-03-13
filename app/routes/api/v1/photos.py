@@ -115,6 +115,22 @@ async def download_photo_simple(
     return await photo_serving_service.serve_photo_download(photo_id, db)
 
 
+@router.get("/photos/{photo_id}/view")
+async def get_photo_view_alias(
+        photo_id: UUID,
+        site_access: tuple = Depends(get_photo_site_access),
+        current_user_id: UUID = Depends(get_current_user_id),
+        db: AsyncSession = Depends(get_database_session)
+):
+    """Alias per serve_photo_full (Backward compatibility for legacy references)"""
+    site, permission = site_access
+    
+    if not permission.can_read():
+        raise InsufficientPermissionsError("Permessi richiesti")
+        
+    return await photo_serving_service.serve_photo_full(photo_id, db)
+
+
 from fastapi import Body
 from app.models import UserSitePermission
 from sqlalchemy import select, and_, or_, func

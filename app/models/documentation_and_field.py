@@ -323,7 +323,7 @@ class Photo(Base, SiteMixin, UserMixin):
 
     @property
     def file_url(self) -> str:
-        return f"/api/v1/photos/{self.id}/view"
+        return f"/api/v1/photos/{self.id}/full"
     
     # ===== METODI PER PhotoType =====
     

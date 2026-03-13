@@ -225,7 +225,10 @@ async def site_documentation(
     )
     context.update({
         "documents": documents,
-        "form_schemas": form_schemas
+        "form_schemas": form_schemas,
+        # Feature flag: Form Builder / Dati Raccolti temporaneamente disattivati in UI
+        # (logica mantenuta, nessuna rimozione di codice)
+        "enable_form_builder_tabs": False,
     })
 
     return templates.TemplateResponse("sites/documentation.html", context)

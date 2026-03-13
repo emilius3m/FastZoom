@@ -69,6 +69,99 @@ function schedaTMAForm() {
     defaultForm,
     form: JSON.parse(JSON.stringify(defaultForm)),
 
+    // Callback per upload successo
+    initPhotoUploadCallback() {
+      // Definiamo una funzione globale che il componente di upload chiamerà al successo
+      window.onTMAPhotoUploadSuccess = (result) => {
+        console.log("onTMAPhotoUploadSuccess called with result:", result);
+        this.handlePhotoUploadSuccess(result);
+      };
+    },
+
+    openPhotoUploadModal() {
+      // Ensure the callback is registered
+      this.initPhotoUploadCallback();
+
+      // Find the alpine component instance for the upload modal and open it
+      const modalEl = document.querySelector('[x-data="photoUploadComponent"]');
+      if (modalEl) {
+        // Update the component's success callback binding to point to our newly registered global function
+        const alpineInstance = Alpine.$data(modalEl);
+        if (alpineInstance) {
+          alpineInstance.config.successCallback = 'onTMAPhotoUploadSuccess';
+          // Pre-fill metadata se vogliamo (es. NCTR + NCTN)
+          alpineInstance.metadata.inventory_number = this.nct;
+          // Open the modal
+          alpineInstance.openModal();
+        }
+      } else {
+        console.error("Photo upload modal component not found");
+      }
+    },
+    
+    handlePhotoUploadSuccess(result) {
+        console.log("Handling photo upload success inside Alpine component", result);
+        
+        let uploadedFiles = [];
+        // Verifica la struttura della risposta per gestire vari formati possibili dal backend
+        if (result && Array.isArray(result.successful)) {
+            uploadedFiles = result.successful;
+        } else if (result && Array.isArray(result.uploaded_photos)) {
+            uploadedFiles = result.uploaded_photos;
+        } else if (Array.isArray(result)) {
+            uploadedFiles = result;
+        }
+        
+        if (uploadedFiles.length === 0) {
+             console.warn("No successful files array found in upload response", result);
+             // Potrebbe essere un upload "finto" da mock per TUS
+             // Prova a scansionare i file temporanei locali se usati?
+             // Nella versione attuale, se non ci sono dettagli dal backend lato TUS, 
+             // il bridge potrebbe non funzionare perfettamente senza un endpoint che 
+             // ritorni l'URL esatto dei file completati. 
+             // Per via della flessibilità del componente, lo mettiamo un Toast informativo.
+             // Se TUS ha avuto successo, `result` potrebbe avere `successful` ma essere un array vuoto
+             // (visto il mock nella versione originale).
+             // Fallback temporaneo
+        }
+
+        uploadedFiles.forEach(fileInfo => {
+            // fileInfo potrebbe essere dict con url, filename, o solo un oggetto fittizio
+            // Idealmente il backend dovrebbe restituire { url: "...", filename: "..." }
+            
+            // Per ora supportiamo un URL base
+            const filePath = typeof fileInfo === 'string' ? fileInfo : 
+                            (fileInfo.url || fileInfo.file_path || fileInfo.file_url || '');
+
+            const photoId = (fileInfo && typeof fileInfo === 'object')
+              ? (fileInfo.photo_id || fileInfo.id || null)
+              : null;
+
+            const previewUrl = (fileInfo && typeof fileInfo === 'object')
+              ? (fileInfo.thumbnail_url || fileInfo.file_url || fileInfo.url || '')
+              : '';
+
+            const filename = fileInfo.filename || fileInfo.name || '';
+            const description = fileInfo.description || '';
+            
+            this.form.fotografie.push({
+               ftax: 'documentazione allegata',
+               ftap: 'fotografia digitale (file)', 
+               ftan: description || filename, 
+               file_path: filePath,
+               photo_id: photoId,
+               preview_url: previewUrl,
+               preview_mode: 'thumbnail',
+               preview_error: false
+             });
+        });
+        
+        this.sections.do_section = true;
+        
+        // Forza alpine a ricaricare l'UI
+        setTimeout(() => { this.$apply || this.$refs?.form?.click(); }, 100);
+    },
+
     regioni: [
       { code: '00', name: '00' },
       { code: '01', name: 'Piemonte' },
@@ -235,6 +328,7 @@ function schedaTMAForm() {
       if (!this.form.cdgg) {
         this.form.cdgg = 'proprietà Stato'
       }
+      this.initPhotoUploadCallback();
       await this.fetchRecords()
     },
 
@@ -384,7 +478,11 @@ function schedaTMAForm() {
               ftax: f?.ftax || '',
               ftap: f?.ftap || '',
               ftan: f?.ftan || '',
-              file_path: f?.file_path || ''
+              file_path: f?.file_path || '',
+              photo_id: null,
+              preview_url: '',
+              preview_mode: 'thumbnail',
+              preview_error: false
             }))
           : [],
         cmpn: safeStrings(record?.cmpn),
@@ -463,10 +561,58 @@ function schedaTMAForm() {
     },
 
     addFoto() {
-      this.form.fotografie.push({ ftax: 'documentazione allegata', ftap: 'fotografia digitale (file)', ftan: '', file_path: '' })
+      this.form.fotografie.push({
+        ftax: 'documentazione allegata',
+        ftap: 'fotografia digitale (file)',
+        ftan: '',
+        file_path: '',
+        photo_id: null,
+        preview_url: '',
+        preview_mode: 'thumbnail',
+        preview_error: false
+      })
     },
     removeFoto(index) {
       this.form.fotografie.splice(index, 1)
+    },
+
+    getPhotoPreviewUrl(foto) {
+      if (!foto || foto.preview_error) return ''
+
+      const explicitPreview = String(foto.preview_url || '').trim()
+      if (explicitPreview && (explicitPreview.startsWith('/') || explicitPreview.startsWith('http://') || explicitPreview.startsWith('https://'))) {
+        return explicitPreview
+      }
+
+      const photoId = String(foto.photo_id || '').trim()
+      if (photoId) {
+        if (foto.preview_mode === 'full') return `/api/v1/photos/${photoId}/full`
+        return `/api/v1/photos/${photoId}/thumbnail`
+      }
+
+      const path = String(foto.file_path || '').trim()
+      if (path) {
+        if (path.startsWith('/') || path.startsWith('http://') || path.startsWith('https://')) {
+          return path
+        }
+
+        return `/api/v1/tma/sites/${this.siteId}/foto-preview?file_path=${encodeURIComponent(path)}`
+      }
+
+      return ''
+    },
+
+    onPhotoPreviewError(index) {
+      const foto = this.form.fotografie?.[index]
+      if (!foto) return
+
+      const photoId = String(foto.photo_id || '').trim()
+      if (photoId && foto.preview_mode !== 'full') {
+        foto.preview_mode = 'full'
+        return
+      }
+
+      foto.preview_error = true
     },
 
     addCompilatore() { this.form.cmpn.push('') },

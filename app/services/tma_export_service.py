@@ -17,15 +17,18 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    PageBreak, KeepTogether,
+    PageBreak, KeepTogether, Image as RLImage,
 )
 from reportlab.platypus.flowables import HRFlowable
 from loguru import logger
 
 try:
     from docx import Document
-    from docx.shared import Pt, RGBColor, Cm, Inches
+    from docx.shared import Pt, RGBColor, Cm
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
     DOCX_AVAILABLE = True
 except ImportError:
     DOCX_AVAILABLE = False
@@ -49,6 +52,7 @@ _PDF_COLORS = {
 _WORD_COLORS = {
     'header_bg': RGBColor(26, 58, 82),
     'accent': RGBColor(44, 90, 160),
+    'accent_light': RGBColor(232, 238, 245),
     'text': RGBColor(26, 26, 26),
     'grey': RGBColor(100, 100, 100),
 }
@@ -262,6 +266,86 @@ def _iccd_sections(s: Dict[str, Any]) -> List[dict]:
     return sections
 
 
+def _collect_export_photos(scheda: Dict[str, Any]) -> List[Dict[str, Any]]:
+    photos: List[Dict[str, Any]] = []
+    for idx, foto in enumerate((scheda.get('fotografie') or []), start=1):
+        image_bytes = foto.get('image_bytes')
+        if isinstance(image_bytes, bytearray):
+            image_bytes = bytes(image_bytes)
+
+        if not isinstance(image_bytes, (bytes, bytearray)) or len(image_bytes) == 0:
+            continue
+
+        caption = foto.get('ftan') or foto.get('ftap') or foto.get('ftax') or f"Foto {idx}"
+        photos.append({
+            'index': idx,
+            'caption': str(caption),
+            'file_path': str(foto.get('file_path') or ''),
+            'image_bytes': bytes(image_bytes),
+        })
+    return photos
+
+
+def _add_pdf_photo_gallery(story: List[Any], scheda: Dict[str, Any], styles):
+    photos = _collect_export_photos(scheda)
+    if not photos:
+        return
+
+    story.append(PageBreak())
+    story.append(Paragraph('DO - ALLEGATI FOTOGRAFICI', styles['TmaSectionHeading']))
+    story.append(Spacer(1, 0.2 * cm))
+
+    col_width = 8.2 * cm
+    cells: List[Any] = []
+
+    for photo in photos:
+        try:
+            img_stream = io.BytesIO(photo['image_bytes'])
+            img = RLImage(img_stream)
+            img._restrictSize(col_width - (0.5 * cm), 5.5 * cm)
+
+            block = [
+                Paragraph(f"<b>Foto {photo['index']}</b> — {photo['caption']}", styles['TmaLabel']),
+                Spacer(1, 1.2 * mm),
+                img,
+            ]
+
+            if photo['file_path']:
+                block.extend([
+                    Spacer(1, 1 * mm),
+                    Paragraph(photo['file_path'], styles['TmaPageNum']),
+                ])
+
+            cells.append(block)
+        except Exception:
+            cells.append([
+                Paragraph(f"<b>Foto {photo['index']}</b> — {photo['caption']}", styles['TmaLabel']),
+                Paragraph("Immagine non disponibile per il rendering", styles['TmaValue']),
+            ])
+
+    rows = []
+    for i in range(0, len(cells), 2):
+        row = cells[i:i + 2]
+        if len(row) < 2:
+            row.append("")
+        rows.append(row)
+
+    gallery = Table(rows, colWidths=[col_width, col_width], hAlign='LEFT')
+    gallery.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('BOX', (0, 0), (-1, -1), 0.5, _PDF_COLORS['border']),
+        ('INNERGRID', (0, 0), (-1, -1), 0.25, _PDF_COLORS['light_grey']),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+    ]))
+
+    story.append(gallery)
+    story.append(Spacer(1, 0.2 * cm))
+
+
 # ═══════════════════════════════════════════════
 #  PDF EXPORT (reportlab)
 # ═══════════════════════════════════════════════
@@ -378,6 +462,9 @@ def generate_tma_pdf(scheda: Dict[str, Any]) -> bytes:
 
         story.append(Spacer(1, 0.15 * cm))
 
+    # Allegati fotografici (se presenti bytes immagine)
+    _add_pdf_photo_gallery(story, scheda, styles)
+
     # Footer / Firma
     story.append(Spacer(1, 0.5 * cm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=_PDF_COLORS['border']))
@@ -401,43 +488,196 @@ def generate_tma_pdf(scheda: Dict[str, Any]) -> bytes:
 #  WORD EXPORT (python-docx)
 # ═══════════════════════════════════════════════
 
-def _add_word_section_heading(doc, text: str):
-    """Sezione principale con sfondo blu per Word."""
-    p = doc.add_paragraph()
-    run = p.add_run(text)
-    run.font.size = Pt(10)
+def _rgb_to_hex(rgb: RGBColor) -> str:
+    return f"{rgb[0]:02X}{rgb[1]:02X}{rgb[2]:02X}"
+
+
+def _set_word_cell_shading(cell, fill_hex: str):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement('w:shd')
+    shd.set(qn('w:val'), 'clear')
+    shd.set(qn('w:color'), 'auto')
+    shd.set(qn('w:fill'), fill_hex)
+    tc_pr.append(shd)
+
+
+def _set_word_cell_border(cell, color: str = "B7C7D9", size: int = 4):
+    tc = cell._tc
+    tc_pr = tc.get_or_add_tcPr()
+    tc_borders = tc_pr.first_child_found_in("w:tcBorders")
+    if tc_borders is None:
+        tc_borders = OxmlElement('w:tcBorders')
+        tc_pr.append(tc_borders)
+
+    for edge in ('top', 'left', 'bottom', 'right'):
+        tag = f'w:{edge}'
+        elem = tc_borders.find(qn(tag))
+        if elem is None:
+            elem = OxmlElement(tag)
+            tc_borders.append(elem)
+        elem.set(qn('w:val'), 'single')
+        elem.set(qn('w:sz'), str(size))
+        elem.set(qn('w:space'), '0')
+        elem.set(qn('w:color'), color)
+
+
+def _add_word_title_block(doc: Document, scheda: Dict[str, Any]):
+    title_table = doc.add_table(rows=1, cols=1)
+    title_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    title_cell = title_table.cell(0, 0)
+    _set_word_cell_shading(title_cell, _rgb_to_hex(_WORD_COLORS['header_bg']))
+    _set_word_cell_border(title_cell, color="1A3A52", size=8)
+
+    p = title_cell.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run("SCHEDA TMA")
+    run.font.size = Pt(16)
     run.font.bold = True
-    run.font.color.rgb = _WORD_COLORS['accent']
-    p.paragraph_format.space_before = Pt(10)
-    p.paragraph_format.space_after = Pt(2)
+    run.font.color.rgb = RGBColor(255, 255, 255)
+
+    p2 = title_cell.add_paragraph()
+    p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run2 = p2.add_run("Tabella Materiali Archeologici — ICCD 3.00")
+    run2.font.size = Pt(9)
+    run2.font.italic = True
+    run2.font.color.rgb = RGBColor(230, 240, 250)
+
+    meta_table = doc.add_table(rows=1, cols=2)
+    meta_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    meta_table.style = "Table Grid"
+
+    nct = f"{scheda.get('nctr', '')}{scheda.get('nctn', '')}"
+    meta_left = meta_table.cell(0, 0)
+    meta_right = meta_table.cell(0, 1)
+
+    _set_word_cell_shading(meta_left, _rgb_to_hex(_WORD_COLORS['accent_light']))
+    _set_word_cell_shading(meta_right, _rgb_to_hex(_WORD_COLORS['accent_light']))
+
+    pl = meta_left.paragraphs[0]
+    pl.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    r1 = pl.add_run(f"NCT: {nct or '-'}")
+    r1.font.size = Pt(9)
+    r1.font.bold = True
+    r1.font.color.rgb = _WORD_COLORS['header_bg']
+
+    pr = meta_right.paragraphs[0]
+    pr.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    r2 = pr.add_run(f"Export: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    r2.font.size = Pt(8)
+    r2.font.color.rgb = _WORD_COLORS['grey']
+
+    doc.add_paragraph()
 
 
-def _add_word_subsection_heading(doc, text: str):
-    """Sotto-sezione ICCD."""
-    p = doc.add_paragraph()
-    run = p.add_run(text)
-    run.font.size = Pt(9)
-    run.font.bold = True
-    run.font.color.rgb = _WORD_COLORS['header_bg']
-    p.paragraph_format.space_before = Pt(4)
-    p.paragraph_format.space_after = Pt(2)
-    p.paragraph_format.left_indent = Cm(0.5)
+def _add_word_section_table(doc: Document, section: Dict[str, Any]):
+    # Heading ribbon
+    heading_table = doc.add_table(rows=1, cols=1)
+    heading_table.alignment = WD_TABLE_ALIGNMENT.LEFT
+    heading_cell = heading_table.cell(0, 0)
+    _set_word_cell_shading(heading_cell, _rgb_to_hex(_WORD_COLORS['accent']))
+    _set_word_cell_border(heading_cell, color="2C5AA0", size=8)
+
+    hp = heading_cell.paragraphs[0]
+    hp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    hr = hp.add_run(section['title'])
+    hr.font.size = Pt(10)
+    hr.font.bold = True
+    hr.font.color.rgb = RGBColor(255, 255, 255)
+
+    table = doc.add_table(rows=0, cols=2)
+    table.style = "Table Grid"
+    table.alignment = WD_TABLE_ALIGNMENT.LEFT
+
+    def add_subsection_row(title: str):
+        row_cells = table.add_row().cells
+        merged = row_cells[0].merge(row_cells[1])
+        _set_word_cell_shading(merged, _rgb_to_hex(_WORD_COLORS['accent_light']))
+        _set_word_cell_border(merged, color="9EB6CF", size=4)
+        p = merged.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        r = p.add_run(title)
+        r.font.size = Pt(9)
+        r.font.bold = True
+        r.font.color.rgb = _WORD_COLORS['header_bg']
+
+    def add_field_row(label: str, value: Any):
+        row_cells = table.add_row().cells
+        label_cell, value_cell = row_cells[0], row_cells[1]
+
+        _set_word_cell_shading(label_cell, "F5F8FC")
+        _set_word_cell_border(label_cell, color="C5D3E3", size=4)
+        _set_word_cell_border(value_cell, color="C5D3E3", size=4)
+
+        lp = label_cell.paragraphs[0]
+        lp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        lr = lp.add_run(str(label))
+        lr.font.size = Pt(8)
+        lr.font.bold = True
+        lr.font.color.rgb = _WORD_COLORS['header_bg']
+
+        vp = value_cell.paragraphs[0]
+        vp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        vr = vp.add_run(str(value) if value not in (None, "") else "-")
+        vr.font.size = Pt(9)
+        vr.font.color.rgb = _WORD_COLORS['text']
+
+    for label, value in section.get('fields', []):
+        add_field_row(label, value)
+
+    for label, value in section.get('extra_fields', []):
+        add_field_row(label, value)
+
+    for sub in section.get('subsections', []):
+        add_subsection_row(sub['title'])
+        for label, value in sub.get('fields', []):
+            add_field_row(label, value)
+
+    doc.add_paragraph()
 
 
-def _add_word_field(doc, label: str, value: str):
-    """Un campo etichetta+valore su due righe."""
-    p = doc.add_paragraph()
-    label_run = p.add_run(label)
-    label_run.font.size = Pt(8)
-    label_run.font.bold = True
-    label_run.font.color.rgb = _WORD_COLORS['header_bg']
+def _add_word_photo_gallery(doc: Document, scheda: Dict[str, Any]):
+    photos = _collect_export_photos(scheda)
+    if not photos:
+        return
 
-    p2 = doc.add_paragraph()
-    val_run = p2.add_run(str(value))
-    val_run.font.size = Pt(9)
-    val_run.font.color.rgb = _WORD_COLORS['text']
-    p2.paragraph_format.left_indent = Cm(0.5)
-    p2.paragraph_format.space_after = Pt(2)
+    heading_table = doc.add_table(rows=1, cols=1)
+    heading_table.alignment = WD_TABLE_ALIGNMENT.LEFT
+    heading_cell = heading_table.cell(0, 0)
+    _set_word_cell_shading(heading_cell, _rgb_to_hex(_WORD_COLORS['accent']))
+    _set_word_cell_border(heading_cell, color="2C5AA0", size=8)
+
+    hp = heading_cell.paragraphs[0]
+    hp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    hr = hp.add_run("DO - ALLEGATI FOTOGRAFICI")
+    hr.font.size = Pt(10)
+    hr.font.bold = True
+    hr.font.color.rgb = RGBColor(255, 255, 255)
+
+    doc.add_paragraph()
+
+    for photo in photos:
+        cap = doc.add_paragraph()
+        cap_run = cap.add_run(f"Foto {photo['index']} — {photo['caption']}")
+        cap_run.font.size = Pt(9)
+        cap_run.font.bold = True
+        cap_run.font.color.rgb = _WORD_COLORS['header_bg']
+
+        try:
+            doc.add_picture(io.BytesIO(photo['image_bytes']), width=Cm(8.5))
+        except Exception:
+            p = doc.add_paragraph("Immagine non disponibile per il rendering")
+            p_run = p.runs[0]
+            p_run.font.size = Pt(8)
+            p_run.font.italic = True
+            p_run.font.color.rgb = _WORD_COLORS['grey']
+
+        if photo['file_path']:
+            meta = doc.add_paragraph(photo['file_path'])
+            meta_run = meta.runs[0]
+            meta_run.font.size = Pt(7)
+            meta_run.font.color.rgb = _WORD_COLORS['grey']
+
+        doc.add_paragraph()
 
 
 def generate_tma_word(scheda: Dict[str, Any]) -> bytes:
@@ -457,37 +697,14 @@ def generate_tma_word(scheda: Dict[str, Any]) -> bytes:
         section.left_margin = Cm(2)
         section.right_margin = Cm(2)
 
-    # Titolo
-    title = doc.add_paragraph()
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = title.add_run("SCHEDA TMA")
-    run.font.size = Pt(18)
-    run.font.bold = True
-    run.font.color.rgb = _WORD_COLORS['header_bg']
-
-    subtitle = doc.add_paragraph()
-    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    sub_run = subtitle.add_run("Tabella Materiali Archeologici — ICCD 3.00")
-    sub_run.font.size = Pt(10)
-    sub_run.font.italic = True
-    sub_run.font.color.rgb = _WORD_COLORS['grey']
-
-    doc.add_paragraph()  # spacer
+    _add_word_title_block(doc, scheda)
 
     # Sezioni ICCD
     for sec in _iccd_sections(scheda):
-        _add_word_section_heading(doc, sec['title'])
+        _add_word_section_table(doc, sec)
 
-        for label, value in sec.get('fields', []):
-            _add_word_field(doc, label, value)
-
-        for label, value in sec.get('extra_fields', []):
-            _add_word_field(doc, label, value)
-
-        for sub in sec.get('subsections', []):
-            _add_word_subsection_heading(doc, sub['title'])
-            for label, value in sub.get('fields', []):
-                _add_word_field(doc, label, value)
+    # Allegati fotografici (se presenti bytes immagine)
+    _add_word_photo_gallery(doc, scheda)
 
     # Firma
     doc.add_paragraph()

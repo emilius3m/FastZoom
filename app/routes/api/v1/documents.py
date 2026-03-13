@@ -4,7 +4,7 @@ Endpoints per gestione documenti archeologici.
 Implementa backward compatibility con avvisi di deprecazione.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form, Query
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from uuid import UUID, uuid4
 from typing import List, Dict, Any, Optional
@@ -368,6 +368,57 @@ async def v1_get_document(
     except Exception as e:
         logger.error(f"Error fetching document {document_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Errore nel recupero documento: {str(e)}")
+
+
+@router.get("/sites/{site_id}/documents/{document_id}/preview", summary="Anteprima documento", tags=["Documents"])
+async def v1_preview_document(
+    site_id: UUID,
+    document_id: UUID,
+    inline: bool = Query(True, description="Se true restituisce Content-Disposition inline"),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """
+    Restituisce il file documento per anteprima browser.
+    Usa Content-Disposition inline per i mime supportati dal browser.
+    """
+    verify_site_access(site_id, user_sites)
+
+    try:
+        query = select(Document).where(
+            and_(
+                Document.id == document_id,
+                Document.site_id == str(site_id),
+                Document.is_deleted == False
+            )
+        )
+
+        result = await db.execute(query)
+        doc = result.scalar_one_or_none()
+
+        if not doc:
+            raise HTTPException(status_code=404, detail="Documento non trovato")
+
+        file_data = await archaeological_minio_service.get_file(doc.filepath)
+        if not file_data:
+            raise ResourceNotFoundError("File storage", doc.filepath)
+
+        disposition_mode = "inline" if inline else "attachment"
+        media_type = doc.mimetype or "application/octet-stream"
+
+        return StreamingResponse(
+            iter([file_data]),
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"{disposition_mode}; filename={doc.filename}"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing document {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nell'anteprima: {str(e)}")
 
 @router.put("/sites/{site_id}/documents/{document_id}", summary="Aggiorna documento", tags=["Documents"])
 async def v1_update_document(

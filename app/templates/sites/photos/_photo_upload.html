@@ -592,6 +592,7 @@
                 let successful = 0;
                 let failed = 0;
                 const errors = [];
+                const successfulUploads = [];
 
                 // Process files sequentially
                 for (let i = 0; i < this.files.length; i++) {
@@ -625,6 +626,25 @@
                                 detail.status = 'completed';
                                 detail.progress = 100;
                                 successful++;
+
+                                const normalizedResult = (result && typeof result === 'object')
+                                    ? {
+                                        ...result,
+                                        photo_id: result.photo_id || result.id || null,
+                                        filename: result.filename || fileObj.name,
+                                        file_path: result.file_path || result.file_url || result.full_url || '',
+                                        thumbnail_url: result.thumbnail_url || '',
+                                        file_url: result.file_url || result.full_url || result.url || ''
+                                    }
+                                    : {
+                                        filename: fileObj.name,
+                                        photo_id: null,
+                                        file_path: '',
+                                        thumbnail_url: '',
+                                        file_url: ''
+                                    };
+
+                                successfulUploads.push(normalizedResult);
                             },
                             onError: (error) => {
                                 console.error(`❌ TUS Error for ${fileObj.name}:`, error);
@@ -650,15 +670,16 @@
 
                     // Trigger global refresh
                     if (window[this.config.successCallback]) {
-                        // Pass simplified result compatible with callback expectations
-                        const resultMock = {
+                        // Pass complete result compatible with callback expectations
+                        const tusResult = {
                             message: `${successful} file caricati`,
                             total_uploaded: successful,
-                            successful: Array(successful).fill({}),
+                            successful: successfulUploads,
+                            failed: errors,
                         };
 
                         if (typeof window[this.config.successCallback] === 'function') {
-                            window[this.config.successCallback](resultMock);
+                            window[this.config.successCallback](tusResult);
                         }
                     }
 
