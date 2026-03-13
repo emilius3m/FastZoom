@@ -284,11 +284,25 @@
                                         </svg>
                                         <span x-text="document.year"></span>
                                     </div>
-                                    <div x-show="document && document.us_reference" class="flex items-center">
+                                    <div x-show="document && document.association_display" class="flex items-center col-span-2">
+                                        <a :href="getUsUrl(document)"
+                                           class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border transition-colors"
+                                           :class="document.association_type === 'USM'
+                                                   ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/50'
+                                                   : 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/50'"
+                                           :title="`Apri ${document.association_type || 'US'} ${document.association_display || ''}`"
+                                           x-text="`${document.association_type || 'US'}: ${document.association_display || ''}`"></a>
+
+                                        <span x-show="document && document.association_kind_label"
+                                              class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
+                                              x-text="document.association_kind_label"></span>
+                                    </div>
+
+                                    <div x-show="document && document.us_reference" class="flex items-center hidden">
                                         <span class="flex-shrink-0 w-4 h-4 mr-2 font-bold text-xs text-purple-600 flex items-center justify-center">US</span>
                                         <span class="truncate" x-text="document.us_reference"></span>
                                     </div>
-                                    <div x-show="document && document.usm_reference" class="flex items-center">
+                                    <div x-show="document && document.usm_reference" class="flex items-center hidden">
                                         <span class="flex-shrink-0 w-4 h-4 mr-2 font-bold text-[10px] text-indigo-600 flex items-center justify-center">USM</span>
                                         <span class="truncate" x-text="document.usm_reference"></span>
                                     </div>

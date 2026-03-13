@@ -44,6 +44,18 @@ def _map_us_file_category(file_type: str) -> str:
     return mapping.get(file_type, 'altro')
 
 
+def _map_us_file_type_label(file_type: str) -> str:
+    """Label human-readable per tipo file US/USM"""
+    mapping = {
+        'pianta': 'Pianta',
+        'sezione': 'Sezione',
+        'prospetto': 'Prospetto',
+        'fotografia': 'Fotografia',
+        'documento': 'Documento'
+    }
+    return mapping.get(file_type, file_type.title() if file_type else 'File')
+
+
 @documentation_router.get("/{site_id}/documentation", response_class=HTMLResponse)
 async def site_documentation(
         request: Request,
@@ -90,7 +102,12 @@ async def site_documentation(
                 "uploaded_by": str(doc.uploaded_by),
                 "version": doc.version,
                 "created_at": doc.uploaded_at.isoformat(),
-                "source": "document"  # Identifica provenienza
+                "source": "document",  # Identifica provenienza
+                "association_type": None,
+                "association_code": None,
+                "association_display": None,
+                "association_kind": None,
+                "association_kind_label": None
             })
         
         # 2. Aggiungi file US/USM come documenti
@@ -128,16 +145,17 @@ async def site_documentation(
                 us = us_result.scalar_one_or_none()
                 
                 if us:
+                    file_type_label = _map_us_file_type_label(assoc.file_type)
                     documents.append({
-                        "id": f"us_{us_file.id}",  # Prefisso per distinguere
-                        "title": us_file.title or f"File US {us.us_code}",
-                        "description": us_file.description or f"File associato a US {us.us_code}",
+                        "id": f"us_{us_file.id}_{us.id}_{assoc.file_type}",  # univoco per associazione
+                        "title": us_file.title or us_file.original_filename or f"{file_type_label} allegata",
+                        "description": us_file.description or None,
                         "category": _map_us_file_category(assoc.file_type),
                         "doc_type": us_file.mimetype,
                         "filename": us_file.original_filename,
                         "file_size": us_file.filesize,
                         "mime_type": us_file.mimetype,
-                        "tags": [f"US {us.us_code}", assoc.file_type],
+                        "tags": [],
                         "doc_date": us_file.photo_date.isoformat() if us_file.photo_date else None,
                         "author": us_file.photographer,
                         "is_public": us_file.is_published,
@@ -146,6 +164,11 @@ async def site_documentation(
                         "version": 1,
                         "created_at": us_file.created_at.isoformat(),
                         "source": "us_file",  # Identifica provenienza
+                        "association_type": "US",
+                        "association_code": us.us_code,
+                        "association_display": us.us_code,
+                        "association_kind": assoc.file_type,
+                        "association_kind_label": file_type_label,
                         "us_reference": us.us_code,
                         "us_id": str(us.id),
                         "file_type": assoc.file_type,
@@ -184,16 +207,17 @@ async def site_documentation(
                 usm = usm_result.scalar_one_or_none()
                 
                 if usm:
+                    file_type_label = _map_us_file_type_label(assoc.file_type)
                     documents.append({
-                        "id": f"usm_{usm_file.id}",  # Prefisso per distinguere
-                        "title": usm_file.title or f"File USM {usm.usm_code}",
-                        "description": usm_file.description or f"File associato a USM {usm.usm_code}",
+                        "id": f"usm_{usm_file.id}_{usm.id}_{assoc.file_type}",  # univoco per associazione
+                        "title": usm_file.title or usm_file.original_filename or f"{file_type_label} allegata",
+                        "description": usm_file.description or None,
                         "category": _map_us_file_category(assoc.file_type),
                         "doc_type": usm_file.mimetype,
                         "filename": usm_file.original_filename,
                         "file_size": usm_file.filesize,
                         "mime_type": usm_file.mimetype,
-                        "tags": [f"USM {usm.usm_code}", assoc.file_type],
+                        "tags": [],
                         "doc_date": usm_file.photo_date.isoformat() if usm_file.photo_date else None,
                         "author": usm_file.photographer,
                         "is_public": usm_file.is_published,
@@ -202,6 +226,11 @@ async def site_documentation(
                         "version": 1,
                         "created_at": usm_file.created_at.isoformat(),
                         "source": "usm_file",  # Identifica provenienza
+                        "association_type": "USM",
+                        "association_code": usm.usm_code,
+                        "association_display": usm.usm_code,
+                        "association_kind": assoc.file_type,
+                        "association_kind_label": file_type_label,
                         "usm_reference": usm.usm_code,
                         "usm_id": str(usm.id),
                         "file_type": assoc.file_type,
