@@ -3,6 +3,9 @@
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 from uuid import UUID
+from collections import defaultdict
+import re
+from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import selectinload
@@ -11,6 +14,7 @@ from loguru import logger
 from app.models import Photo, PhotoType, MaterialType, ConservationStatus
 from app.models import USFile
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria, us_files_association, usm_files_association
+from app.models.tma import SchedaTMA, TMAFotografia
 from app.schemas.photos import PhotoQueryFilters
 from app.routes.api.dependencies import normalize_site_id
 
@@ -97,6 +101,13 @@ class PhotoQueryService:
         # Execute query
         photos = await db.execute(photos_query)
         photos = photos.scalars().all()
+
+        # Build TMA references map (photo_id -> list of references)
+        tma_references_map = await self._build_tma_references_for_photos(
+            normalized_site_id=normalized_site_id,
+            photos=photos,
+            db=db,
+        )
         
         # Convert to dictionary format with URLs
         photos_data = []
@@ -107,9 +118,126 @@ class PhotoQueryService:
             photo_dict['download_url'] = f"/api/v1/photos/{photo.id}/download"
             photo_dict['tags'] = photo.get_keywords_list()
             photo_dict['source_type'] = 'photo'  # Mark as general photo
+            photo_dict['tma_references'] = tma_references_map.get(str(photo.id), [])
+            photo_dict['has_tma_references'] = len(photo_dict['tma_references']) > 0
             photos_data.append(photo_dict)
         
         return photos_data
+
+    @staticmethod
+    def _extract_photo_api_id(path: str) -> Optional[str]:
+        """Extract photo_id from /api/v1/photos/{id}/{variant} path (also absolute URLs)."""
+        raw = (path or "").strip()
+        if not raw:
+            return None
+
+        parsed_path = urlparse(raw).path if (raw.startswith("http://") or raw.startswith("https://")) else raw
+        match = re.match(r"^/api/v1/photos/([0-9a-fA-F-]{36})/(thumbnail|view|full|download)$", parsed_path)
+        if not match:
+            return None
+        return match.group(1)
+
+    @staticmethod
+    def _collect_photo_match_candidates(photo: Photo) -> set[str]:
+        """Collect all candidate identifiers/paths that can match a TMA foto file_path."""
+        candidates: set[str] = set()
+        photo_id = str(photo.id)
+
+        # API-style references
+        for variant in ("thumbnail", "view", "full", "download"):
+            candidates.add(f"/api/v1/photos/{photo_id}/{variant}")
+
+        # Storage-backed paths
+        filepath = (photo.filepath or "").strip()
+        if filepath:
+            candidates.add(filepath)
+
+        thumbnail_path = (photo.thumbnail_path or "").strip()
+        if thumbnail_path:
+            candidates.add(thumbnail_path)
+
+        return candidates
+
+    async def _build_tma_references_for_photos(
+        self,
+        normalized_site_id: str,
+        photos: List[Photo],
+        db: AsyncSession,
+    ) -> Dict[str, List[Dict[str, str]]]:
+        """
+        Build mapping photo_id -> TMA references, matching on:
+        - API-style path (/api/v1/photos/{id}/{variant})
+        - absolute URL containing the same API path
+        - stored Photo.filepath / Photo.thumbnail_path
+        """
+        if not photos:
+            return {}
+
+        photo_ids = {str(photo.id) for photo in photos}
+        references_map: Dict[str, List[Dict[str, str]]] = {photo_id: [] for photo_id in photo_ids}
+
+        candidate_to_photo_ids: Dict[str, set[str]] = defaultdict(set)
+        for photo in photos:
+            photo_id = str(photo.id)
+            for candidate in self._collect_photo_match_candidates(photo):
+                candidate_to_photo_ids[candidate].add(photo_id)
+
+        tma_query = (
+            select(
+                SchedaTMA.id.label("record_id"),
+                SchedaTMA.nctr.label("nctr"),
+                SchedaTMA.nctn.label("nctn"),
+                TMAFotografia.file_path.label("file_path"),
+            )
+            .join(TMAFotografia, TMAFotografia.scheda_id == SchedaTMA.id)
+            .where(SchedaTMA.site_id == normalized_site_id)
+        )
+
+        rows = (await db.execute(tma_query)).all()
+        seen_per_photo: Dict[str, set[str]] = defaultdict(set)
+
+        for row in rows:
+            raw_path = (row.file_path or "").strip()
+            if not raw_path:
+                continue
+
+            matched_photo_ids: set[str] = set()
+
+            # 1) Direct API photo path matching
+            api_photo_id = self._extract_photo_api_id(raw_path)
+            if api_photo_id and api_photo_id in photo_ids:
+                matched_photo_ids.add(api_photo_id)
+
+            # 2) Direct path/object matching
+            if raw_path in candidate_to_photo_ids:
+                matched_photo_ids.update(candidate_to_photo_ids[raw_path])
+
+            # 3) Absolute URL fallback (path part)
+            if raw_path.startswith("http://") or raw_path.startswith("https://"):
+                parsed_path = urlparse(raw_path).path
+                if parsed_path in candidate_to_photo_ids:
+                    matched_photo_ids.update(candidate_to_photo_ids[parsed_path])
+
+            if not matched_photo_ids:
+                continue
+
+            nctr = (row.nctr or "").strip()
+            nctn = str(row.nctn or "").strip().zfill(8)
+            nct = f"{nctr}{nctn}" if (nctr or nctn) else ""
+
+            ref = {
+                "record_id": str(row.record_id),
+                "nct": nct,
+                "label": f"TMA {nct}" if nct else "TMA",
+            }
+
+            for matched_photo_id in matched_photo_ids:
+                if ref["record_id"] in seen_per_photo[matched_photo_id]:
+                    continue
+                references_map.setdefault(matched_photo_id, []).append(ref)
+                seen_per_photo[matched_photo_id].add(ref["record_id"])
+
+        return references_map
 
     async def _query_us_photos(
         self,
@@ -267,7 +395,9 @@ class PhotoQueryService:
                 # Source marker
                 "source_type": "us_file",  # Mark as US photo
                 "upload_date": us_file.created_at.isoformat() if us_file.created_at else None,
-                "tags": []  # US files don't have tags
+                "tags": [],  # US files don't have tags
+                "tma_references": [],
+                "has_tma_references": False,
             }
             us_photos_data.append(us_photo_dict)
         
