@@ -2087,7 +2087,7 @@
             },
 
             async uploadSingleFile(file, fileName) {
-                const formData = new FormData();
+                let formData = new FormData();
                 formData.append('file', file);
                 formData.append('file_type', this.currentFileType);
 
