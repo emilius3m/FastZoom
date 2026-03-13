@@ -12,11 +12,19 @@
 
 {% block content %}
 {% set current_site_id = '' %}
+{% set breadcrumb_site_name = (current_site_name if current_site_name is defined and current_site_name else 'Sito') %}
+{% set breadcrumb_site_code = 'SITE' %}
 {% if site %}
     {% if site.id is defined and site.id %}
         {% set current_site_id = site.id %}
     {% elif site.site_id is defined and site.site_id %}
         {% set current_site_id = site.site_id %}
+    {% endif %}
+    {% if site.name is defined and site.name %}
+        {% set breadcrumb_site_name = site.name %}
+    {% endif %}
+    {% if site.code is defined and site.code %}
+        {% set breadcrumb_site_code = site.code %}
     {% endif %}
 {% elif site_id is defined and site_id %}
     {% set current_site_id = site_id %}
@@ -30,14 +38,16 @@
                 <div class="flex flex-col">
                     <!-- Breadcrumb Navigation -->
                     <nav class="flex items-center space-x-4 text-sm mb-2">
-                        <i class="fas fa-home text-gray-500 text-lg"></i>
+                        <a href="/dashboard" class="text-gray-500 hover:text-blue-600 transition-colors" title="Dashboard">
+                            <i class="fas fa-home text-lg"></i>
+                        </a>
                         <div class="flex items-center space-x-4">
-                            <span class="text-gray-400 text-lg">→</span>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
                             <a href="{% if current_site_id %}/view/{{ current_site_id }}/dashboard{% else %}/dashboard{% endif %}"
-                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
-                                {{ site.name if site is defined else "Sito" }} ({{ site.code if site is defined else 'SITE' }})
+                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                {{ breadcrumb_site_name }} ({{ breadcrumb_site_code }})
                             </a>
-                            <span class="text-gray-400 text-lg">→</span>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
                             <span class="text-gray-700 dark:text-gray-300 font-semibold px-2 py-1">Gestione US</span>
                         </div>
                     </nav>

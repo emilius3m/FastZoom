@@ -483,6 +483,16 @@
 {% endblock %}
 
 {% block content %}
+{% set current_site_id = '' %}
+{% if site %}
+    {% if site.id is defined and site.id %}
+        {% set current_site_id = site.id %}
+    {% elif site.site_id is defined and site.site_id %}
+        {% set current_site_id = site.site_id %}
+    {% endif %}
+{% elif site_id is defined and site_id %}
+    {% set current_site_id = site_id %}
+{% endif %}
 <div x-data="harrisMatrixEditor()" x-init="init()" class="mx-auto px-4 py-6">
 
     <!-- Header with Breadcrumbs -->
@@ -490,7 +500,7 @@
         <nav class="flex mb-4" aria-label="Breadcrumb">
             <ol class="inline-flex items-center space-x-1 md:space-x-3">
                 <li class="inline-flex items-center">
-                    <a href="/view/{{ site.id }}/dashboard"
+                    <a href="{% if current_site_id %}/view/{{ current_site_id }}/dashboard{% else %}/dashboard{% endif %}"
                         class="text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">
                         <i class="fas fa-home mr-2"></i>Dashboard
                     </a>
@@ -498,14 +508,14 @@
                 <li>
                     <div class="flex items-center">
                         <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <a href="/view/{{ site.id }}/us"
+                        <a href="{% if current_site_id %}/view/{{ current_site_id }}/us{% else %}/dashboard{% endif %}"
                             class="text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">US/USM</a>
                     </div>
                 </li>
                 <li>
                     <div class="flex items-center">
                         <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <a href="/view/{{ site.id }}/harris-matrix"
+                        <a href="{% if current_site_id %}/view/{{ current_site_id }}/us?tab=harris-matrix{% else %}/dashboard{% endif %}"
                             class="text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">Harris
                             Matrix</a>
                     </div>
@@ -1268,7 +1278,7 @@
                 },
 
                 // Site ID from template
-                siteId: '{{ site.id }}',
+                siteId: '{{ current_site_id if current_site_id is defined and current_site_id else (site.id if site and site.id is defined else (site.site_id if site and site.site_id is defined else (site_id if site_id is defined else ""))) }}',
 
                 /**
                  * CRITICAL: ID standardization helper
