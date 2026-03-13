@@ -116,6 +116,7 @@ class PhotoQueryService:
             photo_dict['file_url'] = f"/api/v1/photos/{photo.id}/full"
             photo_dict['thumbnail_url'] = f"/api/v1/photos/{photo.id}/thumbnail"
             photo_dict['download_url'] = f"/api/v1/photos/{photo.id}/download"
+            photo_dict['upload_date'] = photo.created_at.isoformat() if photo.created_at else None
             photo_dict['tags'] = photo.get_keywords_list()
             photo_dict['source_type'] = 'photo'  # Mark as general photo
             photo_dict['tma_references'] = tma_references_map.get(str(photo.id), [])
@@ -228,7 +229,7 @@ class PhotoQueryService:
             ref = {
                 "record_id": str(row.record_id),
                 "nct": nct,
-                "label": f"TMA {nct}" if nct else "TMA",
+                "label": nct if nct else "Scheda",
             }
 
             for matched_photo_id in matched_photo_ids:

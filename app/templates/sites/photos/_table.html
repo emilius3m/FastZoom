@@ -162,15 +162,16 @@
                     </div>
 
                     <!-- TMA References -->
-                    <div x-show="photo.has_tma_references" class="mt-2">
-                        <p class="text-[11px] font-semibold text-gray-500 mb-1 uppercase tracking-wide">TMA</p>
-                        <div class="flex flex-wrap gap-1">
+                    <div x-show="photo.has_tma_references" class="mt-2 flex flex-wrap items-center gap-1">
+                        <span class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mr-1">TMA</span>
+                        <div class="flex flex-wrap items-center gap-1">
                             <template x-for="ref in (photo.tma_references || []).slice(0, 2)" :key="`${photo.id}-grid-tma-${ref.record_id}`">
                                 <a
                                     :href="`/view/${getCurrentSiteId()}/tma?nct=${encodeURIComponent(ref.nct || '')}`"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full hover:bg-amber-200 transition-colors"
+                                    class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full transition-colors border border-amber-300"
+                                    style="background-color:#fef3c7;color:#92400e;"
                                     :title="`Apri TMA ${ref.nct || ''}`"
                                     x-text="ref.label || ('TMA ' + (ref.nct || ''))"></a>
                             </template>
@@ -296,7 +297,8 @@
                                                     :href="`/view/${getCurrentSiteId()}/tma?nct=${encodeURIComponent(ref.nct || '')}`"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full hover:bg-amber-200 transition-colors"
+                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full transition-colors border border-amber-300"
+                                                    style="background-color:#fef3c7;color:#92400e;"
                                                     :title="`Apri TMA ${ref.nct || ''}`"
                                                     x-text="ref.label || ('TMA ' + (ref.nct || ''))"></a>
                                             </template>
