@@ -1,126 +1,80 @@
-# Istruzioni per l'integrazione del Giornale di Cantiere in FastZoom
+﻿# Integrazione FastZoom
 
-## 1. AGGIORNAMENTO MODELLI ESISTENTI
+## Scopo
 
-### A. Aggiornare app/models/sites.py
-Aggiungere questa relazione alla classe `ArchaeologicalSite`:
+Questa guida descrive i punti di integrazione **attuali** del progetto FastZoom.
+Non e una checklist storica di migrazione: i moduli principali (Giornale, US/USM, Harris Matrix, foto, voice) sono gia integrati.
 
-```python
-# Relazione con i giornali di cantiere
-giornali_cantiere = relationship("GiornaleCantiere", back_populates="site", cascade="all, delete-orphan")
-```
+## Architettura di Integrazione
 
-### B. Aggiornare app/database/base.py  
-Nella funzione `init_models()`, aggiungere gli import:
+- Entrypoint app: `app/app.py`
+- Router API v1 aggregati: `app/routes/api/v1/__init__.py`
+- Config runtime: `app/core/config.py`
+- Config voice assistant: `app/core/pipecat_settings.py`
+- Storage immagini: servizi in `app/services/` (MinIO + Deep Zoom)
 
-```python
-# Import giornale di cantiere
-from ..models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere  # noqa: F401
-```
+## Integrazione API v1
 
-## 2. CREARE I NUOVI FILE
+Tutti i domini API sono montati sotto `/api/v1`.
+Le aree principali attive includono:
 
-### A. Copiare i file creati nella struttura corretta:
-- `giornale-cantiere-models.py` → `app/models/giornale_cantiere.py`
-- `giornale-cantiere-schemas.py` → `app/schemas/giornale_cantiere.py` 
-- `giornale-cantiere-routes.py` → `app/routes/api/giornale_cantiere.py`
+- Auth
+- Sites
+- Photos
+- Deep Zoom
+- Documents
+- US/USM
+- Harris Matrix (+ mapping/validation)
+- Giornale/Cantieri
+- Teams
+- TUS uploads
+- Voice (`/api/v1/voice`, `/api/v1/pipecat`)
 
-### B. Creare la route view (prossimo file da generare):
-- `app/routes/view/giornale_cantiere.py` - Route HTML per le pagine web
+Per estendere l'API:
 
-### C. Creare il template HTML:
-- `app/templates/pages/giornale_cantiere.html` - Template con Alpine.js
+1. creare il router in `app/routes/api/v1/<dominio>.py`
+2. includerlo in `app/routes/api/v1/__init__.py`
+3. verificare dipendenze auth/permessi
+4. aggiungere test in `tests/`
 
-## 3. AGGIORNARE app/app.py
+## Integrazione Frontend
 
-Aggiungere import e registrazione router:
+- Template: `app/templates/`
+- Static assets: `app/static/`
+- Componenti riusabili: `app/templates/sites/components/` e `app/templates/sites/photos/`
+- Le view routes HTML sono in `app/routes/view/`
 
-```python
-# Import del router giornale cantiere
-from app.routes.api.giornale_cantiere import router as giornale_cantiere_api_router
-from app.routes.view.giornale_cantiere import router as giornale_cantiere_view_router
+## Storage e File
 
-# Registrazione API router
-app.include_router(
-    giornale_cantiere_api_router,
-    tags=["giornale-cantiere"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]
-)
+FastZoom usa MinIO con profilo configurabile (`local` o `remote`):
 
-# Registrazione view router
-app.include_router(
-    giornale_cantiere_view_router,
-    tags=["Pages", "Giornale Cantiere"],
-    dependencies=[Depends(get_current_user_id_with_blacklist)]
-)
-```
+- variabili in `.env` (vedi `.env.example`)
+- selezione profilo tramite `MINIO_CONFIG_PROFILE`
+- Deep Zoom processato dai servizi dedicati in `app/services/deep_zoom*`
 
-## 4. MIGRATION DATABASE
+## Database e Migrazioni
 
-Creare migration Alembic:
+- ORM: SQLAlchemy async
+- Migrazioni: Alembic (`alembic/`, `alembic.ini`)
+
+Comandi standard:
 
 ```bash
-# Dalla root del progetto
-alembic revision --autogenerate -m "add giornale cantiere tables"
 alembic upgrade head
+pytest
 ```
 
-## 5. STRUTTURA FINALE
+## Integrazione Voice
 
-```
-app/
-├── models/
-│   ├── sites.py (AGGIORNATO)
-│   └── giornale_cantiere.py (NUOVO)
-├── schemas/
-│   └── giornale_cantiere.py (NUOVO)
-├── routes/
-│   ├── api/
-│   │   └── giornale_cantiere.py (NUOVO)
-│   └── view/
-│       └── giornale_cantiere.py (NUOVO)
-├── templates/
-│   └── pages/
-│       └── giornale_cantiere.html (NUOVO)
-├── database/
-│   └── base.py (AGGIORNATO)
-└── app.py (AGGIORNATO)
-```
+- HTTP planning/execution: `app/routes/api/v1/voice.py`
+- WebSocket streaming: `app/routes/api/v1/pipecat.py`
+- Whitelist tools: `app/services/voice_tools_registry.py`
+- Executor in-process ASGI: `app/services/voice_execute.py`
 
-## 6. FUNZIONALITÀ IMPLEMENTATE
+## Checklist per Nuove Integrazioni
 
-### API Endpoints:
-- `POST /api/giornale-cantiere/operatori` - Crea operatore
-- `GET /api/giornale-cantiere/operatori` - Lista operatori con filtri
-- `POST /api/giornale-cantiere/` - Crea giornale
-- `GET /api/giornale-cantiere/site/{site_id}` - Lista giornali per sito
-- `GET /api/giornale-cantiere/{id}` - Dettaglio giornale
-- `PUT /api/giornale-cantiere/{id}` - Aggiorna giornale
-- `POST /api/giornale-cantiere/{id}/valida` - Valida giornale
-- `DELETE /api/giornale-cantiere/{id}` - Elimina giornale
-- `GET /api/giornale-cantiere/site/{site_id}/stats` - Statistiche
-
-### Sicurezza:
-- Autenticazione con blacklist token
-- Controllo accessi per sito
-- Permessi di modifica (solo responsabile/superuser)
-- Validazione dati Pydantic
-- Protezione CSRF per form
-
-### Conformità Normativa:
-- Campi obbligatori secondo normative italiane
-- Enum per condizioni meteo
-- Tracking US/USM/USR elaborate
-- Gestione sopralluoghi e disposizioni
-- Firma digitale e validazione
-- Versioning delle modifiche
-
-## 7. PROSSIMI PASSI
-
-1. Copiare i file nella struttura corretta
-2. Aggiornare i file esistenti come indicato
-3. Eseguire la migration
-4. Creare view routes e template (prossimo file)
-5. Testare le funzionalità
-
-Il sistema è progettato per integrarsi perfettamente con l'architettura esistente di FastZoom, mantenendo tutte le convenzioni di sicurezza, autenticazione e multi-sito.
+1. Definire il confine del dominio (modelli, schema, service, route).
+2. Applicare sicurezza (auth + permessi sito).
+3. Aggiornare API router aggregato.
+4. Aggiungere test unit/integration.
+5. Aggiornare la documentazione correlata (`README.md` + file di dominio).
