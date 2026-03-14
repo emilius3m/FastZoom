@@ -115,6 +115,9 @@ async def compile_us_template(us: UnitaStratigrafica, template_path: Path, db: A
         '{{saggio}}': us.saggio or '',
         '{{posizione}}': us.posizione or '',
         '{{settori}}': us.settori or '',
+        # Campi presenti nel template MiC ma non ancora persistiti nel modello US
+        '{{quadrati}}': '',
+        '{{quote}}': '',
         '{{piante}}': piante_text,
         '{{prospetti}}': prospetti_text,
         '{{sezioni}}': sezioni_text,
@@ -324,13 +327,36 @@ def _replace_placeholders_in_doc(doc: Document, replacements: Dict[str, str]):
 
 
 def _replace_in_paragraph(paragraph, replacements: Dict[str, str]):
-    """Sostituisce placeholder in paragrafo mantenendo formattazione"""
+    """
+    Sostituisce placeholder in paragrafo.
+
+    Nota importante:
+    nei file .docx i placeholder possono essere spezzati su più run
+    (es. '{{us_' + 'code}}'), quindi una sostituzione run-by-run non li trova.
+    Per garantire compilazione completa, ricostruiamo il testo del paragrafo,
+    applichiamo tutte le sostituzioni e poi riscriviamo il contenuto.
+    """
+    if not paragraph.runs:
+        text = paragraph.text or ""
+        for placeholder, value in replacements.items():
+            text = text.replace(placeholder, str(value))
+        paragraph.text = text
+        return
+
+    full_text = ''.join(run.text for run in paragraph.runs)
+    updated_text = full_text
+
     for placeholder, value in replacements.items():
-        if placeholder in paragraph.text:
-            # Sostituisci in tutti i run
-            for run in paragraph.runs:
-                if placeholder in run.text:
-                    run.text = run.text.replace(placeholder, str(value))
+        updated_text = updated_text.replace(placeholder, str(value))
+
+    # Evita riscritture inutili
+    if updated_text == full_text:
+        return
+
+    # Mantiene lo stile del primo run, svuotando i successivi
+    paragraph.runs[0].text = updated_text
+    for run in paragraph.runs[1:]:
+        run.text = ''
 
 
 def generate_us_filename(us: UnitaStratigrafica) -> str:
@@ -750,4 +776,3 @@ async def get_supported_export_formats():
             'placeholders_count': 48
         }
     }
-
