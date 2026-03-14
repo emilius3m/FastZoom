@@ -1,43 +1,36 @@
-﻿# ER Diagram - FastZoom
+# ER Diagram - FastZoom (Modulare)
 
-## Stato Documento
+Questo documento ora funge da indice al modello ER modulare (6 moduli + 1 context map).
 
-Questo file e una sintesi architetturale aggiornata del dominio dati FastZoom.
-Per il dettaglio completo dei campi fare sempre riferimento ai modelli SQLAlchemy in `app/models/`.
+## Context Map
 
-## Domini Principali
+- [ER_CONTEXT_MAP.md](ER_CONTEXT_MAP.md)
 
-- Identity e Access
-  - utenti, profili, ruoli, permessi per sito, token blacklist
-- Siti archeologici
-  - anagrafica sito, stato, metadati geografici
-- Stratigrafia
-  - US, USM, relazioni Harris Matrix e mapping
-- Media e documenti
-  - foto, metadati, Deep Zoom, document management
-- Operativita cantiere
-  - giornale, operatori, mezzi, cantieri
-- Catalogazione
-  - moduli ICCD e schede correlate
+## Physical ER (source of truth)
 
-## Relazioni Chiave
+- [PHYSICAL_ER.md](PHYSICAL_ER.md)
+- Generator script: [scripts/generate_physical_er.py](scripts/generate_physical_er.py)
+- Regenerate with: `python scripts/generate_physical_er.py`
 
-1. `users` <-> `user_site_permissions` <-> `archaeological_sites`
-2. `archaeological_sites` -> entita operative (US/USM, foto, documenti, cantieri)
-3. `sequenza_fisica` (US/USM) -> grafo Harris Matrix
-4. oggetti media -> storage object (MinIO) + metadati applicativi
+## Moduli ER
 
-## Fonti di Verita
+| Modulo | Entità incluse | File |
+| --- | --- | --- |
+| ER-IAM | User, UserProfile, Role, UserSitePermission, UserActivity, TokenBlacklist | [ER_IAM.md](ER_IAM.md) |
+| ER-SiteCore | ArchaeologicalSite, GeographicMap, GeographicMapLayer, GeographicMapMarker, ArchaeologicalPlan | [ER_SITECORE.md](ER_SITECORE.md) |
+| ER-Stratigraphy | UnitaStratigrafica, UnitaStratigraficaMuraria, USFile, HarrisMatrixMapping, MatrixHarris | [ER_STRATIGRAPHY.md](ER_STRATIGRAPHY.md) |
+| ER-ICCD | ICCDBaseRecord, ICCDAuthorityFile, ICCDSchemaTemplate, SchedaTMA + child tables | [ER_ICCD.md](ER_ICCD.md) |
+| ER-Media | Photo, Document, TavolaGrafica, FotografiaArcheologica, ElencoConsegna | [ER_MEDIA.md](ER_MEDIA.md) |
+| ER-FieldOps | Cantiere, GiornaleCantiere, OperatoreCantiere, MezzoCantiere | [ER_FIELDOPS.md](ER_FIELDOPS.md) |
 
-- Modelli ORM: `app/models/`
-- Migrazioni: `alembic/` e `app/migrations/`
-- Servizi di dominio: `app/services/`
+## Regole di lettura
 
-## Nota Operativa
+- I diagrammi sono orientati al dominio e mantengono i soli campi chiave (PK/FK + identificativi funzionali).
+- Le relazioni cross-modulo sono rappresentate come entità esterne minimali quando necessario.
+- La fonte di verità tecnica resta nei modelli SQLAlchemy in `app/models/`.
 
-Se schema o naming cambiano, aggiornare nello stesso ciclo:
+## Workflow consigliato
 
-1. modelli
-2. migrazioni
-3. servizi/query
-4. documentazione
+1. Aggiorna i modelli ORM e/o migrazioni Alembic.
+2. Rigenera il physical ER con `python scripts/generate_physical_er.py`.
+3. Aggiorna solo i diagrammi modulari impattati (IAM/SiteCore/Stratigraphy/ICCD/Media/FieldOps).
