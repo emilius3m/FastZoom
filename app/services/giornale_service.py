@@ -1,17 +1,76 @@
 from typing import List, Dict, Any, Optional
 from uuid import UUID
-from datetime import date, time
+from datetime import date, time, datetime
+import hashlib
+import json
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from app.repositories.giornale_repository import GiornaleRepository
 from app.models.giornale_cantiere import GiornaleCantiere
+from app.models.users import User
 
 class GiornaleService:
     def __init__(self, db_session: AsyncSession):
         self.repository = GiornaleRepository(db_session)
         self.db = db_session
+
+    async def _is_superuser(self, user_id: UUID) -> bool:
+        user = await self.db.get(User, str(user_id))
+        return bool(user and user.is_superuser)
+
+    async def _ensure_responsabile_or_superuser(self, giornale: GiornaleCantiere, user_id: UUID) -> None:
+        if str(giornale.responsabile_id) == str(user_id):
+            return
+        if await self._is_superuser(user_id):
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operazione consentita solo al responsabile del giornale o a un superuser",
+        )
+
+    @staticmethod
+    def _compute_content_hash(giornale: GiornaleCantiere) -> str:
+        payload = {
+            "id": str(giornale.id),
+            "site_id": str(giornale.site_id),
+            "cantiere_id": str(giornale.cantiere_id) if giornale.cantiere_id else None,
+            "data": giornale.data.isoformat() if giornale.data else None,
+            "ora_inizio": giornale.ora_inizio.isoformat() if giornale.ora_inizio else None,
+            "ora_fine": giornale.ora_fine.isoformat() if giornale.ora_fine else None,
+            "descrizione_lavori": giornale.descrizione_lavori,
+            "condizioni_meteo": giornale.condizioni_meteo,
+            "responsabile_id": str(giornale.responsabile_id) if giornale.responsabile_id else None,
+            "us_elaborate": giornale.us_elaborate,
+            "usm_elaborate": giornale.usm_elaborate,
+            "usr_elaborate": giornale.usr_elaborate,
+            "materiali_rinvenuti": giornale.materiali_rinvenuti,
+            "documentazione_prodotta": giornale.documentazione_prodotta,
+            "note_generali": giornale.note_generali,
+            "problematiche": giornale.problematiche,
+        }
+        canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _append_audit_event(giornale: GiornaleCantiere, event_type: str, actor_id: UUID, data: Dict[str, Any]) -> None:
+        try:
+            audit = json.loads(giornale.validation_audit) if giornale.validation_audit else []
+            if not isinstance(audit, list):
+                audit = []
+        except Exception:
+            audit = []
+
+        audit.append(
+            {
+                "event_type": event_type,
+                "actor_id": str(actor_id),
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": data,
+            }
+        )
+        giornale.validation_audit = json.dumps(audit, ensure_ascii=False)
 
     async def _resolve_mezzi_associations(
         self,
@@ -25,7 +84,7 @@ class GiornaleService:
         Returns:
             {
                 "associations": [{"mezzo_id": "...", "ore_utilizzo": float|None, "note_utilizzo": str}],
-                "display_value": "stringa leggibile per compatibilità storica"
+                "display_value": "stringa leggibile per compatibilitÃ  storica"
             }
         """
         mezzi_payload = payload.get("mezzi")
@@ -133,7 +192,7 @@ class GiornaleService:
                 if strict:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Uno o più mezzi selezionati non sono assegnati al sito"
+                        detail="Uno o piÃ¹ mezzi selezionati non sono assegnati al sito"
                     )
                 continue
 
@@ -251,6 +310,16 @@ class GiornaleService:
             "forniture": g.forniture,
             "data_validazione": g.data_validazione.isoformat() if g.data_validazione else None,
             "firma_digitale_hash": g.firma_digitale_hash,
+            "validated_by_id": str(g.validated_by_id) if g.validated_by_id else None,
+            "content_hash": g.content_hash,
+            "legal_freeze_at": g.legal_freeze_at.isoformat() if g.legal_freeze_at else None,
+            "signature_type": g.signature_type,
+            "signed_file_path": g.signed_file_path,
+            "signature_reference": g.signature_reference,
+            "signature_timestamp": g.signature_timestamp.isoformat() if g.signature_timestamp else None,
+            "protocol_number": g.protocol_number,
+            "protocol_date": g.protocol_date.isoformat() if g.protocol_date else None,
+            "legal_status": g.legal_status,
             "allegati_paths": g.allegati_paths,
             "created_at": g.created_at.isoformat() if g.created_at else None,
             "updated_at": g.updated_at.isoformat() if g.updated_at else None,
@@ -373,7 +442,7 @@ class GiornaleService:
                 if not is_valid_op:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"L'operatore {op_id} non è assegnato al sito {site_id}"
+                        detail=f"L'operatore {op_id} non Ã¨ assegnato al sito {site_id}"
                     )
                 
                 await self.repository.add_operatore_association(
@@ -400,7 +469,8 @@ class GiornaleService:
         self,
         site_id: UUID,
         giornale_id: UUID,
-        giornale_data: Dict[str, Any]
+        giornale_data: Dict[str, Any],
+        user_id: UUID
     ) -> GiornaleCantiere:
         """
         Aggiorna giornale esistente
@@ -410,6 +480,12 @@ class GiornaleService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Giornale non trovato"
+            )
+        await self._ensure_responsabile_or_superuser(giornale, user_id)
+        if giornale.validato:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Giornale validato: modifica non consentita (record congelato legalmente)",
             )
 
         # Validate cantiere ownership if changed
@@ -442,7 +518,7 @@ class GiornaleService:
                     if not is_valid_op:
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"L'operatore {op_id} non è assegnato al sito {site_id}"
+                            detail=f"L'operatore {op_id} non Ã¨ assegnato al sito {site_id}"
                         )
                         
                     await self.repository.add_operatore_association(
@@ -497,39 +573,148 @@ class GiornaleService:
         await self.db.refresh(giornale)
         return giornale
 
-    async def validate_giornale(self, site_id: UUID, giornale_id: UUID) -> GiornaleCantiere:
-        """Valida il giornale"""
+    async def validate_giornale(
+        self,
+        site_id: UUID,
+        giornale_id: UUID,
+        user_id: UUID,
+        legal_data: Optional[Dict[str, Any]] = None
+    ) -> GiornaleCantiere:
+        """Valida il giornale e ne congela il contenuto per workflow legale."""
         giornale = await self.repository.get(giornale_id)
         if not giornale or str(giornale.site_id) != str(site_id):
             raise HTTPException(status_code=404, detail="Giornale non trovato")
-        
+        await self._ensure_responsabile_or_superuser(giornale, user_id)
+
         if giornale.validato:
-            raise HTTPException(status_code=400, detail="Giornale già validato")
-            
+            raise HTTPException(status_code=400, detail="Giornale giÃ  validato")
+
+        legal_data = legal_data or {}
         giornale.validato = True
-        giornale.data_validazione = date.today()
+        giornale.data_validazione = datetime.utcnow()
+        giornale.validated_by_id = str(user_id)
+        giornale.content_hash = self._compute_content_hash(giornale)
+        giornale.legal_freeze_at = datetime.utcnow()
+        giornale.firma_digitale_hash = legal_data.get("firma_digitale_hash") or giornale.firma_digitale_hash
+        giornale.signature_type = legal_data.get("signature_type")
+        giornale.signed_file_path = legal_data.get("signed_file_path")
+        giornale.signature_reference = legal_data.get("signature_reference")
+        if legal_data.get("signature_timestamp"):
+            giornale.signature_timestamp = datetime.fromisoformat(legal_data["signature_timestamp"])
+        if legal_data.get("protocol_date"):
+            giornale.protocol_date = date.fromisoformat(legal_data["protocol_date"])
+        giornale.protocol_number = legal_data.get("protocol_number")
+
+        if giornale.protocol_number and giornale.signature_type:
+            giornale.legal_status = "protocolled"
+        elif giornale.signature_type:
+            giornale.legal_status = "signed"
+        else:
+            giornale.legal_status = "validated"
+
+        self._append_audit_event(
+            giornale,
+            "validated",
+            user_id,
+            {
+                "legal_status": giornale.legal_status,
+                "protocol_number": giornale.protocol_number,
+                "signature_type": giornale.signature_type,
+            },
+        )
         await self.db.commit()
         await self.db.refresh(giornale)
         return giornale
 
-    async def delete_giornale(self, site_id: UUID, giornale_id: UUID):
+    async def update_legal_metadata(
+        self,
+        site_id: UUID,
+        giornale_id: UUID,
+        user_id: UUID,
+        legal_data: Dict[str, Any]
+    ) -> GiornaleCantiere:
+        """Aggiorna metadati legali post-validazione senza sbloccare il record."""
+        giornale = await self.repository.get(giornale_id)
+        if not giornale or str(giornale.site_id) != str(site_id):
+            raise HTTPException(status_code=404, detail="Giornale non trovato")
+        await self._ensure_responsabile_or_superuser(giornale, user_id)
+        if not giornale.validato:
+            raise HTTPException(status_code=409, detail="Il giornale deve essere prima validato")
+
+        if "firma_digitale_hash" in legal_data:
+            giornale.firma_digitale_hash = legal_data.get("firma_digitale_hash")
+        if "signature_type" in legal_data:
+            giornale.signature_type = legal_data.get("signature_type")
+        if "signed_file_path" in legal_data:
+            giornale.signed_file_path = legal_data.get("signed_file_path")
+        if "signature_reference" in legal_data:
+            giornale.signature_reference = legal_data.get("signature_reference")
+        if legal_data.get("signature_timestamp"):
+            giornale.signature_timestamp = datetime.fromisoformat(legal_data["signature_timestamp"])
+        if "protocol_number" in legal_data:
+            giornale.protocol_number = legal_data.get("protocol_number")
+        if legal_data.get("protocol_date"):
+            giornale.protocol_date = date.fromisoformat(legal_data["protocol_date"])
+
+        if giornale.protocol_number and giornale.signature_type:
+            giornale.legal_status = "protocolled"
+        elif giornale.signature_type:
+            giornale.legal_status = "signed"
+        else:
+            giornale.legal_status = "validated"
+
+        self._append_audit_event(
+            giornale,
+            "legal_metadata_updated",
+            user_id,
+            {
+                "legal_status": giornale.legal_status,
+                "protocol_number": giornale.protocol_number,
+                "signature_type": giornale.signature_type,
+            },
+        )
+        await self.db.commit()
+        await self.db.refresh(giornale)
+        return giornale
+
+    async def delete_giornale(self, site_id: UUID, giornale_id: UUID, user_id: UUID):
         """Elimina il giornale"""
         giornale = await self.repository.get(giornale_id)
         if not giornale or str(giornale.site_id) != str(site_id):
             raise HTTPException(status_code=404, detail="Giornale non trovato")
-            
+        await self._ensure_responsabile_or_superuser(giornale, user_id)
+        if giornale.validato:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Giornale validato: eliminazione non consentita (record congelato legalmente)",
+            )
+
         await self.repository.clear_operatore_associations(giornale.id)
         await self.repository.clear_mezzo_associations(giornale.id)
         await self.repository.remove(giornale.id)
         return True
 
-    async def link_photo(self, site_id: UUID, giornale_id: UUID, foto_id: UUID, didascalia: str = None, ordine: int = 0):
+    async def link_photo(
+        self,
+        site_id: UUID,
+        giornale_id: UUID,
+        foto_id: UUID,
+        user_id: UUID,
+        didascalia: str = None,
+        ordine: int = 0
+    ):
         """Link photo"""
         # Verify access
         giornale = await self.repository.get(giornale_id)
         if not giornale or str(giornale.site_id) != str(site_id):
             raise HTTPException(status_code=404, detail="Giornale non trovato")
-            
+        await self._ensure_responsabile_or_superuser(giornale, user_id)
+        if giornale.validato:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Giornale validato: modifica allegati non consentita",
+            )
+
         # Verify photo (generic repo check or direct query)
         # Using direct query for simplicity as we don't have PhotoService injected yet
         from app.models.documentation_and_field import Photo
@@ -538,17 +723,23 @@ class GiornaleService:
             raise HTTPException(status_code=404, detail="Foto non trovata")
 
         if await self.repository.check_photo_linked(giornale_id, foto_id):
-             raise HTTPException(status_code=400, detail="Foto già collegata")
-             
+             raise HTTPException(status_code=400, detail="Foto giÃ  collegata")
+
         await self.repository.link_photo(giornale_id, foto_id, didascalia, ordine)
         await self.db.commit()
 
-    async def unlink_photo(self, site_id: UUID, giornale_id: UUID, foto_id: UUID):
+    async def unlink_photo(self, site_id: UUID, giornale_id: UUID, foto_id: UUID, user_id: UUID):
         """Unlink photo"""
         giornale = await self.repository.get(giornale_id)
         if not giornale or str(giornale.site_id) != str(site_id):
             raise HTTPException(status_code=404, detail="Giornale non trovato")
-            
+        await self._ensure_responsabile_or_superuser(giornale, user_id)
+        if giornale.validato:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Giornale validato: modifica allegati non consentita",
+            )
+
         success = await self.repository.unlink_photo(giornale_id, foto_id)
         if not success:
             raise HTTPException(status_code=404, detail="Associazione non trovata")
@@ -586,4 +777,5 @@ class GiornaleService:
             "data": operators_data,
             "count": total
         }
+
 

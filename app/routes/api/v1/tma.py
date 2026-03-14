@@ -25,6 +25,7 @@ from app.models.tma import (
     TMAMotivazioneCronologia,
 )
 from app.models.documentation_and_field import Photo
+from app.models.user_activity import UserActivity
 from app.schemas.tma import SchedaTMACreate, SchedaTMAUpdate, SchedaTMARead
 from app.services.photo_serving_service import photo_serving_service
 from app.services.archaeological_minio_service import archaeological_minio_service
@@ -243,6 +244,16 @@ async def create_tma_record(
             db.add(TMAFunzionario(scheda_id=scheda.id, ordine=idx, nome=item))
 
         await db.commit()
+        
+        nct_full = f"{scheda.nctr or ''}{scheda.nctn or ''}"
+        await UserActivity.log_tma_action(
+            db=db,
+            user_id=str(user_id),
+            action="create",
+            tomba_id=str(scheda.id),
+            site_id=str(site_id),
+            nct=nct_full
+        )
     except Exception as exc:
         await db.rollback()
         raise HTTPException(status_code=422, detail=f"Errore validazione/salvataggio TMA: {str(exc)}")
@@ -435,6 +446,16 @@ async def update_tma_record(
 
     try:
         await db.commit()
+        
+        nct_full = f"{row.nctr or ''}{row.nctn or ''}"
+        await UserActivity.log_tma_action(
+            db=db,
+            user_id=str(user_id),
+            action="update",
+            tomba_id=str(row.id),
+            site_id=str(site_id),
+            nct=nct_full
+        )
     except Exception as exc:
         await db.rollback()
         raise HTTPException(status_code=422, detail=f"Errore aggiornamento TMA: {str(exc)}")
@@ -455,6 +476,7 @@ async def delete_tma_record(
     site_id: UUID,
     record_id: str,
     db: AsyncSession = Depends(get_database_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
 ):
     if not await verify_site_access(site_id, user_sites):
@@ -464,8 +486,18 @@ async def delete_tma_record(
     if not row or row.site_id != str(site_id):
         raise HTTPException(status_code=404, detail="Record TMA non trovato")
 
+    nct_full = f"{row.nctr or ''}{row.nctn or ''}"
     await db.delete(row)
     await db.commit()
+    
+    await UserActivity.log_tma_action(
+        db=db,
+        user_id=str(user_id),
+        action="delete",
+        tomba_id=str(record_id),
+        site_id=str(site_id),
+        nct=nct_full
+    )
     return
 
 

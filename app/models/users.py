@@ -96,7 +96,11 @@ class User(Base, SoftDeleteMixin):
                                  back_populates="creator")
     uploaded_documents = relationship("Document", foreign_keys="Document.uploaded_by", back_populates="uploader")
     created_forms = relationship("FormSchema", foreign_keys="FormSchema.created_by", back_populates="creator")
-    giornali_cantiere = relationship("GiornaleCantiere", back_populates="responsabile")
+    giornali_cantiere = relationship(
+        "GiornaleCantiere",
+        foreign_keys="GiornaleCantiere.responsabile_id",
+        back_populates="responsabile"
+    )
     activities = relationship("UserActivity", back_populates="user", cascade="all, delete-orphan")
     profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
 

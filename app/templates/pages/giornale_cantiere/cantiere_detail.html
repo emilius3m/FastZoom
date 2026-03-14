@@ -339,9 +339,21 @@
                                                 </div>
                                                 <div class="text-xs text-gray-500 dark:text-gray-400"
                                                     x-text="new Date(giornale.data).getFullYear()"></div>
-                                                <div class="mt-1 text-xs px-2 py-0.5 rounded-full inline-block"
-                                                    :class="giornale.validato ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'">
-                                                    <span x-text="giornale.validato ? 'Validato' : 'Bozza'"></span>
+                                                <div class="mt-1 flex flex-wrap gap-1">
+                                                    <div class="text-xs px-2 py-0.5 rounded-full inline-block"
+                                                        :class="giornale.validato ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'">
+                                                        <span x-text="giornale.validato ? 'Validato' : 'Bozza'"></span>
+                                                    </div>
+                                                    <div x-show="giornale.validato"
+                                                        class="text-xs px-2 py-0.5 rounded-full inline-block"
+                                                        :class="['signed','protocolled','complete','finalized','archived'].includes((giornale.legal_status || '').toLowerCase())
+                                                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300'
+                                                            : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300'">
+                                                        <span
+                                                            x-text="['signed','protocolled','complete','finalized','archived'].includes((giornale.legal_status || '').toLowerCase())
+                                                                ? 'Legale: completo'
+                                                                : 'Legale: in attesa firma'"></span>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -825,6 +837,15 @@
                 operatori_ids: [],
                 mezzi_ids: []
             },
+            legalData: {
+                signature_type: '',
+                firma_digitale_hash: '',
+                signature_reference: '',
+                signature_timestamp: '',
+                signed_file_path: '',
+                protocol_number: '',
+                protocol_date: ''
+            },
 
             // Available options (these would normally be loaded from API)
             condizioni_meteo: [
@@ -867,6 +888,7 @@
                 this.editingGiornale = data.editingGiornale;
                 this.editingGiornaleData = data.editingGiornaleData;
                 this.formData = data.formData;
+                this.legalData = this.prepareLegalDataFromGiornale(data.editingGiornaleData);
 
                 // Load operators before showing the modal
                 await this.loadOperatoriDisponibili();
@@ -916,6 +938,84 @@
             closeModal() {
                 this.showCreateModal = false;
                 this.errorMessage = '';
+            },
+
+            prepareLegalDataFromGiornale(giornale) {
+                if (!giornale) {
+                    return {
+                        signature_type: '',
+                        firma_digitale_hash: '',
+                        signature_reference: '',
+                        signature_timestamp: '',
+                        signed_file_path: '',
+                        protocol_number: '',
+                        protocol_date: ''
+                    };
+                }
+
+                const toDateInput = (value) => {
+                    if (!value) return '';
+                    const raw = String(value);
+                    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+                    const parsed = new Date(raw);
+                    if (Number.isNaN(parsed.getTime())) return '';
+                    return parsed.toISOString().slice(0, 10);
+                };
+
+                const toDatetimeLocalInput = (value) => {
+                    if (!value) return '';
+                    const raw = String(value);
+                    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw)) return raw.slice(0, 16);
+                    const parsed = new Date(raw);
+                    if (Number.isNaN(parsed.getTime())) return '';
+                    return parsed.toISOString().slice(0, 16);
+                };
+
+                const signatureTimestamp = giornale.signature_timestamp
+                    ? toDatetimeLocalInput(giornale.signature_timestamp)
+                    : '';
+                const protocolDate = giornale.protocol_date
+                    ? toDateInput(giornale.protocol_date)
+                    : '';
+
+                return {
+                    signature_type: giornale.signature_type || '',
+                    firma_digitale_hash: '',
+                    signature_reference: giornale.signature_reference || '',
+                    signature_timestamp: signatureTimestamp,
+                    signed_file_path: giornale.signed_file_path || '',
+                    protocol_number: giornale.protocol_number || '',
+                    protocol_date: protocolDate
+                };
+            },
+
+            buildLegalPayload() {
+                const payload = {
+                    signature_type: this.legalData.signature_type?.trim() || '',
+                    firma_digitale_hash: this.legalData.firma_digitale_hash?.trim() || '',
+                    signature_reference: this.legalData.signature_reference?.trim() || '',
+                    signature_timestamp: this.legalData.signature_timestamp || '',
+                    signed_file_path: this.legalData.signed_file_path?.trim() || '',
+                    protocol_number: this.legalData.protocol_number?.trim() || '',
+                    protocol_date: this.legalData.protocol_date || ''
+                };
+
+                return Object.fromEntries(
+                    Object.entries(payload).filter(([, value]) => value !== '')
+                );
+            },
+
+            async parseApiError(response, fallbackMessage) {
+                let message = fallbackMessage;
+                try {
+                    const data = await response.json();
+                    if (data?.detail) {
+                        message = data.detail;
+                    }
+                } catch (_) {
+                    // ignore parse error, keep fallback
+                }
+                return message;
             },
 
             resetForm() {
@@ -977,6 +1077,7 @@
                         operatori_ids: [],
                         mezzi_ids: []
                     };
+                    this.legalData = this.prepareLegalDataFromGiornale(null);
 
                     // Reset enhanced operator data
                     this.operatori_data = {};
@@ -1824,16 +1925,23 @@
                     this.saving = true;
                     this.errorMessage = '';
 
+                    const payload = this.buildLegalPayload();
                     const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}/validate`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                        }
+                        },
+                        body: JSON.stringify({ legal_data: payload })
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Errore durante la validazione del giornale');
+                        if (response.status === 403) {
+                            throw new Error(await this.parseApiError(response, 'Non hai i permessi per validare questo giornale'));
+                        }
+                        if (response.status === 409) {
+                            throw new Error(await this.parseApiError(response, 'Il giornale risulta già validato o bloccato'));
+                        }
+                        throw new Error(await this.parseApiError(response, 'Errore durante la validazione del giornale'));
                     }
 
                     const result = await response.json();
@@ -1842,6 +1950,9 @@
                     if (this.editingGiornaleData) {
                         this.editingGiornaleData.validato = true;
                         this.editingGiornaleData.data_validazione = result.data_validazione;
+                        this.editingGiornaleData.legal_status = result.legal_status || this.editingGiornaleData.legal_status;
+                        this.editingGiornaleData.content_hash = result.content_hash || this.editingGiornaleData.content_hash;
+                        this.editingGiornaleData.legal_freeze_at = result.legal_freeze_at || this.editingGiornaleData.legal_freeze_at;
                     }
 
                     this.showAlert('success', 'Giornale validato con successo');
@@ -1850,12 +1961,71 @@
                     const giornaliApp = document.querySelector('[x-data*="giornaliListApp"]');
                     if (giornaliApp) {
                         // Dispatch event to refresh the list
-                        this.$dispatch('giornale-validated', { giornaleId: this.editingGiornaleData.id });
+                        this.$dispatch('giornale-validated', {
+                            giornaleId: this.editingGiornaleData.id,
+                            legal_status: result.legal_status || null,
+                            content_hash: result.content_hash || null,
+                            legal_freeze_at: result.legal_freeze_at || null
+                        });
                     }
 
                 } catch (error) {
                     this.errorMessage = error.message || 'Errore durante la validazione del giornale';
                     console.error('Error validating giornale:', error);
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            async saveLegalMetadata() {
+                if (!this.editingGiornaleData || !this.editingGiornaleData.id) {
+                    this.errorMessage = 'Nessun giornale selezionato';
+                    return;
+                }
+
+                if (!this.editingGiornaleData.validato) {
+                    this.errorMessage = 'I metadati legali sono aggiornabili solo dopo la validazione';
+                    return;
+                }
+
+                try {
+                    this.saving = true;
+                    this.errorMessage = '';
+
+                    const payload = this.buildLegalPayload();
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}/legal-metadata`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 403) {
+                            throw new Error(await this.parseApiError(response, 'Non hai i permessi per aggiornare i metadati legali'));
+                        }
+                        if (response.status === 409) {
+                            throw new Error(await this.parseApiError(response, 'Aggiornamento metadati non consentito nello stato attuale'));
+                        }
+                        throw new Error(await this.parseApiError(response, 'Errore durante il salvataggio dei metadati legali'));
+                    }
+
+                    const result = await response.json();
+                    if (this.editingGiornaleData) {
+                        this.editingGiornaleData.signature_type = result.signature_type || '';
+                        this.editingGiornaleData.signature_reference = result.signature_reference || '';
+                        this.editingGiornaleData.signature_timestamp = result.signature_timestamp || '';
+                        this.editingGiornaleData.signed_file_path = result.signed_file_path || '';
+                        this.editingGiornaleData.protocol_number = result.protocol_number || '';
+                        this.editingGiornaleData.protocol_date = result.protocol_date || '';
+                        this.editingGiornaleData.legal_status = result.legal_status || this.editingGiornaleData.legal_status;
+                    }
+
+                    this.showAlert('success', 'Metadati legali aggiornati');
+                } catch (error) {
+                    this.errorMessage = error.message || 'Errore durante il salvataggio dei metadati legali';
+                    console.error('Error saving legal metadata:', error);
                 } finally {
                     this.saving = false;
                 }
@@ -2036,6 +2206,9 @@
                     const index = this.giornali.findIndex(g => g.id === giornaleId);
                     if (index !== -1) {
                         this.giornali[index].validato = true;
+                        if (e.detail.legal_status) this.giornali[index].legal_status = e.detail.legal_status;
+                        if (e.detail.content_hash) this.giornali[index].content_hash = e.detail.content_hash;
+                        if (e.detail.legal_freeze_at) this.giornali[index].legal_freeze_at = e.detail.legal_freeze_at;
                         // Optional: reload specific item or just update UI flag
                     }
                 });

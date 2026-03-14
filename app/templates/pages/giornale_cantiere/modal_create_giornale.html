@@ -1143,6 +1143,23 @@
                                                 Il giornale non è ancora stato validato
                                             </span>
                                         </p>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-2"
+                                            x-show="editingGiornaleData && editingGiornaleData.validato">
+                                            <div>
+                                                Stato legale:
+                                                <span class="font-medium"
+                                                    x-text="editingGiornaleData.legal_status || 'validated_pending_signature'"></span>
+                                            </div>
+                                            <div>
+                                                Freeze:
+                                                <span class="font-medium"
+                                                    x-text="editingGiornaleData.legal_freeze_at ? new Date(editingGiornaleData.legal_freeze_at).toLocaleString('it-IT') : 'n/d'"></span>
+                                            </div>
+                                            <div>
+                                                Hash contenuto:
+                                                <span class="font-mono" x-text="editingGiornaleData.content_hash || 'n/d'"></span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1154,6 +1171,81 @@
                                         <i x-show="saving" class="fas fa-spinner fa-spin mr-2"></i>
                                         <i x-show="!saving" class="fas fa-check-circle mr-2"></i>
                                         <span x-text="saving ? 'Validazione...' : 'Valida Giornale'"></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Metadati legali -->
+                            <div class="mt-4 border-t border-gray-200 dark:border-gray-600 pt-4">
+                                <h5 class="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                                    Metadati Legali e Firma
+                                </h5>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Tipo firma
+                                        </label>
+                                        <select x-model="legalData.signature_type"
+                                            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                            <option value="">Non specificato</option>
+                                            <option value="digitale">Digitale</option>
+                                            <option value="elettronica_avanzata">Elettronica avanzata</option>
+                                            <option value="autografa_scansita">Autografa scansita</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Hash firma digitale
+                                        </label>
+                                        <input type="text" x-model="legalData.firma_digitale_hash"
+                                            placeholder="SHA256 / riferimento hash"
+                                            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Riferimento firma
+                                        </label>
+                                        <input type="text" x-model="legalData.signature_reference"
+                                            placeholder="ID firma remota / seriale certificato"
+                                            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Timestamp firma
+                                        </label>
+                                        <input type="datetime-local" x-model="legalData.signature_timestamp"
+                                            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Percorso file firmato
+                                        </label>
+                                        <input type="text" x-model="legalData.signed_file_path"
+                                            placeholder="/signed/giornale_2026-03-14.p7m"
+                                            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Numero protocollo
+                                        </label>
+                                        <input type="text" x-model="legalData.protocol_number"
+                                            placeholder="Prot. 1234/2026"
+                                            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            Data protocollo
+                                        </label>
+                                        <input type="date" x-model="legalData.protocol_date"
+                                            class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                    </div>
+                                </div>
+                                <div class="mt-3" x-show="editingGiornaleData && editingGiornaleData.validato">
+                                    <button type="button" @click="saveLegalMetadata()" :disabled="saving"
+                                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm flex items-center">
+                                        <i x-show="saving" class="fas fa-spinner fa-spin mr-2"></i>
+                                        <i x-show="!saving" class="fas fa-save mr-2"></i>
+                                        <span>Aggiorna metadati legali</span>
                                     </button>
                                 </div>
                             </div>

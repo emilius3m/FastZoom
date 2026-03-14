@@ -290,7 +290,7 @@ async def v1_update_giornale(
     try:
         site_info = verify_site_access(site_id, user_sites)
         service = GiornaleService(db)
-        giornale = await service.update_giornale(site_id, giornale_id, giornale_data)
+        giornale = await service.update_giornale(site_id, giornale_id, giornale_data, current_user_id)
 
         return {
             "id": str(giornale.id),
@@ -300,6 +300,8 @@ async def v1_update_giornale(
         }
     except (InsufficientPermissionsError, SiteNotFoundError, ResourceNotFoundError, DomainValidationError):
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Errore aggiornamento giornale: {str(e)}")
         raise HTTPException(status_code=500, detail="Errore nell'aggiornamento del giornale")
@@ -308,6 +310,7 @@ async def v1_update_giornale(
 async def v1_validate_giornale(
     site_id: UUID,
     giornale_id: UUID,
+    legal_data: Optional[Dict[str, Any]] = None,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_database_session)
@@ -318,15 +321,20 @@ async def v1_validate_giornale(
     try:
         site_info = verify_site_access(site_id, user_sites)
         service = GiornaleService(db)
-        giornale = await service.validate_giornale(site_id, giornale_id)
+        giornale = await service.validate_giornale(site_id, giornale_id, current_user_id, legal_data)
         
         return {
             "id": str(giornale.id),
             "message": "Giornale validato con successo",
             "data_validazione": giornale.data_validazione.isoformat(),
-            "validato": True
+            "validato": True,
+            "legal_status": giornale.legal_status,
+            "content_hash": giornale.content_hash,
+            "legal_freeze_at": giornale.legal_freeze_at.isoformat() if giornale.legal_freeze_at else None,
         }
     except (InsufficientPermissionsError, SiteNotFoundError, ResourceNotFoundError):
+        raise
+    except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Errore validazione giornale: {str(e)}")
@@ -346,7 +354,7 @@ async def v1_delete_giornale(
     try:
         site_info = verify_site_access(site_id, user_sites)
         service = GiornaleService(db)
-        await service.delete_giornale(site_id, giornale_id)
+        await service.delete_giornale(site_id, giornale_id, current_user_id)
         
         return {
             "message": "Giornale eliminato con successo",
@@ -354,9 +362,43 @@ async def v1_delete_giornale(
         }
     except (InsufficientPermissionsError, SiteNotFoundError, ResourceNotFoundError):
         raise
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Errore eliminazione giornale: {str(e)}")
         raise HTTPException(status_code=500, detail="Errore nell'eliminazione del giornale")
+
+
+@router.put("/sites/{site_id}/giornali/{giornale_id}/legal-metadata", summary="Aggiorna metadati legali", tags=["Giornale di Cantiere"])
+async def v1_update_legal_metadata(
+    site_id: UUID,
+    giornale_id: UUID,
+    legal_data: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """
+    Aggiorna metadati legali post-validazione (firma/protocollo) senza rendere il record modificabile.
+    """
+    try:
+        verify_site_access(site_id, user_sites)
+        service = GiornaleService(db)
+        giornale = await service.update_legal_metadata(site_id, giornale_id, current_user_id, legal_data)
+        return {
+            "id": str(giornale.id),
+            "message": "Metadati legali aggiornati con successo",
+            "legal_status": giornale.legal_status,
+            "protocol_number": giornale.protocol_number,
+            "signature_type": giornale.signature_type,
+        }
+    except (InsufficientPermissionsError, SiteNotFoundError, ResourceNotFoundError):
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore aggiornamento metadati legali: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nell'aggiornamento dei metadati legali")
 
 # MIGRATION HELPER
 
@@ -1526,7 +1568,7 @@ async def v1_link_foto_to_giornale(
     try:
         site_info = verify_site_access(site_id, user_sites)
         service = GiornaleService(db)
-        await service.link_photo(site_id, giornale_id, foto_id, didascalia, ordine)
+        await service.link_photo(site_id, giornale_id, foto_id, current_user_id, didascalia, ordine)
         
         return {
             "message": "Foto collegata con successo",
@@ -1556,7 +1598,7 @@ async def v1_unlink_foto_from_giornale(
     try:
         site_info = verify_site_access(site_id, user_sites)
         service = GiornaleService(db)
-        await service.unlink_photo(site_id, giornale_id, foto_id)
+        await service.unlink_photo(site_id, giornale_id, foto_id, current_user_id)
         
         return {
             "message": "Foto scollegata con successo",
@@ -1586,6 +1628,15 @@ async def v1_update_foto_didascalia(
     try:
         # Verifica accesso al sito
         site_info = verify_site_access(site_id, user_sites)
+
+        giornale = await db.get(GiornaleCantiere, str(giornale_id))
+        if not giornale or str(giornale.site_id) != str(site_id):
+            raise HTTPException(status_code=404, detail="Giornale non trovato")
+        if giornale.validato:
+            raise HTTPException(
+                status_code=409,
+                detail="Giornale validato: modifica didascalia non consentita",
+            )
         
         # Prepara i valori da aggiornare
         update_values = {}

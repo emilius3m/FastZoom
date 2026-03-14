@@ -269,6 +269,31 @@ class UserActivity(Base):
             }
         )
     
+    @classmethod
+    async def log_tma_action(
+        cls,
+        db: AsyncSession,
+        user_id: str,
+        action: str,
+        tomba_id: str,
+        site_id: str,
+        nct: str,
+        description: Optional[str] = None
+    ) -> 'UserActivity':
+        """Log azione su Scheda TMA"""
+        activity_type = f"tma_{action}"
+        default_desc = f"{action.title()} TMA {nct}"
+        
+        return await cls.log_activity(
+            db=db,
+            user_id=user_id,
+            activity_type=activity_type,
+            description=description or default_desc,
+            site_id=site_id,
+            tomba_id=tomba_id,
+            extra_data={'nct': nct, 'action': action}
+        )
+    
     # ===== METODI QUERY =====
     
     @classmethod
@@ -369,6 +394,12 @@ ACTIVITY_TYPES = {
     'usm_update': 'Modifica USM',
     'usm_delete': 'Eliminazione USM',
     'usm_validate': 'Validazione USM',
+    
+    # TMA Actions
+    'tma_create': 'Creazione Tomba',
+    'tma_update': 'Modifica Tomba',
+    'tma_delete': 'Eliminazione Tomba',
+    'tma_validate': 'Validazione Tomba',
     
     # Photo Actions
     'photo_upload': 'Caricamento foto',

@@ -18,6 +18,7 @@ from app.core.security import (
     get_current_user_sites_with_blacklist,
 )
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.models.user_activity import UserActivity
 from app.schemas.us import (
     USCreate, USUpdate, USOut,
     USMCreate, USMUpdate, USMOut
@@ -138,6 +139,7 @@ async def v1_update_us(
     us_id: str,
     payload: USUpdate,
     db: AsyncSession = Depends(get_database_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Update a specific US for the specified site."""
@@ -145,7 +147,7 @@ async def v1_update_us(
         if not await verify_site_access(site_id, user_sites):
             raise HTTPException(status_code=403, detail="Accesso negato al sito")
         
-        us = await USService.update_us(db, us_id, payload, site_id)
+        us = await USService.update_us(db, us_id, payload, site_id, user_id)
         return us
         
     except DomainValidationError as e:
@@ -163,6 +165,7 @@ async def v1_delete_us(
     site_id: UUID,
     us_id: str,
     db: AsyncSession = Depends(get_database_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """Delete a specific US for the specified site."""
@@ -170,7 +173,7 @@ async def v1_delete_us(
         if not await verify_site_access(site_id, user_sites):
             raise HTTPException(status_code=403, detail="Accesso negato al sito")
         
-        await USService.delete_us(db, us_id, site_id)
+        await USService.delete_us(db, us_id, site_id, user_id)
         return
         
     except ResourceNotFoundError as e:
@@ -282,6 +285,15 @@ async def v1_create_usm(
         db.add(usm)
         await db.commit()
         await db.refresh(usm)
+        
+        await UserActivity.log_usm_action(
+            db=db,
+            user_id=str(user_id),
+            action="create",
+            usm_id=str(usm.id),
+            site_id=str(site_id),
+            usm_code=usm.usm_code
+        )
         return usm
         
     except ValidationError as e:
@@ -476,6 +488,7 @@ async def v1_update_usm(
     usm_id: str,  # Accept as string to handle both formats
     payload: USMUpdate,
     db: AsyncSession = Depends(get_database_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
@@ -572,6 +585,15 @@ async def v1_update_usm(
         print(f"[UPDATE USM] data_rilevamento after save: {usm.data_rilevamento}")
         print(f"[UPDATE USM] data_rielaborazione after save: {usm.data_rielaborazione}")
         print(f"{'='*80}\n")
+        
+        await UserActivity.log_usm_action(
+            db=db,
+            user_id=str(user_id),
+            action="update",
+            usm_id=str(usm.id),
+            site_id=str(site_id),
+            usm_code=usm.usm_code
+        )
         return usm
         
     except ValidationError as e:
@@ -593,6 +615,7 @@ async def v1_delete_usm(
     site_id: UUID,
     usm_id: str,  # Accept as string to handle both formats
     db: AsyncSession = Depends(get_database_session),
+    user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist)
 ):
     """
@@ -634,8 +657,19 @@ async def v1_delete_usm(
         raise HTTPException(status_code=403, detail="Accesso negato al sito")
     if usm.site_id != str(site_id):
         raise HTTPException(status_code=404, detail="USM non trovata per questo sito")
+        
+    usm_code = usm.usm_code
     await db.delete(usm)
     await db.commit()
+    
+    await UserActivity.log_usm_action(
+        db=db,
+        user_id=str(user_id),
+        action="delete",
+        usm_id=str(usm_id_uuid),
+        site_id=str(site_id),
+        usm_code=usm_code
+    )
     return
 
 # MIGRATION HELPER

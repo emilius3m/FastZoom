@@ -271,6 +271,17 @@ class GiornaleCantiere(Base):
     validato = Column(Boolean, default=False, nullable=False)
     data_validazione = Column(DateTime, nullable=True)
     firma_digitale_hash = Column(String(500), nullable=True)  # Hash della firma digitale
+    validated_by_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    content_hash = Column(String(128), nullable=True)  # SHA-256 del contenuto al momento della validazione
+    legal_freeze_at = Column(DateTime, nullable=True)  # Timestamp congelamento legale record
+    signature_type = Column(String(50), nullable=True)  # es. FEQ, FEA, FIRMA_DIGITALE
+    signed_file_path = Column(String(1000), nullable=True)  # path file firmato (MinIO/local)
+    signature_reference = Column(String(255), nullable=True)  # riferimento transazione provider firma
+    signature_timestamp = Column(DateTime, nullable=True)  # marca temporale/firma
+    protocol_number = Column(String(100), nullable=True)  # protocollo esterno
+    protocol_date = Column(Date, nullable=True)  # data protocollo
+    legal_status = Column(String(30), nullable=False, default="draft")  # draft, validated, signed, protocolled, archived
+    validation_audit = Column(Text, nullable=True)  # JSON audit trail validazione/aggiornamenti legali
     
     # ===== ALLEGATI E DOCUMENTAZIONE =====
     # Path degli allegati su MinIO storage
@@ -292,6 +303,7 @@ class GiornaleCantiere(Base):
     
     # Relazione con l'utente responsabile
     responsabile = relationship("User", foreign_keys=[responsabile_id], back_populates="giornali_cantiere")
+    validated_by = relationship("User", foreign_keys=[validated_by_id])
     
     # Relazione many-to-many con operatori
     operatori = relationship(

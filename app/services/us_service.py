@@ -13,6 +13,7 @@ from loguru import logger
 import re
 
 from app.models.stratigraphy import UnitaStratigrafica, UnitaStratigraficaMuraria
+from app.models.user_activity import UserActivity
 from app.schemas.us import USCreate, USUpdate, USMCreate, USMUpdate
 from app.core.domain_exceptions import (
     SiteNotFoundError,
@@ -250,6 +251,14 @@ class USService:
         await db.refresh(us)
         
         logger.success(f"US created successfully: {us.id}")
+        await UserActivity.log_us_action(
+            db=db,
+            user_id=str(user_id),
+            action="create",
+            us_id=str(us.id),
+            site_id=str(site_id),
+            us_code=us.us_code
+        )
         return us
     
     @staticmethod
@@ -409,7 +418,8 @@ class USService:
         db: AsyncSession,
         us_id: str,
         payload: USUpdate,
-        site_id: UUID
+        site_id: UUID,
+        user_id: UUID
     ) -> UnitaStratigrafica:
         """
         Update an existing US.
@@ -456,13 +466,22 @@ class USService:
         await db.refresh(us)
         
         logger.success(f"US {normalized_id} updated successfully")
+        await UserActivity.log_us_action(
+            db=db,
+            user_id=str(user_id),
+            action="update",
+            us_id=str(us.id),
+            site_id=str(site_id),
+            us_code=us.us_code
+        )
         return us
     
     @staticmethod
     async def delete_us(
         db: AsyncSession,
         us_id: str,
-        site_id: UUID
+        site_id: UUID,
+        user_id: UUID
     ) -> None:
         """
         Delete a US.
@@ -481,10 +500,21 @@ class USService:
         # Get existing US
         us = await USService.get_us(db, normalized_id, site_id)
         
+        # Save code before deletion for logging
+        us_code = us.us_code
+        
         await db.delete(us)
         await db.commit()
         
         logger.success(f"US {normalized_id} deleted successfully")
+        await UserActivity.log_us_action(
+            db=db,
+            user_id=str(user_id),
+            action="delete",
+            us_id=normalized_id,
+            site_id=str(site_id),
+            us_code=us_code
+        )
     
     # USM methods follow similar pattern
     
@@ -507,6 +537,14 @@ class USService:
         await db.refresh(usm)
         
         logger.success(f"USM created successfully: {usm.id}")
+        await UserActivity.log_usm_action(
+            db=db,
+            user_id=str(user_id),
+            action="create",
+            usm_id=str(usm.id),
+            site_id=str(site_id),
+            usm_code=usm.usm_code
+        )
         return usm
     
     @staticmethod
@@ -629,7 +667,8 @@ class USService:
         db: AsyncSession,
         usm_id: str,
         payload: USMUpdate,
-        site_id: UUID
+        site_id: UUID,
+        user_id: UUID
     ) -> UnitaStratigraficaMuraria:
         """Update an existing USM."""
         normalized_id = USService.normalize_uuid(usm_id)
@@ -668,13 +707,22 @@ class USService:
         await db.refresh(usm)
         
         logger.success(f"USM {normalized_id} updated successfully")
+        await UserActivity.log_usm_action(
+            db=db,
+            user_id=str(user_id),
+            action="update",
+            usm_id=str(usm.id),
+            site_id=str(site_id),
+            usm_code=usm.usm_code
+        )
         return usm
     
     @staticmethod
     async def delete_usm(
         db: AsyncSession,
         usm_id: str,
-        site_id: UUID
+        site_id: UUID,
+        user_id: UUID
     ) -> None:
         """Delete a USM."""
         normalized_id = USService.normalize_uuid(usm_id)
@@ -683,7 +731,18 @@ class USService:
         # Get existing USM
         usm = await USService.get_usm(db, normalized_id, site_id)
         
+        # Save code before deletion for logging
+        usm_code = usm.usm_code
+        
         await db.delete(usm)
         await db.commit()
         
         logger.success(f"USM {normalized_id} deleted successfully")
+        await UserActivity.log_usm_action(
+            db=db,
+            user_id=str(user_id),
+            action="delete",
+            usm_id=normalized_id,
+            site_id=str(site_id),
+            usm_code=usm_code
+        )

@@ -1,0 +1,25 @@
+Nel tuo stato attuale, in FastZoom la “validazione” **non rende il documento legalmente valido da sola**.
+
+Nel codice oggi succede questo:
+- endpoint di validazione giornale: [app/routes/api/v1/giornale.py:307](C:\Users\E3M\OneDrive - beniculturali.it\Desktop\FastZoom\app\routes\api\v1\giornale.py:307)
+- la service imposta solo `validato=True` e `data_validazione`: [app/services/giornale_service.py:500](C:\Users\E3M\OneDrive - beniculturali.it\Desktop\FastZoom\app\services\giornale_service.py:500)
+- esiste un campo `firma_digitale_hash`, ma non viene valorizzato automaticamente: [app/models/giornale_cantiere.py:271](C:\Users\E3M\OneDrive - beniculturali.it\Desktop\FastZoom\app\models\giornale_cantiere.py:271)
+
+Inoltre, tecnicamente si valida il **giornale**, non il record **cantiere** (il cantiere ha stato, non “validazione legale”).
+
+Per renderlo “valido legalmente” in pratica (Italia):
+1. Chiudi/valida il giornale in piattaforma.
+2. Esporta PDF definitivo.
+3. Apponi **firma elettronica qualificata/digitale** del soggetto competente.
+4. Apponi **marca temporale qualificata** (se richiesta dal tuo processo interno/ente).
+5. Registra a **protocollo** (se sei PA/ente soggetto a protocollo).
+6. Metti il documento in **conservazione a norma** (non solo storage applicativo).
+7. Se inviato a terzi, usa **PEC** e conserva ricevute.
+
+Fonti ufficiali utili:
+- Linee guida AgID su documento informatico e conservazione: [agid.gov.it/linee-guida](https://www.agid.gov.it/it/linee-guida)
+- Ambito AgID gestione documentale/conservazione: [agid.gov.it/gestione-documentale](https://www.agid.gov.it/it/ambiti-intervento/gestione-documentale)
+- CAD (testo vigente): [gazzettaufficiale.it/codici/amministrazioneDigitale](https://www.gazzettaufficiale.it/sommario/codici/amministrazioneDigitale)
+- eIDAS consolidato (UE): [eur-lex CELEX 02014R0910-20241018](https://eur-lex.europa.eu/legal-content/IT/TXT/?uri=CELEX%3A02014R0910-20241018)
+
+Se vuoi, posso proporti subito una patch per FastZoom che aggiunge workflow legale completo (`validated_by`, `signed_file_path`, `signature_type`, `timestamp`, `protocol_number`, `protocol_date`, blocco modifiche hard, audit trail).
