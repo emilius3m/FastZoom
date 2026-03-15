@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     rate_limit_default_window: int = 60
 
     # MinIO Storage - Profile-based Configuration
+    minio_enabled: bool = True
     minio_config_profile: str = "local"
     
     # Local MinIO Configuration

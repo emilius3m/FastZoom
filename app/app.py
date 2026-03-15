@@ -916,6 +916,18 @@ async def on_startup():
         from app.database.base import init_models
         init_models()
         await create_db_and_tables()
+
+        # Optional explicit MinIO initialization (safe/non-blocking for app bootstrap)
+        try:
+            from app.services.archaeological_minio_service import archaeological_minio_service
+            archaeological_minio_service.initialize()
+            if getattr(archaeological_minio_service, "minio_enabled", True):
+                logger.info("✅ MinIO initialization completed")
+            else:
+                logger.info("ℹ️ MinIO disabled via MINIO_ENABLED=false")
+        except Exception as e:
+            # Do not fail application startup if MinIO is unavailable
+            logger.warning(f"MinIO initialization skipped/unavailable: {e}")
         
         # Start background services
         services_started = []
@@ -976,5 +988,4 @@ async def on_startup():
         logger.error(f"❌ Critical error during application startup: {e}")
         logger.error("❌ Application startup failed - cannot continue")
         raise
-
 

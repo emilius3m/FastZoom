@@ -5,9 +5,10 @@ import asyncio
 import json
 import os
 import random
+import threading
 import time
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Tuple, AsyncGenerator
+from typing import Optional, Dict, Any, List, Tuple, AsyncGenerator, Callable
 from uuid import UUID
 from pathlib import Path
 from loguru import logger
@@ -132,8 +133,24 @@ class RetryWithJitter:
         return True
 
 
+class _LazyMinioClientProxy:
+    """Proxy che risolve il client MinIO solo al primo utilizzo reale."""
+
+    def __init__(self, client_factory: Callable[[], Minio]):
+        self._client_factory = client_factory
+
+    def __getattr__(self, item):
+        client = self._client_factory()
+        return getattr(client, item)
+
+
 class ArchaeologicalMinIOService(FileStorageInterface):
     """Servizio MinIO ottimizzato per dati archeologici con supporto avanzato"""
+
+    def _ensure_minio_enabled(self) -> None:
+        """Fail-fast when MinIO is explicitly disabled (e.g. CI/tests)."""
+        if not self.minio_enabled:
+            raise StorageTemporaryError("MinIO is disabled via MINIO_ENABLED=false")
 
     def _create_minio_client(self) -> Minio:
         """Crea e configura il client MinIO con supporto profile-based configuration"""
@@ -377,7 +394,29 @@ class ArchaeologicalMinIOService(FileStorageInterface):
         return merged
 
     def __init__(self):
-        self._client = self._create_minio_client()  # Renamed to private
+        # NOTE:
+        # - No connessioni a MinIO in __init__
+        # - Il client reale viene creato lazy al primo uso operativo
+        self._client_lock = threading.Lock()
+        self._real_client: Optional[Minio] = None
+        self._bucket_init_attempted = False
+
+        # Feature flag: allows running tests/CI without MinIO availability.
+        # Read from centralized app settings first, fallback to dedicated MinIO settings.
+        try:
+            from app.core.config import get_settings
+            self.minio_enabled = bool(get_settings().minio_enabled)
+        except Exception:
+            self.minio_enabled = bool(getattr(settings, "minio_enabled", True))
+
+        # Attributi valorizzati in _create_minio_client (prima del primo uso)
+        self.minio_endpoint = ""
+        self.access_key = ""
+        self.secret_key = ""
+        self.secure = False
+
+        # Compatibilità retroattiva: molti call-site accedono a self._client direttamente
+        self._client = _LazyMinioClientProxy(self._get_or_create_client)
         
         # Inizializza retry pattern con jitter
         self.retry_handler = RetryWithJitter(
@@ -405,10 +444,35 @@ class ArchaeologicalMinIOService(FileStorageInterface):
             'recovery_timeout': 60  # 60 seconds
         }
 
-        # FIXED: Initialize buckets with timeout to prevent hanging
-        self._initialize_buckets_with_timeout()
+    def _get_or_create_client(self) -> Minio:
+        """
+        Crea il client MinIO on-demand e inizializza i bucket solo al primo uso.
+        Evita side-effect a import-time.
+        """
+        self._ensure_minio_enabled()
 
-    def _initialize_buckets_with_timeout(self):
+        if self._real_client is not None and self._bucket_init_attempted:
+            return self._real_client
+
+        with self._client_lock:
+            if self._real_client is None:
+                self._real_client = self._create_minio_client()
+
+            if not self._bucket_init_attempted:
+                # Segna subito come tentato per evitare loop/retry ripetuti in caso di MinIO down
+                self._bucket_init_attempted = True
+                self._initialize_buckets_with_timeout(self._real_client)
+
+        return self._real_client
+
+    def initialize(self) -> None:
+        """Inizializzazione esplicita opzionale (es. startup hook)."""
+        if not self.minio_enabled:
+            logger.info("MinIO initialization skipped: MINIO_ENABLED=false")
+            return
+        self._get_or_create_client()
+
+    def _initialize_buckets_with_timeout(self, client: Minio):
         """FIXED: Initialize buckets with timeout and non-blocking behavior"""
         try:
             # Include the legacy 'storage' bucket for compatibility
@@ -419,41 +483,45 @@ class ArchaeologicalMinIOService(FileStorageInterface):
             import socket
             
             # Set socket timeout for all operations
+            original_timeout = socket.getdefaulttimeout()
             socket.setdefaulttimeout(30)  # 30 seconds timeout
-            
-            for bucket_type, bucket_name in all_buckets.items():
-                try:
-                    # FIXED: Add timeout to bucket existence check
-                    if not self._client.bucket_exists(bucket_name):
-                        logger.info(f"Creating bucket: {bucket_name} ({bucket_type})")
-                        self._client.make_bucket(bucket_name)
-                        logger.info(f"Created bucket: {bucket_name} ({bucket_type})")
 
-                        # Policy di accesso per bucket pubblici (thumbnails e storage)
-                        if bucket_name in ["thumbnails", "storage"]:
-                            policy = {
-                                "Version": "2012-10-17",
-                                "Statement": [
-                                    {
-                                        "Effect": "Allow",
-                                        "Principal": {"AWS": "*"},
-                                        "Action": ["s3:GetObject"],
-                                        "Resource": [f"arn:aws:s3:::{bucket_name}/*"]
-                                    }
-                                ]
-                            }
-                            try:
-                                self._client.set_bucket_policy(bucket_name, json.dumps(policy))
-                                logger.info(f"Set public policy for bucket: {bucket_name}")
-                            except Exception as policy_error:
-                                logger.warning(f"Could not set policy for {bucket_name}: {policy_error}")
-                    else:
-                        logger.debug(f"Bucket already exists: {bucket_name}")
-                        
-                except Exception as bucket_e:
-                    logger.error(f"Error initializing bucket {bucket_name}: {bucket_e}")
-                    # FIXED: Continue with other buckets instead of failing completely
-                    continue
+            try:
+                for bucket_type, bucket_name in all_buckets.items():
+                    try:
+                        # FIXED: Add timeout to bucket existence check
+                        if not client.bucket_exists(bucket_name):
+                            logger.info(f"Creating bucket: {bucket_name} ({bucket_type})")
+                            client.make_bucket(bucket_name)
+                            logger.info(f"Created bucket: {bucket_name} ({bucket_type})")
+
+                            # Policy di accesso per bucket pubblici (thumbnails e storage)
+                            if bucket_name in ["thumbnails", "storage"]:
+                                policy = {
+                                    "Version": "2012-10-17",
+                                    "Statement": [
+                                        {
+                                            "Effect": "Allow",
+                                            "Principal": {"AWS": "*"},
+                                            "Action": ["s3:GetObject"],
+                                            "Resource": [f"arn:aws:s3:::{bucket_name}/*"]
+                                        }
+                                    ]
+                                }
+                                try:
+                                    client.set_bucket_policy(bucket_name, json.dumps(policy))
+                                    logger.info(f"Set public policy for bucket: {bucket_name}")
+                                except Exception as policy_error:
+                                    logger.warning(f"Could not set policy for {bucket_name}: {policy_error}")
+                        else:
+                            logger.debug(f"Bucket already exists: {bucket_name}")
+
+                    except Exception as bucket_e:
+                        logger.error(f"Error initializing bucket {bucket_name}: {bucket_e}")
+                        # FIXED: Continue with other buckets instead of failing completely
+                        continue
+            finally:
+                socket.setdefaulttimeout(original_timeout)
 
         except Exception as e:
             logger.error(f"Error in bucket initialization: {e}")

@@ -19,8 +19,33 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     PageBreak, KeepTogether, Image as RLImage,
 )
+from reportlab.pdfgen import canvas
 from reportlab.platypus.flowables import HRFlowable
 from loguru import logger
+
+class NumberedCanvas(canvas.Canvas):
+    def __init__(self, *args, **kwargs):
+        canvas.Canvas.__init__(self, *args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_number(num_pages)
+            canvas.Canvas.showPage(self)
+        canvas.Canvas.save(self)
+
+    def draw_page_number(self, page_count):
+        self.saveState()
+        self.setFont('Helvetica', 9)
+        self.drawRightString(21*cm - 2.5*cm, 29.7*cm - 1.5*cm, f"Pagina {self._pageNumber} di {page_count}")
+        self.restoreState()
+
 
 try:
     from docx import Document
@@ -383,12 +408,12 @@ def _setup_pdf_styles():
 
     add_or_update('TmaLabel', parent=styles['Normal'],
                   fontSize=8, fontName='Helvetica-Bold',
-                  textColor=_PDF_COLORS['header_bg'], spaceAfter=1, leading=10)
+                  textColor=_PDF_COLORS['text'], spaceAfter=2, leading=10)
 
     add_or_update('TmaValue', parent=styles['Normal'],
                   fontSize=9, fontName='Helvetica',
-                  textColor=_PDF_COLORS['text'], spaceAfter=3,
-                  alignment=TA_JUSTIFY, leading=11, leftIndent=8)
+                  textColor=_PDF_COLORS['text'], spaceAfter=6,
+                  alignment=TA_LEFT, leading=13)
 
     add_or_update('TmaPageNum', parent=styles['Normal'],
                   fontSize=7, textColor=_PDF_COLORS['grey'],
@@ -402,19 +427,6 @@ def _setup_pdf_styles():
     return styles
 
 
-def _add_pdf_header_footer(canvas, doc):
-    """Aggiunge header e footer su ogni pagina."""
-    canvas.saveState()
-    # Footer
-    canvas.setFont('Helvetica-Oblique', 7)
-    canvas.setFillColor(_PDF_COLORS['grey'])
-    canvas.drawCentredString(
-        doc.pagesize[0] / 2, 1 * cm,
-        f"Pagina {canvas.getPageNumber()} — Scheda TMA ICCD 3.00 — FastZoom Archaeological System"
-    )
-    canvas.restoreState()
-
-
 def generate_tma_pdf(scheda: Dict[str, Any]) -> bytes:
     """
     Genera PDF conforme ICCD per una scheda TMA.
@@ -425,58 +437,111 @@ def generate_tma_pdf(scheda: Dict[str, Any]) -> bytes:
 
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
-        topMargin=1.5 * cm, bottomMargin=1.5 * cm,
-        leftMargin=2 * cm, rightMargin=2 * cm,
+        topMargin=2.5 * cm, bottomMargin=2.5 * cm,
+        leftMargin=2.5 * cm, rightMargin=2.5 * cm,
         title=f"Scheda TMA — NCT {scheda.get('nctr', '')}{scheda.get('nctn', '')}",
     )
 
     story: list = []
 
     # Titolo
-    story.append(Paragraph("SCHEDA TMA", styles['TmaTitle']))
-    story.append(Paragraph("Tabella Materiali Archeologici — ICCD 3.00", styles['TmaSubtitle']))
+    story.append(Paragraph("Scheda", styles['TmaTitle']))
     story.append(HRFlowable(width="100%", thickness=1.5, color=_PDF_COLORS['accent']))
     story.append(Spacer(1, 0.4 * cm))
 
+    def _make_fields_table(fields_list):
+        if not fields_list: return None
+        cells = []
+        for lbl, val in fields_list:
+            cells.append([
+                Paragraph(lbl, styles['TmaLabel']),
+                Paragraph(str(val) if val else "-", styles['TmaValue'])
+            ])
+        rows = []
+        for i in range(0, len(cells), 2):
+            row = cells[i:i+2]
+            if len(row) == 1:
+                row.append([])
+            rows.append(row)
+        if rows:
+            cw = (doc.width) / 2.0
+            t = Table(rows, colWidths=[cw, cw])
+            t.setStyle(TableStyle([
+                ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('LEFTPADDING', (0,0), (-1,-1), 0),
+                ('RIGHTPADDING', (0,0), (-1,-1), 10),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 0),
+                ('TOPPADDING', (0,0), (-1,-1), 0),
+            ]))
+            return t
+        return None
+
     # Sezioni ICCD
     for sec in _iccd_sections(scheda):
+        if sec['title'] == 'MA - MATERIALE':
+            story.append(HRFlowable(width="100%", thickness=0.5, color=_PDF_COLORS['light_grey']))
+            story.append(Spacer(1, 0.4 * cm))
+
         # Intestazione sezione
         story.append(Paragraph(sec['title'], styles['TmaSectionHeading']))
 
         # Campi diretti della sezione
-        for label, value in sec.get('fields', []):
-            story.append(Paragraph(label, styles['TmaLabel']))
-            story.append(Paragraph(str(value), styles['TmaValue']))
+        t = _make_fields_table(sec.get('fields', []))
+        if t: story.append(t)
 
         # Extra fields (usati per ESC/ECP dopo NCT)
-        for label, value in sec.get('extra_fields', []):
-            story.append(Paragraph(label, styles['TmaLabel']))
-            story.append(Paragraph(str(value), styles['TmaValue']))
+        t_ext = _make_fields_table(sec.get('extra_fields', []))
+        if t_ext: story.append(t_ext)
 
         # Sottosezioni
         for sub in sec.get('subsections', []):
             story.append(Paragraph(sub['title'], styles['TmaSubsection']))
-            for label, value in sub.get('fields', []):
-                story.append(Paragraph(label, styles['TmaLabel']))
-                story.append(Paragraph(str(value), styles['TmaValue']))
+            t_sub = _make_fields_table(sub.get('fields', []))
+            if t_sub: story.append(t_sub)
 
-        story.append(Spacer(1, 0.15 * cm))
+        story.append(Spacer(1, 0.6 * cm))
 
     # Allegati fotografici (se presenti bytes immagine)
     _add_pdf_photo_gallery(story, scheda, styles)
 
+    # Entita Multimediali associate (metadati)
+    photos = _collect_export_photos(scheda)
+    if photos:
+        story.append(PageBreak())
+        story.append(Paragraph("Entita' multimediali associate", styles['TmaSectionHeading']))
+        story.append(Spacer(1, 0.4 * cm))
+        for photo in photos:
+            story.append(Paragraph("MC - METADATI DI CATALOGAZIONE", styles['TmaSubsection']))
+            story.append(Paragraph("FTA - DOCUMENTAZIONE FOTOGRAFICA", styles['TmaSubsection']))
+            
+            fta_fields = []
+            fta_fields.append(('FTAP - Tipo', 'fotografia digitale (file)'))
+            fta_fields.append(('FTAN - Codice identificativo', photo['caption']))
+            t_fta = _make_fields_table(fta_fields)
+            if t_fta: story.append(t_fta)
+            
+            story.append(Paragraph("MM - METADATI DATO MULTIMEDIALE", styles['TmaSubsection']))
+            story.append(Paragraph("MMT - METADATI TECNICI DATO MULTIMEDIALE", styles['TmaSubsection']))
+            
+            mm_fields = []
+            filename = photo['file_path'].split('/')[-1] if photo['file_path'] else f"{photo['caption']}.jpg"
+            mm_fields.append(('MMTO - Nome file originale', filename))
+            t_mm = _make_fields_table(mm_fields)
+            if t_mm: story.append(t_mm)
+            
+            story.append(Spacer(1, 0.4 * cm))
+            story.append(HRFlowable(width="50%", thickness=0.5, color=_PDF_COLORS['light_grey']))
+            story.append(Spacer(1, 0.6 * cm))
+
     # Footer / Firma
+    story.append(PageBreak())
     story.append(Spacer(1, 0.5 * cm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=_PDF_COLORS['border']))
     story.append(Spacer(1, 0.3 * cm))
     story.append(Paragraph("Firma", styles['TmaLabel']))
     story.append(Spacer(1, 1.5 * cm))
-    story.append(Paragraph(
-        f"Documento generato da FastZoom Archaeological System — {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-        styles['TmaFooter'],
-    ))
 
-    doc.build(story, onFirstPage=_add_pdf_header_footer, onLaterPages=_add_pdf_header_footer)
+    doc.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     pdf_bytes = buffer.getvalue()
     buffer.close()

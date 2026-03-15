@@ -5,6 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    minio_enabled: bool = Field(default=True, alias="MINIO_ENABLED")
+
     # Profile selector
     minio_config_profile: str = Field(default="local", alias="MINIO_CONFIG_PROFILE")
     
