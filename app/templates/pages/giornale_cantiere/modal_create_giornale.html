@@ -805,166 +805,263 @@
                             <i class="fas fa-camera mr-2 text-indigo-600"></i>
                             Documentazione Fotografica
                             <span class="ml-2 text-sm font-normal text-gray-500" x-show="editingGiornale"
-                                x-text="'(' + (editingGiornaleData?.foto?.length || 0) + ' foto)'"></span>
+                                x-text="'(' + (editingGiornaleData?.foto?.length || 0) + ' foto collegate)'"></span>
                         </h4>
 
-                        <!-- New entry message - improved -->
-                        <div x-show="!editingGiornale"
-                            class="border-2 border-dashed border-blue-200 dark:border-blue-700 rounded-lg bg-blue-50 dark:bg-blue-900/20 p-6">
-                            <div class="flex items-start gap-4">
-                                <div class="flex-shrink-0">
-                                    <div
-                                        class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center">
-                                        <i class="fas fa-camera text-blue-600 dark:text-blue-300 text-xl"></i>
+                        <div class="rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50/40 dark:bg-indigo-900/10 p-4">
+                            <div x-show="!editingGiornale"
+                                class="border-2 border-dashed border-blue-200 dark:border-blue-700 rounded-lg bg-blue-50 dark:bg-blue-900/20 p-6">
+                                <div class="flex items-start gap-4">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-800 flex items-center justify-center">
+                                            <i class="fas fa-camera text-blue-600 dark:text-blue-300 text-xl"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h5 class="text-base font-medium text-blue-800 dark:text-blue-200 mb-1">
+                                            Collegamento foto disponibile dopo il salvataggio
+                                        </h5>
+                                        <p class="text-sm text-blue-600 dark:text-blue-300 mb-3">
+                                            Dopo il primo salvataggio puoi collegare immagini dall'archivio del sito,
+                                            visualizzarle in anteprima e rimuoverle quando necessario.
+                                        </p>
+                                        <a href="/view/{{ site.id }}/photos" target="_blank"
+                                            class="inline-flex items-center text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline">
+                                            <i class="fas fa-upload mr-1"></i>
+                                            Vai all'archivio foto per caricare nuove immagini
+                                        </a>
                                     </div>
                                 </div>
-                                <div class="flex-1">
-                                    <h5 class="text-base font-medium text-blue-800 dark:text-blue-200 mb-1">
-                                        Collegamento foto disponibile dopo il salvataggio
-                                    </h5>
-                                    <p class="text-sm text-blue-600 dark:text-blue-300 mb-3">
-                                        Una volta salvato il giornale, potrai collegare le foto dall'archivio
-                                        fotografico del sito.
-                                        Le foto collegate appariranno qui e nel report PDF esportato.
+                            </div>
+
+                            <div x-show="editingGiornale">
+                                <div class="mb-4 flex flex-wrap items-center gap-2">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                        <i class="fas fa-link mr-1"></i>
+                                        <span x-text="(editingGiornaleData?.foto?.length || 0) + ' collegate'"></span>
+                                    </span>
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                                        <i class="fas fa-folder-open mr-1"></i>
+                                        <span x-text="availablePhotos.length + ' in elenco archivio'"></span>
+                                    </span>
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+                                        :class="showPhotoSelector ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'">
+                                        <i class="fas" :class="showPhotoSelector ? 'fa-check-circle' : 'fa-minus-circle'"></i>
+                                        <span class="ml-1" x-text="showPhotoSelector ? 'Selettore aperto' : 'Selettore chiuso'"></span>
+                                    </span>
+                                </div>
+
+                                <div class="mb-4" x-show="editingGiornaleData?.foto?.length > 0">
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                        <i class="fas fa-link mr-1"></i>
+                                        Foto collegate al giornale
                                     </p>
-                                    <div class="flex items-center gap-2 text-xs text-blue-500 dark:text-blue-400">
-                                        <i class="fas fa-lightbulb"></i>
-                                        <span>Suggerimento: Puoi collegare foto anche dopo la validazione del
-                                            giornale</span>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        <template x-for="foto in (editingGiornaleData?.foto || [])" :key="foto.id">
+                                            <article class="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm">
+                                                <button type="button" @click="openPhotoPreview(foto)"
+                                                    class="w-full text-left">
+                                                    <img :src="foto.thumbnail_url || `/api/v1/photos/${foto.id}/thumbnail`"
+                                                        :alt="getPhotoDisplayName(foto)"
+                                                        class="w-full h-36 object-cover rounded-t-lg"
+                                                        onerror="this.onerror=null;this.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='">
+                                                </button>
+                                                <div class="p-3">
+                                                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate"
+                                                        x-text="getPhotoDisplayName(foto)"></p>
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5"
+                                                        x-text="foto.filename || 'File non disponibile'"></p>
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1"
+                                                        x-text="formatPhotoDate(foto.created_at)"></p>
+                                                    <div class="mt-3 flex items-center gap-2">
+                                                        <button type="button" @click="openPhotoPreview(foto)"
+                                                            class="px-2.5 py-1.5 text-xs rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/60">
+                                                            <i class="fas fa-eye mr-1"></i>Anteprima
+                                                        </button>
+                                                        <a :href="foto.full_url || `/api/v1/photos/${foto.id}/full`" target="_blank"
+                                                            class="px-2.5 py-1.5 text-xs rounded-md bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-500">
+                                                            <i class="fas fa-up-right-from-square mr-1"></i>Apri
+                                                        </a>
+                                                        <button type="button" @click="unlinkFoto(foto.id)"
+                                                            class="ml-auto px-2.5 py-1.5 text-xs rounded-md bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60">
+                                                            <i class="fas fa-unlink mr-1"></i>Rimuovi
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </article>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <div x-show="!editingGiornaleData?.foto?.length && !showPhotoSelector"
+                                    class="text-center py-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                                    <i class="fas fa-image text-4xl text-gray-300 dark:text-gray-600 mb-2"></i>
+                                    <p class="text-gray-500 dark:text-gray-400 mb-1">Nessuna foto collegata a questo giornale</p>
+                                    <p class="text-sm text-gray-400 dark:text-gray-500">Apri il selettore per collegare foto dall'archivio</p>
+                                </div>
+
+                                <div class="mt-4 flex flex-wrap items-center gap-3">
+                                    <button type="button" @click="togglePhotoSelector()"
+                                        class="inline-flex items-center px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+                                        <i class="fas" :class="showPhotoSelector ? 'fa-times mr-2' : 'fa-plus mr-2'"></i>
+                                        <span x-text="showPhotoSelector ? 'Chiudi Selettore' : 'Collega Foto' "></span>
+                                    </button>
+
+                                    <button type="button" @click="loadAvailablePhotos()" :disabled="loadingPhotos"
+                                        class="inline-flex items-center px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50">
+                                        <i class="fas" :class="loadingPhotos ? 'fa-spinner fa-spin mr-2' : 'fa-arrows-rotate mr-2'"></i>
+                                        Aggiorna elenco
+                                    </button>
+
+                                    <a href="/view/{{ site.id }}/photos" target="_blank"
+                                        class="inline-flex items-center px-3 py-2 text-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors">
+                                        <i class="fas fa-upload mr-2"></i>
+                                        Carica nuove foto
+                                    </a>
+
+                                    <a href="/view/{{ site.id }}/photos" target="_blank"
+                                        class="inline-flex items-center px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                        <i class="fas fa-external-link-alt mr-2"></i>
+                                        Apri archivio completo
+                                    </a>
+                                </div>
+
+                                <div x-show="showPhotoSelector" x-collapse
+                                    class="mt-4 border border-indigo-200 dark:border-indigo-700 rounded-lg bg-white dark:bg-gray-800 p-4">
+
+                                    <div class="flex items-center justify-between mb-3">
+                                        <h5 class="text-sm font-medium text-indigo-800 dark:text-indigo-200">
+                                            <i class="fas fa-images mr-2"></i>Seleziona foto dall'archivio
+                                        </h5>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs text-gray-500" x-text="availablePhotos.length + ' foto' "></span>
+                                            <button type="button" @click="showPhotoSelector = false"
+                                                class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="relative mb-4">
+                                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                            <i class="fas fa-search text-gray-400"></i>
+                                        </div>
+                                        <input type="text" x-model="photoSearchQuery"
+                                            @input.debounce.300ms="searchAvailablePhotos()"
+                                            placeholder="Cerca per titolo, descrizione o nome file"
+                                            class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500">
+                                    </div>
+
+                                    <div x-show="loadingPhotos" class="text-center py-6">
+                                        <i class="fas fa-spinner fa-spin text-indigo-600 text-xl"></i>
+                                        <p class="text-sm text-gray-500 mt-2">Caricamento foto...</p>
+                                    </div>
+
+                                    <div x-show="!loadingPhotos && availablePhotos.length > 0"
+                                        class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 max-h-80 overflow-y-auto">
+                                        <template x-for="photo in availablePhotos" :key="photo.id">
+                                            <article class="rounded-lg border bg-gray-50 dark:bg-gray-700/60 p-2"
+                                                :class="isPhotoLinked(photo.id) ? 'border-green-400 dark:border-green-600' : 'border-gray-200 dark:border-gray-600'">
+                                                <button type="button" @click="openPhotoPreview(photo)" class="w-full text-left">
+                                                    <img :src="photo.thumbnail_url || `/api/v1/photos/${photo.id}/thumbnail`"
+                                                        :alt="getPhotoDisplayName(photo)"
+                                                        class="w-full h-28 object-cover rounded-md"
+                                                        onerror="this.onerror=null;this.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='">
+                                                </button>
+                                                <div class="mt-2">
+                                                    <p class="text-xs font-medium text-gray-900 dark:text-gray-100 truncate"
+                                                        x-text="getPhotoDisplayName(photo)"></p>
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400 truncate"
+                                                        x-text="photo.filename || 'File non disponibile'"></p>
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5"
+                                                        x-text="formatPhotoDate(photo.created_at)"></p>
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2"
+                                                        x-text="photo.description || 'Nessuna descrizione disponibile'"></p>
+
+                                                    <div class="mt-2 flex items-center gap-2">
+                                                        <button type="button" @click="openPhotoPreview(photo)"
+                                                            class="px-2 py-1 text-xs rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/60">
+                                                            <i class="fas fa-eye mr-1"></i>Anteprima
+                                                        </button>
+                                                        <button type="button" @click="linkPhoto(photo)" :disabled="isPhotoLinked(photo.id)"
+                                                            class="px-2 py-1 text-xs rounded text-white"
+                                                            :class="isPhotoLinked(photo.id)
+                                                                ? 'bg-green-600 cursor-not-allowed opacity-90'
+                                                                : 'bg-indigo-600 hover:bg-indigo-700'">
+                                                            <i class="fas" :class="isPhotoLinked(photo.id) ? 'fa-check mr-1' : 'fa-link mr-1'"></i>
+                                                            <span x-text="isPhotoLinked(photo.id) ? 'Collegata' : 'Collega' "></span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </article>
+                                        </template>
+                                    </div>
+
+                                    <div x-show="!loadingPhotos && availablePhotos.length === 0" class="text-center py-6">
+                                        <i class="fas fa-image text-3xl text-gray-300 mb-2"></i>
+                                        <p class="text-sm text-gray-500">
+                                            <span x-show="photoSearchQuery">Nessuna foto trovata per la ricerca</span>
+                                            <span x-show="!photoSearchQuery">Nessuna foto disponibile nell'archivio</span>
+                                        </p>
+                                        <a href="/view/{{ site.id }}/photos" target="_blank"
+                                            class="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-800 mt-2">
+                                            <i class="fas fa-upload mr-1"></i> Carica nuove foto
+                                        </a>
+                                    </div>
+
+                                    <div x-show="availablePhotos.length > 0" class="mt-3 text-center">
+                                        <p class="text-xs text-gray-500">
+                                            Mostrate <span x-text="availablePhotos.length"></span> foto
+                                            <span x-show="availablePhotos.length >= 30"> - usa la ricerca per risultati più specifici</span>
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Existing photos and photo selector (only in edit mode) -->
-                        <div x-show="editingGiornale">
-
-                            <!-- Linked photos grid -->
-                            <div class="mb-4" x-show="editingGiornaleData?.foto?.length > 0">
-                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                    <i class="fas fa-link mr-1"></i> Foto collegate a questo giornale:
-                                </p>
-                                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                    <template x-for="foto in (editingGiornaleData?.foto || [])" :key="foto.id">
-                                        <div
-                                            class="relative group rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 shadow-sm hover:shadow-md transition-shadow">
-                                            <img :src="foto.thumbnail_url || `/api/v1/photos/${foto.id}/thumbnail`"
-                                                :alt="foto.title || foto.filename" class="w-full h-24 object-cover"
-                                                onerror="this.src='/static/img/placeholder-photo.png'">
-                                            <div
-                                                class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all flex items-center justify-center">
-                                                <button type="button" @click="unlinkFoto(foto.id)"
-                                                    class="opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-red-500 text-white rounded-full hover:bg-red-600"
-                                                    title="Rimuovi foto">
-                                                    <i class="fas fa-times"></i>
-                                                </button>
-                                            </div>
-                                            <div class="p-1.5 text-xs text-gray-600 dark:text-gray-400 truncate"
-                                                x-text="foto.title || foto.filename || 'Foto'"></div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-
-                            <!-- Empty state for edit mode -->
-                            <div x-show="!editingGiornaleData?.foto?.length && !showPhotoSelector"
-                                class="text-center py-6 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                                <i class="fas fa-image text-4xl text-gray-300 dark:text-gray-600 mb-2"></i>
-                                <p class="text-gray-500 dark:text-gray-400 mb-2">Nessuna foto collegata a questo
-                                    giornale</p>
-                                <p class="text-sm text-gray-400 dark:text-gray-500">Clicca "Collega Foto" per aggiungere
-                                    foto dall'archivio</p>
-                            </div>
-
-                            <!-- Action buttons -->
-                            <div class="mt-4 flex flex-wrap items-center gap-3">
-                                <button type="button" @click="togglePhotoSelector()"
-                                    class="inline-flex items-center px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
-                                    <i class="fas fa-plus mr-2"></i>
-                                    <span x-text="showPhotoSelector ? 'Chiudi Selettore' : 'Collega Foto'"></span>
-                                </button>
-                                <a href="/sites/{{ site.id }}/photos" target="_blank"
-                                    class="inline-flex items-center px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                                    <i class="fas fa-external-link-alt mr-2"></i>
-                                    Apri archivio completo
-                                </a>
-                            </div>
-
-                            <!-- Inline Photo Selector Panel -->
-                            <div x-show="showPhotoSelector" x-collapse
-                                class="mt-4 border border-indigo-200 dark:border-indigo-700 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 p-4">
-
-                                <div class="flex items-center justify-between mb-3">
-                                    <h5 class="text-sm font-medium text-indigo-800 dark:text-indigo-200">
-                                        <i class="fas fa-images mr-2"></i>Seleziona foto dall'archivio
-                                    </h5>
-                                    <button type="button" @click="showPhotoSelector = false"
-                                        class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800">
+                        <div x-show="photoPreview.show" x-cloak @click.self="closePhotoPreview()"
+                            class="fixed inset-0 bg-black/80 p-4 flex items-center justify-center" style="z-index:70;">
+                            <div class="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-lg shadow-2xl overflow-hidden">
+                                <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+                                    <div class="min-w-0">
+                                        <h5 class="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate"
+                                            x-text="getPhotoDisplayName(photoPreview.photo)"></h5>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 truncate"
+                                            x-text="photoPreview.photo?.filename || 'File non disponibile'"></p>
+                                    </div>
+                                    <button type="button" @click="closePhotoPreview()"
+                                        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 </div>
 
-                                <!-- Search box -->
-                                <div class="relative mb-4">
-                                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                        <i class="fas fa-search text-gray-400"></i>
+                                <div class="grid grid-cols-1 lg:grid-cols-4 gap-0">
+                                    <div class="lg:col-span-3 bg-black">
+                                        <img :src="photoPreview.photo?.full_url || photoPreview.photo?.thumbnail_url"
+                                            :alt="getPhotoDisplayName(photoPreview.photo)"
+                                            class="w-full max-h-[70vh] object-contain mx-auto"
+                                            onerror="this.onerror=null;this.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='">
                                     </div>
-                                    <input type="text" x-model="photoSearchQuery"
-                                        @input.debounce.300ms="searchAvailablePhotos()"
-                                        placeholder="Cerca foto per titolo, descrizione, area di scavo..."
-                                        class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500">
-                                </div>
-
-                                <!-- Loading state -->
-                                <div x-show="loadingPhotos" class="text-center py-6">
-                                    <i class="fas fa-spinner fa-spin text-indigo-600 text-xl"></i>
-                                    <p class="text-sm text-gray-500 mt-2">Caricamento foto...</p>
-                                </div>
-
-                                <!-- Photos grid -->
-                                <div x-show="!loadingPhotos && availablePhotos.length > 0"
-                                    class="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2 max-h-64 overflow-y-auto">
-                                    <template x-for="photo in availablePhotos" :key="photo.id">
-                                        <div @click="linkPhoto(photo)"
-                                            class="relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all"
-                                            :class="isPhotoLinked(photo.id) 
-                                                ? 'border-green-500 opacity-50 cursor-not-allowed' 
-                                                : 'border-transparent hover:border-indigo-500 hover:shadow-md'">
-                                            <img :src="photo.thumbnail_url || `/api/v1/photos/${photo.id}/thumbnail`"
-                                                :alt="photo.title || photo.filename" class="w-full h-16 object-cover"
-                                                onerror="this.src='/static/img/placeholder-photo.png'">
-                                            <div x-show="isPhotoLinked(photo.id)"
-                                                class="absolute inset-0 bg-green-500/30 flex items-center justify-center">
-                                                <i class="fas fa-check text-white text-lg"></i>
-                                            </div>
-                                            <div class="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
-                                                <p class="text-xs text-white truncate"
-                                                    x-text="photo.title || photo.filename || 'Foto'"></p>
-                                            </div>
+                                    <div class="p-4 space-y-3 bg-gray-50 dark:bg-gray-700/40">
+                                        <div>
+                                            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Titolo</p>
+                                            <p class="text-sm text-gray-900 dark:text-gray-100" x-text="getPhotoDisplayName(photoPreview.photo)"></p>
                                         </div>
-                                    </template>
-                                </div>
-
-                                <!-- No photos state -->
-                                <div x-show="!loadingPhotos && availablePhotos.length === 0" class="text-center py-6">
-                                    <i class="fas fa-image text-3xl text-gray-300 mb-2"></i>
-                                    <p class="text-sm text-gray-500">
-                                        <span x-show="photoSearchQuery">Nessuna foto trovata per la ricerca</span>
-                                        <span x-show="!photoSearchQuery">Nessuna foto disponibile nell'archivio</span>
-                                    </p>
-                                    <a href="/sites/{{ site.id }}/photos" target="_blank"
-                                        class="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-800 mt-2">
-                                        <i class="fas fa-upload mr-1"></i> Carica nuove foto
-                                    </a>
-                                </div>
-
-                                <!-- Pagination hint -->
-                                <div x-show="availablePhotos.length > 0" class="mt-3 text-center">
-                                    <p class="text-xs text-gray-500">
-                                        Mostrate <span x-text="availablePhotos.length"></span> foto
-                                        <span x-show="availablePhotos.length >= 30"> - usa la ricerca per trovare foto
-                                            specifiche</span>
-                                    </p>
+                                        <div>
+                                            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Data</p>
+                                            <p class="text-sm text-gray-900 dark:text-gray-100" x-text="formatPhotoDate(photoPreview.photo?.created_at)"></p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Descrizione</p>
+                                            <p class="text-sm text-gray-700 dark:text-gray-300" x-text="photoPreview.photo?.description || 'Nessuna descrizione disponibile'"></p>
+                                        </div>
+                                        <a :href="photoPreview.photo?.full_url || (photoPreview.photo?.id ? `/api/v1/photos/${photoPreview.photo.id}/full` : '#')"
+                                            target="_blank"
+                                            class="inline-flex items-center px-3 py-2 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700">
+                                            <i class="fas fa-up-right-from-square mr-2"></i>
+                                            Apri file originale
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1148,16 +1245,16 @@
                                             <div>
                                                 Stato legale:
                                                 <span class="font-medium"
-                                                    x-text="editingGiornaleData.legal_status || 'validated_pending_signature'"></span>
+                                                    x-text="(editingGiornaleData && editingGiornaleData.legal_status) ? editingGiornaleData.legal_status : 'validated_pending_signature'"></span>
                                             </div>
                                             <div>
                                                 Freeze:
                                                 <span class="font-medium"
-                                                    x-text="editingGiornaleData.legal_freeze_at ? new Date(editingGiornaleData.legal_freeze_at).toLocaleString('it-IT') : 'n/d'"></span>
+                                                    x-text="(editingGiornaleData && editingGiornaleData.legal_freeze_at) ? new Date(editingGiornaleData.legal_freeze_at).toLocaleString('it-IT') : 'n/d'"></span>
                                             </div>
                                             <div>
                                                 Hash contenuto:
-                                                <span class="font-mono" x-text="editingGiornaleData.content_hash || 'n/d'"></span>
+                                                <span class="font-mono" x-text="(editingGiornaleData && editingGiornaleData.content_hash) ? editingGiornaleData.content_hash : 'n/d'"></span>
                                             </div>
                                         </div>
                                     </div>

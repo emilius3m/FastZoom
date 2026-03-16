@@ -69,6 +69,7 @@ async def domain_exception_handler(
             status_code=status_code,
             content={
                 "valid": False,
+                "detail": exc.message,
                 "error_code": exc.error_code,
                 "errors": [exc.message],
                 "details": exc.details,
@@ -166,6 +167,7 @@ async def validation_exception_handler(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "valid": False,
+                "detail": errors[0] if errors else "Validation error",
                 "error_code": "VALIDATION_ERROR",
                 "errors": errors,
                 "details": {"validation_errors": exc.errors()}
@@ -177,6 +179,7 @@ async def validation_exception_handler(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "valid": False,
+            "detail": str(exc),
             "error_code": "VALIDATION_ERROR",
             "errors": [str(exc)],
         }
@@ -219,6 +222,7 @@ async def generic_exception_handler(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "valid": False,
+                "detail": "An unexpected error occurred",
                 "error_code": "INTERNAL_ERROR",
                 "errors": ["An unexpected error occurred"],
                 "details": {

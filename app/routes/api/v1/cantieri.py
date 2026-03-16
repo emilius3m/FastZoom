@@ -558,7 +558,7 @@ async def v1_get_cantiere_detail(
             select(Cantiere)
             .options(
                 selectinload(Cantiere.site),
-                selectinload(Cantiere.giornali)
+                selectinload(Cantiere.giornali_cantiere)
             )
             .where(
                 and_(Cantiere.id == str(cantiere_id), Cantiere.is_active == True)

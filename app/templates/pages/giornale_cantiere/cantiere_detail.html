@@ -875,6 +875,10 @@
             availablePhotos: [],
             loadingPhotos: false,
             photoSearchQuery: '',
+            photoPreview: {
+                show: false,
+                photo: null
+            },
 
             // Init
             init() {
@@ -889,6 +893,9 @@
                 this.editingGiornaleData = data.editingGiornaleData;
                 this.formData = data.formData;
                 this.legalData = this.prepareLegalDataFromGiornale(data.editingGiornaleData);
+                this.showPhotoSelector = false;
+                this.photoSearchQuery = '';
+                this.closePhotoPreview();
 
                 // Load operators before showing the modal
                 await this.loadOperatoriDisponibili();
@@ -923,6 +930,9 @@
                 this.modalMode = 'giornale';
                 this.showCreateModal = true;
                 this.editingGiornale = false;
+                this.showPhotoSelector = false;
+                this.photoSearchQuery = '';
+                this.closePhotoPreview();
                 this.resetForm();
                 await this.loadOperatoriDisponibili();
                 await this.loadMezziDisponibili();
@@ -938,6 +948,9 @@
             closeModal() {
                 this.showCreateModal = false;
                 this.errorMessage = '';
+                this.showPhotoSelector = false;
+                this.photoSearchQuery = '';
+                this.closePhotoPreview();
             },
 
             prepareLegalDataFromGiornale(giornale) {
@@ -1009,8 +1022,14 @@
                 let message = fallbackMessage;
                 try {
                     const data = await response.json();
-                    if (data?.detail) {
+                    if (typeof data?.detail === 'string' && data.detail.trim().length > 0) {
                         message = data.detail;
+                    } else if (Array.isArray(data?.errors) && data.errors.length > 0) {
+                        message = String(data.errors[0]);
+                    } else if (typeof data?.error === 'string' && data.error.trim().length > 0) {
+                        message = data.error;
+                    } else if (typeof data?.message === 'string' && data.message.trim().length > 0) {
+                        message = data.message;
                     }
                 } catch (_) {
                     // ignore parse error, keep fallback
@@ -1040,7 +1059,9 @@
                         oggetto_appalto: '',
                         codice_cup: '',
                         codice_cig: '',
-                        importo_lavori: ''
+                        importo_lavori: '',
+                        operatori_ids: [],
+                        mezzi_ids: []
                     };
                 } else {
                     // Reset for giornale
@@ -1183,8 +1204,7 @@
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Errore aggiornamento del giornale');
+                        throw new Error(await this.parseApiError(response, 'Errore aggiornamento del giornale'));
                     }
 
                     const result = await response.json();
@@ -1228,8 +1248,7 @@
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Errore durante il salvataggio del cantiere');
+                        throw new Error(await this.parseApiError(response, 'Errore durante il salvataggio del cantiere'));
                     }
 
                     const result = await response.json();
@@ -1282,8 +1301,7 @@
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Errore nel salvataggio del giornale');
+                        throw new Error(await this.parseApiError(response, 'Errore nel salvataggio del giornale'));
                     }
 
                     const result = await response.json();
@@ -1420,6 +1438,9 @@
             // Toggle operator selection
             toggleOperatore(operatore) {
                 const operatoreId = operatore.id;
+                if (!Array.isArray(this.formData.operatori_ids)) {
+                    this.formData.operatori_ids = [];
+                }
                 const index = this.formData.operatori_ids.indexOf(operatoreId);
 
                 if (index === -1) {
@@ -1442,7 +1463,9 @@
 
             // Check if operator is selected
             isOperatoreSelezionato(operatoreId) {
-                return this.formData.operatori_ids.includes(operatoreId);
+                return Array.isArray(this.formData.operatori_ids)
+                    ? this.formData.operatori_ids.includes(operatoreId)
+                    : false;
             },
 
             // Get operator data
@@ -1467,7 +1490,11 @@
 
             // Get enhanced operatori data for API
             getEnhancedOperatoriData() {
-                return this.formData.operatori_ids.map(operatoreId => ({
+                const selectedOperatori = Array.isArray(this.formData.operatori_ids)
+                    ? this.formData.operatori_ids
+                    : [];
+
+                return selectedOperatori.map(operatoreId => ({
                     id: operatoreId,
                     ore_lavorate: this.operatori_data[operatoreId]?.ore_lavorate || null,
                     note_presenza: this.operatori_data[operatoreId]?.note_presenza || ''
@@ -1483,16 +1510,20 @@
 
             // Get count of selected operators
             getOperatoriSelezionatiCount() {
-                return this.formData.operatori_ids.length;
+                return Array.isArray(this.formData.operatori_ids)
+                    ? this.formData.operatori_ids.length
+                    : 0;
             },
 
             // Load operator data for editing
             loadOperatoriDataForEditing(giornale) {
+                this.formData.operatori_ids = [];
+                this.operatori_data = {};
+
                 if (giornale.operatori_presenti && Array.isArray(giornale.operatori_presenti)) {
                     this.formData.operatori_ids = giornale.operatori_presenti.map(op => op.id);
 
                     // Load enhanced data
-                    this.operatori_data = {};
                     giornale.operatori_presenti.forEach(op => {
                         this.operatori_data[op.id] = {
                             ore_lavorate: op.ore_lavorate || null,
@@ -1504,6 +1535,9 @@
 
             toggleMezzo(mezzo) {
                 const mezzoId = mezzo.id;
+                if (!Array.isArray(this.formData.mezzi_ids)) {
+                    this.formData.mezzi_ids = [];
+                }
                 const index = this.formData.mezzi_ids.indexOf(mezzoId);
 
                 if (index === -1) {
@@ -1524,7 +1558,9 @@
             },
 
             isMezzoSelezionato(mezzoId) {
-                return this.formData.mezzi_ids.includes(mezzoId);
+                return Array.isArray(this.formData.mezzi_ids)
+                    ? this.formData.mezzi_ids.includes(mezzoId)
+                    : false;
             },
 
             getMezzoData(mezzoId) {
@@ -1545,7 +1581,11 @@
             },
 
             getEnhancedMezziData() {
-                return this.formData.mezzi_ids.map(mezzoId => ({
+                const selectedMezzi = Array.isArray(this.formData.mezzi_ids)
+                    ? this.formData.mezzi_ids
+                    : [];
+
+                return selectedMezzi.map(mezzoId => ({
                     id: mezzoId,
                     ore_utilizzo: this.mezzi_data[mezzoId]?.ore_utilizzo || null,
                     note_utilizzo: this.mezzi_data[mezzoId]?.note_utilizzo || ''
@@ -1557,7 +1597,9 @@
             },
 
             getMezziSelezionatiCount() {
-                return this.formData.mezzi_ids.length;
+                return Array.isArray(this.formData.mezzi_ids)
+                    ? this.formData.mezzi_ids.length
+                    : 0;
             },
 
             syncMezziUtilizzatiFromSelection() {
@@ -2033,6 +2075,78 @@
 
             // ===== FOTO DOCUMENTATION FUNCTIONS =====
 
+            resolvePhotoUrl(rawUrl, photoId, variant = 'full') {
+                if (rawUrl) {
+                    const url = String(rawUrl).trim();
+
+                    if (/^https?:\/\//i.test(url)) {
+                        return url;
+                    }
+
+                    if (url.startsWith('/api/v1/photos/')) {
+                        return url;
+                    }
+
+                    if (url.startsWith('/photos/')) {
+                        return `/api/v1${url}`;
+                    }
+
+                    if (url.startsWith('api/v1/photos/')) {
+                        return `/${url}`;
+                    }
+
+                    if (url.startsWith('photos/')) {
+                        return `/api/v1/${url}`;
+                    }
+
+                    if (url.startsWith('/')) {
+                        return url;
+                    }
+                }
+
+                if (!photoId) {
+                    return '#';
+                }
+
+                return `/api/v1/photos/${photoId}/${variant}`;
+            },
+
+            getPhotoDisplayName(photo) {
+                if (!photo) return 'Foto';
+                return photo.title || photo.original_filename || photo.filename || `Foto ${String(photo.id || '').slice(0, 8)}`;
+            },
+
+            formatPhotoDate(value) {
+                if (!value) return 'Data non disponibile';
+                try {
+                    return new Date(value).toLocaleString('it-IT');
+                } catch (_) {
+                    return 'Data non disponibile';
+                }
+            },
+
+            openPhotoPreview(photo) {
+                if (!photo || !photo.id) {
+                    return;
+                }
+
+                this.photoPreview = {
+                    show: true,
+                    photo: {
+                        ...photo,
+                        thumbnail_url: this.resolvePhotoUrl(photo.thumbnail_url, photo.id, 'thumbnail'),
+                        full_url: this.resolvePhotoUrl(photo.full_url, photo.id, 'full')
+                    }
+                };
+            },
+
+            closePhotoPreview() {
+                this.photoPreview = {
+                    show: false,
+                    photo: null
+                };
+            },
+
             async unlinkFoto(fotoId) {
                 if (!this.editingGiornaleData || !this.editingGiornaleData.id) {
                     this.errorMessage = 'Nessun giornale selezionato';
@@ -2053,8 +2167,7 @@
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Errore durante la rimozione della foto');
+                        throw new Error(await this.parseApiError(response, 'Errore durante la rimozione della foto'));
                     }
 
                     // Remove foto from local data
@@ -2137,8 +2250,7 @@
                     });
 
                     if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.detail || 'Errore durante il collegamento della foto');
+                        throw new Error(await this.parseApiError(response, 'Errore durante il collegamento della foto'));
                     }
 
                     // Add photo to local data
@@ -2151,7 +2263,10 @@
                         id: photo.id,
                         title: photo.title || photo.filename,
                         filename: photo.filename,
-                        thumbnail_url: photo.thumbnail_url || `/api/v1/photos/${photo.id}/thumbnail`
+                        thumbnail_url: this.resolvePhotoUrl(photo.thumbnail_url, photo.id, 'thumbnail'),
+                        full_url: this.resolvePhotoUrl(photo.full_url, photo.id, 'full'),
+                        created_at: photo.created_at || null,
+                        description: photo.description || ''
                     });
 
                     this.showAlert('success', 'Foto collegata con successo');
