@@ -3,10 +3,11 @@ version: "3.9"
 services:
   app:
     build: .
+    restart: unless-stopped
     security_opt:
       - apparmor=unconfined
     working_dir: /app
-    command: python -m uvicorn app.app:app --host 0.0.0.0 --port 8000 --loop asyncio
+    command: python -m uvicorn app.app:app --host 0.0.0.0 --port 8000 --loop asyncio 
     environment:
 #      DATABASE_URL: sqlite+aiosqlite:///./archaeological_catalog.db
       DATABASE_URL: sqlite+aiosqlite:////app/data/archaeological_catalog.db
@@ -29,6 +30,7 @@ services:
 
   minio:
     image: minio/minio:latest
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
