@@ -18,6 +18,7 @@ from app.database.db import get_async_session
 from app.models.cantiere import Cantiere
 from app.models.sites import ArchaeologicalSite
 from app.models.giornale_cantiere import GiornaleCantiere, giornale_operatori_association
+from app.models.documents import Document
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload
 
@@ -308,6 +309,39 @@ async def v1_cantiere_detail_view(
             .where(GiornaleCantiere.cantiere_id == str(cantiere_id))
         )
         operatori_count = operatori_count_result.scalar() or 0
+
+        # Documenti collegati al cantiere (via tag convenzionale: cantiere:<id>)
+        cantiere_tag_token = f"%cantiere:{cantiere_id}%"
+        documenti_result = await db.execute(
+            select(Document)
+            .where(
+                and_(
+                    Document.site_id == str(cantiere.site_id),
+                    Document.is_deleted == False,
+                    Document.tags.ilike(cantiere_tag_token)
+                )
+            )
+            .order_by(Document.uploaded_at.desc())
+        )
+        documenti_cantiere = documenti_result.scalars().all()
+
+        documenti_cantiere_data = []
+        for doc in documenti_cantiere:
+            documenti_cantiere_data.append({
+                "id": str(doc.id),
+                "title": doc.title,
+                "description": doc.description,
+                "category": doc.category,
+                "doc_type": doc.doc_type,
+                "filename": doc.filename,
+                "file_size": doc.filesize,
+                "mime_type": doc.mimetype,
+                "tags": doc.tags.split(",") if doc.tags else [],
+                "doc_date": doc.doc_date.isoformat() if doc.doc_date else None,
+                "author": doc.author,
+                "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+                "uploaded_by": str(doc.uploaded_by) if doc.uploaded_by else None,
+            })
         
         # Serializza i dati del cantiere per evitare lazy loading nel template
         cantiere_data = {
@@ -379,6 +413,8 @@ async def v1_cantiere_detail_view(
             "giornali_count": giornali_count,
             "ultimo_giornale": ultimo_giornale_data,  # Usa dati serializzati
             "operatori_count": operatori_count,
+            "documenti_cantiere": documenti_cantiere_data,
+            "documenti_cantiere_count": len(documenti_cantiere_data),
         })
         
         return templates.TemplateResponse(

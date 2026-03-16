@@ -150,7 +150,7 @@
     </div>
 
     <!-- Stats Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <!-- Giornali Card -->
         <div class="stat-card bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
@@ -177,6 +177,21 @@
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Operatori</p>
                     <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ operatori_count }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Documenti Card -->
+        <div class="stat-card bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="p-3 bg-indigo-100 rounded-lg dark:bg-indigo-900">
+                        <i class="fas fa-file-invoice text-indigo-600 dark:text-indigo-300 text-2xl"></i>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Documenti</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="documentiCantiere.length"></p>
                 </div>
             </div>
         </div>
@@ -772,10 +787,118 @@
             <!-- Tab Files -->
             <div class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800" id="files" role="tabpanel"
                 aria-labelledby="files-tab">
-                <div class="text-center py-12">
-                    <i class="fas fa-folder-open text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
-                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Sezione File</h3>
-                    <p class="text-gray-500 dark:text-gray-400">Funzionalità in fase di sviluppo</p>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between gap-4">
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Documenti collegati al cantiere</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                Bolle materiali, fatture e altra documentazione amministrativa riferita a questo cantiere.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-700 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-600">
+                        <h4 class="text-base font-semibold text-gray-900 dark:text-white mb-3">
+                            <i class="fas fa-upload mr-2 text-blue-600"></i>Carica nuovo documento
+                        </h4>
+
+                        {% if not can_write %}
+                        <div class="mb-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-700 dark:text-yellow-300 text-sm">
+                            <i class="fas fa-lock mr-2"></i>
+                            Hai accesso in sola lettura: puoi vedere i documenti collegati al cantiere, ma non puoi caricarne di nuovi.
+                        </div>
+                        {% endif %}
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Titolo</label>
+                                <input type="text" x-model="documentUploadForm.title" {% if not can_write %}disabled{% endif %}
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                    placeholder="Es: Fattura fornitura materiali 15/03/2026">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
+                                <select x-model="documentUploadForm.category" {% if not can_write %}disabled{% endif %}
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed">
+                                    <option value="amministrativi">Amministrativi</option>
+                                    <option value="documentazione">Documentazione</option>
+                                    <option value="relazioni">Relazioni</option>
+                                    <option value="altro">Altro</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrizione</label>
+                                <textarea x-model="documentUploadForm.description" rows="2" {% if not can_write %}disabled{% endif %}
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                                    placeholder="Dettagli utili per il riconoscimento del documento"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input x-ref="cantiereDocumentInput" @change="handleCantiereDocumentSelected($event)" type="file"
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.tif,.tiff,.zip" class="hidden" {% if not can_write %}disabled{% endif %}>
+
+                            <button type="button" @click="openCantiereDocumentPicker()" {% if not can_write %}disabled{% endif %}
+                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-60 disabled:cursor-not-allowed">
+                                <i class="fas fa-paperclip mr-2"></i>
+                                Seleziona file
+                            </button>
+
+                            <span class="text-sm text-gray-600 dark:text-gray-300" x-show="documentUploadForm.file"
+                                x-text="documentUploadForm.file ? `${documentUploadForm.file.name} (${formatDocumentFileSize(documentUploadForm.file.size)})` : ''"></span>
+
+                            <button type="button" @click="uploadCantiereDocument()" :disabled="uploadingCantiereDocument {% if not can_write %}|| true{% endif %}"
+                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed">
+                                <i class="fas fa-cloud-upload-alt mr-2" x-show="!uploadingCantiereDocument"></i>
+                                <i class="fas fa-spinner fa-spin mr-2" x-show="uploadingCantiereDocument"></i>
+                                <span x-text="uploadingCantiereDocument ? 'Caricamento...' : 'Carica documento' "></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-700 rounded-lg shadow overflow-hidden">
+                        <div class="divide-y divide-gray-200 dark:divide-gray-600" x-show="documentiCantiere.length > 0">
+                            <template x-for="doc in documentiCantiere" :key="doc.id">
+                                <div class="p-4 flex items-start justify-between gap-3 hover:bg-gray-50 dark:hover:bg-gray-600/30 transition-colors">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                            <h5 class="font-semibold text-gray-900 dark:text-white truncate" x-text="doc.title || doc.filename"></h5>
+                                            <span class="text-xs px-2 py-0.5 rounded-full"
+                                                :class="getDocumentCategoryBadgeClass(doc.category)"
+                                                x-text="getDocumentCategoryLabel(doc.category)"></span>
+                                        </div>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400" x-show="doc.description" x-text="doc.description"></p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            <span x-text="doc.filename"></span>
+                                            <span class="mx-1">•</span>
+                                            <span x-text="formatDocumentFileSize(doc.file_size)"></span>
+                                            <span class="mx-1">•</span>
+                                            <span x-text="formatDocumentDate(doc.uploaded_at)"></span>
+                                        </p>
+                                    </div>
+                                    <div class="flex items-center gap-2 flex-shrink-0">
+                                        <a :href="`/api/v1/sites/{{ site.id }}/documents/${doc.id}/preview?inline=true`"
+                                            target="_blank"
+                                            class="p-2 rounded-md text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-gray-600"
+                                            title="Anteprima">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a :href="`/api/v1/sites/{{ site.id }}/documents/${doc.id}/download`"
+                                            class="p-2 rounded-md text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-gray-600"
+                                            title="Scarica">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div x-show="documentiCantiere.length === 0" class="text-center py-10">
+                            <i class="fas fa-folder-open text-gray-300 dark:text-gray-600 text-4xl mb-3"></i>
+                            <p class="text-gray-600 dark:text-gray-300 font-medium">Nessun documento collegato al cantiere</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Carica una bolla materiale o una fattura per associarla subito a questo cantiere.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -798,6 +921,15 @@
             modalMode: 'giornale', // 'giornale' or 'edit-cantiere'
             loadingExport: false,
             loadingExportWord: false,
+            uploadingCantiereDocument: false,
+            documentiCantiere: {{ documenti_cantiere|tojson if documenti_cantiere else '[]' }},
+            documentUploadForm: {
+                file: null,
+                title: '',
+                description: '',
+                category: 'amministrativi',
+                tags: ''
+            },
 
             // Enhanced operator data structure
             operatori_data: {}, // Store enhanced operator data { operatorId: { ore_lavorate, note_presenza } }
@@ -1337,6 +1469,166 @@
                 setTimeout(() => {
                     this.alert.show = false;
                 }, 5000);
+            },
+
+            openCantiereDocumentPicker() {
+                if (this.$refs.cantiereDocumentInput) {
+                    this.$refs.cantiereDocumentInput.click();
+                }
+            },
+
+            handleCantiereDocumentSelected(event) {
+                const file = event?.target?.files?.[0] || null;
+                if (!file) {
+                    return;
+                }
+
+                if (file.size > 52428800) {
+                    this.showAlert('error', 'Il file supera la dimensione massima di 50MB');
+                    event.target.value = '';
+                    return;
+                }
+
+                this.documentUploadForm.file = file;
+                if (!this.documentUploadForm.title) {
+                    this.documentUploadForm.title = file.name.replace(/\.[^/.]+$/, '');
+                }
+            },
+
+            guessDocumentTypeFromFile(file) {
+                if (!file) return '';
+                const name = (file.name || '').toLowerCase();
+                if (name.endsWith('.pdf')) return 'pdf';
+                if (name.endsWith('.doc') || name.endsWith('.docx')) return 'word';
+                if (name.endsWith('.xls') || name.endsWith('.xlsx')) return 'excel';
+                if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.tif') || name.endsWith('.tiff')) return 'image';
+                if (name.endsWith('.zip')) return 'archive';
+                return file.type || '';
+            },
+
+            resetCantiereDocumentForm() {
+                this.documentUploadForm = {
+                    file: null,
+                    title: '',
+                    description: '',
+                    category: 'amministrativi',
+                    tags: ''
+                };
+                if (this.$refs.cantiereDocumentInput) {
+                    this.$refs.cantiereDocumentInput.value = '';
+                }
+            },
+
+            formatDocumentFileSize(bytes) {
+                const value = Number(bytes || 0);
+                if (!value) return '0 B';
+                const units = ['B', 'KB', 'MB', 'GB'];
+                const idx = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+                const size = value / Math.pow(1024, idx);
+                return `${size.toFixed(size >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`;
+            },
+
+            formatDocumentDate(value) {
+                if (!value) return 'Data non disponibile';
+                try {
+                    return new Date(value).toLocaleString('it-IT');
+                } catch (_) {
+                    return 'Data non disponibile';
+                }
+            },
+
+            getDocumentCategoryLabel(category) {
+                const labels = {
+                    relazioni: 'Relazioni',
+                    documentazione: 'Documentazione',
+                    planimetrie: 'Planimetrie',
+                    pubblicazioni: 'Pubblicazioni',
+                    amministrativi: 'Amministrativi',
+                    altro: 'Altro'
+                };
+                return labels[category] || 'Documento';
+            },
+
+            getDocumentCategoryBadgeClass(category) {
+                const classes = {
+                    relazioni: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+                    documentazione: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+                    planimetrie: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
+                    pubblicazioni: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+                    amministrativi: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
+                    altro: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                };
+                return classes[category] || classes.altro;
+            },
+
+            async uploadCantiereDocument() {
+                if (!this.documentUploadForm.file) {
+                    this.showAlert('error', 'Seleziona un file da caricare');
+                    return;
+                }
+                if (!this.documentUploadForm.title?.trim()) {
+                    this.showAlert('error', 'Inserisci un titolo documento');
+                    return;
+                }
+
+                this.uploadingCantiereDocument = true;
+
+                try {
+                    const cantiereTag = `cantiere:{{ cantiere.id }}`;
+                    const userTags = (this.documentUploadForm.tags || '')
+                        .split(',')
+                        .map(tag => tag.trim())
+                        .filter(tag => tag.length > 0 && tag !== cantiereTag);
+                    const mergedTags = [...userTags, cantiereTag].join(',');
+
+                    const formData = new FormData();
+                    formData.append('file', this.documentUploadForm.file);
+                    formData.append('title', this.documentUploadForm.title.trim());
+                    formData.append('description', this.documentUploadForm.description || '');
+                    formData.append('category', this.documentUploadForm.category || 'amministrativi');
+                    formData.append('doc_type', this.guessDocumentTypeFromFile(this.documentUploadForm.file));
+                    formData.append('tags', mergedTags);
+                    formData.append('doc_date', new Date().toISOString().slice(0, 10));
+                    formData.append('author', '');
+                    formData.append('is_public', 'true');
+
+                    const response = await fetch(`/api/v1/sites/{{ site.id }}/documents`, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'include'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(await this.parseApiError(response, 'Errore nel caricamento del documento'));
+                    }
+
+                    const result = await response.json();
+                    const uploaded = result?.document || {};
+
+                    this.documentiCantiere.unshift({
+                        id: uploaded.id,
+                        title: uploaded.title || this.documentUploadForm.title,
+                        description: this.documentUploadForm.description || '',
+                        category: this.documentUploadForm.category || 'amministrativi',
+                        doc_type: this.guessDocumentTypeFromFile(this.documentUploadForm.file),
+                        filename: uploaded.filename || this.documentUploadForm.file.name,
+                        file_size: this.documentUploadForm.file.size,
+                        mime_type: this.documentUploadForm.file.type,
+                        tags: mergedTags ? mergedTags.split(',') : [],
+                        doc_date: null,
+                        author: null,
+                        uploaded_at: uploaded.uploaded_at || new Date().toISOString(),
+                        uploaded_by: null
+                    });
+
+                    this.resetCantiereDocumentForm();
+                    this.showAlert('success', 'Documento caricato e collegato al cantiere');
+                } catch (error) {
+                    console.error('Error uploading cantiere document:', error);
+                    this.showAlert('error', error.message || 'Errore durante il caricamento del documento');
+                } finally {
+                    this.uploadingCantiereDocument = false;
+                }
             },
 
             // Load operators for the modal
@@ -2487,70 +2779,3 @@
 
 </script>
 {% endblock %}
-
-
-async exportSingleGiornalePDF(giornale) {
-try {
-this.loadingExport = true;
-this.showAlert('info', 'Generazione PDF singolo giornale in corso...');
-
-const exportUrl = `/api/v1/giornale/sites/{{ site.id }}/giornali/${giornale.id}/export-pdf`;
-
-console.log('🔍 [DEBUG] Exporting single giornale PDF:', giornale.id);
-
-const response = await fetch(exportUrl, {
-method: 'GET',
-headers: {
-'Content-Type': 'application/json',
-'X-Requested-With': 'XMLHttpRequest'
-},
-credentials: 'include'
-});
-
-if (!response.ok) {
-const errorText = await response.text();
-let errorMessage = 'Errore nella generazione del PDF del giornale';
-try {
-const errorData = JSON.parse(errorText);
-errorMessage = errorData.detail || errorMessage;
-} catch (e) {
-errorMessage = errorText || errorMessage;
-}
-throw new Error(errorMessage);
-}
-
-// Get filename from Content-Disposition header
-const contentDisposition = response.headers.get('Content-Disposition');
-let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.pdf`;
-
-if (contentDisposition) {
-const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-if (filenameMatch && filenameMatch[1]) {
-filename = filenameMatch[1].replace(/['"]/g, '');
-}
-}
-
-const blob = await response.blob();
-const url = window.URL.createObjectURL(blob);
-const link = document.createElement('a');
-link.href = url;
-link.download = filename;
-link.style.display = 'none';
-
-document.body.appendChild(link);
-link.click();
-
-setTimeout(() => {
-document.body.removeChild(link);
-window.URL.revokeObjectURL(url);
-}, 100);
-
-this.showAlert('success', 'PDF del giornale generato con successo!');
-
-} catch (error) {
-console.error('🔍 [DEBUG] Error exporting single giornale PDF:', error);
-this.showAlert('error', `Errore nell'esportazione del PDF: ${error.message || error}`);
-} finally {
-this.loadingExport = false;
-}
-}
