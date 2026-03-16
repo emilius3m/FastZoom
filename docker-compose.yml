@@ -11,6 +11,7 @@ services:
     environment:
 #      DATABASE_URL: sqlite+aiosqlite:///./archaeological_catalog.db
       DATABASE_URL: sqlite+aiosqlite:////app/data/archaeological_catalog.db
+      PYTHONPATH: /app
       MINIO_CONFIG_PROFILE: local
       MINIO_LOCAL_URL: http://minio:9000
       MINIO_LOCAL_ACCESS_KEY: minioadmin
@@ -25,7 +26,6 @@ services:
     depends_on:
       - minio
     volumes:
-      - .:/app
       - ./data:/app/data
 
   minio:
