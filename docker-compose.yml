@@ -6,7 +6,7 @@ services:
     security_opt:
       - apparmor=unconfined
     working_dir: /app
-    command: python -m uvicorn app.app:app --host 0.0.0.0 --port 8000 --loop asyncio --reload --reload-dir /app/app
+    command: python -m uvicorn app.app:app --host 0.0.0.0 --port 8000 --loop asyncio
     environment:
 #      DATABASE_URL: sqlite+aiosqlite:///./archaeological_catalog.db
       DATABASE_URL: sqlite+aiosqlite:////app/data/archaeological_catalog.db
