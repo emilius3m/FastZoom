@@ -26,7 +26,7 @@ services:
     depends_on:
       - minio
     volumes:
-      - ./data:/app/data
+      - /opt/FastZoom/data:/app/data
 
   minio:
     image: minio/minio:latest
