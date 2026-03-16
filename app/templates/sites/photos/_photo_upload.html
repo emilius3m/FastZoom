@@ -2,15 +2,15 @@
 <!-- Componente modulare per l'upload di foto con metadati archeologici -->
 <!-- Parametri configurabili disponibili tramite data-* attributes -->
 
-<div x-data="photoUploadComponent"
-    class="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50"
-    :class="{'hidden': !isModalOpen}" x-show="isModalOpen" x-transition:enter="transition ease-out duration-300"
-    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0" data-upload-url="/api/v1/sites/{{ site.id }}/photos/upload"
+<div x-data="photoUploadComponent" data-upload-url="/api/v1/sites/{{ site.id }}/photos/upload"
     data-site-id="{{ site.id }}" data-allowed-types="image/*" data-max-file-size="10GB" data-max-files="100"
     data-success-callback="refreshPhotos" data-error-callback="showUploadError" data-custom-styles="default"
     data-show-archaeological-fields="true" x-init="initializeUploadComponent($el)">
+
+    <div x-show="isModalOpen" x-cloak class="fixed inset-0 bg-gray-600 dark:bg-gray-900 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+        x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
 
     <div class="relative top-5 mx-auto border shadow-lg rounded-md bg-white dark:bg-gray-800 max-w-7xl h-[90vh] flex flex-col"
         :class="modalSizeClasses" data-theme="currentTheme">
@@ -315,6 +315,8 @@
                 </button>
             </div>
         </div>
+
+    </div>
 
     </div>
 

@@ -19,12 +19,24 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
     # 🔧 FIXED: Check if it's an API route FIRST before redirecting
     if route and route.startswith("/api/"):
+        detail = exc.detail if getattr(exc, "detail", None) is not None else "An error occurred"
+
+        # Manteniamo backward compatibility su "errors" e aggiungiamo "detail"
+        # per i client che leggono errorData.detail
+        if isinstance(detail, list):
+            errors = [str(item) for item in detail]
+        elif isinstance(detail, dict):
+            errors = [str(detail.get("message") or detail)]
+        else:
+            errors = [str(detail)]
+
         # For API routes, return JSON response instead of redirecting
         return JSONResponse(
             status_code=exc.status_code,
             content={
                 "valid": False,
-                "errors": [exc.detail or "An error occurred"],
+                "detail": detail,
+                "errors": errors,
                 "schema_type": None,
                 "level": None,
                 "validation_timestamp": "2025-10-01T14:56:49.482Z"

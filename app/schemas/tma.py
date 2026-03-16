@@ -182,7 +182,7 @@ class SchedaTMABase(BaseModel):
 
     # DT
     dtzg: str = Field(..., max_length=50)
-    dtm: List[str] = Field(..., min_length=1)
+    dtm: List[str] = Field(default_factory=list)
 
     # DA
     nsc: Optional[str] = Field(None, max_length=4000)
@@ -202,8 +202,8 @@ class SchedaTMABase(BaseModel):
 
     # CM
     cmpd: str = Field(..., min_length=4, max_length=4)
-    cmpn: List[str] = Field(..., min_length=1)
-    fur: List[str] = Field(..., min_length=1)
+    cmpn: List[str] = Field(default_factory=list)
+    fur: List[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="forbid", use_enum_values=True)
 
@@ -292,10 +292,7 @@ class SchedaTMABase(BaseModel):
     def normalize_dtm(cls, values: List[str]) -> List[str]:
         normalized = [v.strip() for v in values if v and v.strip()]
         if not normalized:
-            # Backward compatibility: existing historical records may have empty arrays.
-            if cls.__name__ == "SchedaTMARead":
-                return []
-            raise ValueError("DTM richiede almeno una motivazione")
+            return []
 
         invalid = [v for v in normalized if v not in _DTM_MOTIVAZIONI_TMA_EXTENDED_VALORI]
         if invalid:
@@ -314,11 +311,6 @@ class SchedaTMABase(BaseModel):
     @classmethod
     def validate_name_list(cls, values: List[str]) -> List[str]:
         normalized = [v.strip() for v in values if v and v.strip()]
-        if not normalized:
-            # Backward compatibility: allow empty arrays only for read serialization.
-            if cls.__name__ == "SchedaTMARead":
-                return []
-            raise ValueError("La lista non può essere vuota")
         return normalized
 
     @model_validator(mode="after")
@@ -345,7 +337,25 @@ class SchedaTMABase(BaseModel):
 
 
 class SchedaTMACreate(SchedaTMABase):
-    pass
+    dtm: List[str] = Field(..., min_length=1)
+    cmpn: List[str] = Field(..., min_length=1)
+    fur: List[str] = Field(..., min_length=1)
+
+    @field_validator("dtm")
+    @classmethod
+    def validate_create_dtm_not_empty(cls, values: List[str]) -> List[str]:
+        normalized = [v.strip() for v in values if v and v.strip()]
+        if not normalized:
+            raise ValueError("DTM richiede almeno una motivazione")
+        return normalized
+
+    @field_validator("cmpn", "fur")
+    @classmethod
+    def validate_create_name_list_not_empty(cls, values: List[str]) -> List[str]:
+        normalized = [v.strip() for v in values if v and v.strip()]
+        if not normalized:
+            raise ValueError("La lista non può essere vuota")
+        return normalized
 
 
 class SchedaTMAUpdate(BaseModel):
