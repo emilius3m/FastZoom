@@ -10,6 +10,29 @@
 {% block content %}
 <div class=" mx-auto p-6" x-data="photosManager">
 
+    {% if is_giornale_linker and giornale_id %}
+    <div class="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/20 p-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+                <h2 class="text-base font-semibold text-indigo-900 dark:text-indigo-200 flex items-center">
+                    <i class="fas fa-link mr-2"></i>
+                    Modalità collegamento foto al giornale
+                </h2>
+                <p class="text-sm text-indigo-700 dark:text-indigo-300 mt-1">
+                    Seleziona una o più foto e usa le azioni rapide per collegarle o scollegarle dal giornale corrente.
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="/view/{{ site.id }}/cantieri"
+                   class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium bg-white dark:bg-gray-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/40">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Torna ai cantieri
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Toast Notifications System -->
     {% include 'components/_toast_notifications.html' %}
 
@@ -62,6 +85,24 @@
 
                 <div class="flex items-center space-x-3">
                     {% if can_write %}
+                    {% if is_giornale_linker and giornale_id %}
+                    <button @click="linkSelectedToGiornale()"
+                        :disabled="selectedPhotos.length === 0 || (typeof giornaleLinkLoading !== 'undefined' && giornaleLinkLoading)"
+                        :class="(selectedPhotos.length === 0 || (typeof giornaleLinkLoading !== 'undefined' && giornaleLinkLoading)) ? 'opacity-50 cursor-not-allowed bg-emerald-400 dark:bg-emerald-700' : 'bg-emerald-600 dark:bg-emerald-700 hover:bg-emerald-700 dark:hover:bg-emerald-800'"
+                        class="inline-flex items-center px-4 py-2 border-transparent rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500">
+                        <i class="fas fa-link mr-2"></i>
+                        <span x-text="(typeof giornaleLinkLoading !== 'undefined' && giornaleLinkLoading) ? 'Collegamento...' : `Collega selezionate (${selectedPhotos.length})`"></span>
+                    </button>
+
+                    <button @click="unlinkSelectedFromGiornale()"
+                        :disabled="selectedPhotos.length === 0 || (typeof giornaleUnlinkLoading !== 'undefined' && giornaleUnlinkLoading)"
+                        :class="(selectedPhotos.length === 0 || (typeof giornaleUnlinkLoading !== 'undefined' && giornaleUnlinkLoading)) ? 'opacity-50 cursor-not-allowed bg-amber-400 dark:bg-amber-700' : 'bg-amber-600 dark:bg-amber-700 hover:bg-amber-700 dark:hover:bg-amber-800'"
+                        class="inline-flex items-center px-4 py-2 border-transparent rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500">
+                        <i class="fas fa-unlink mr-2"></i>
+                        <span x-text="(typeof giornaleUnlinkLoading !== 'undefined' && giornaleUnlinkLoading) ? 'Scollegamento...' : `Scollega selezionate (${selectedPhotos.length})`"></span>
+                    </button>
+                    {% endif %}
+
                     <!-- Upload Button -->
                     <button @click="openUploadModal()"
                         class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
@@ -539,7 +580,14 @@
 </div>
 
 <!-- Main JavaScript Component -->
-<script src="/static/js/photos.js"></script>
+<script>
+    window.photosPageContext = {
+        mode: {{ photos_mode|tojson }},
+        giornaleId: {{ giornale_id|tojson }},
+        isGiornaleLinker: {{ is_giornale_linker|tojson }}
+    };
+</script>
+<script src="/static/js/photos.js?v=20260317a"></script>
 <!-- TUS Uploader Client -->
 <script src="/static/js/tus-uploader.js"></script>
 <!-- Photo Upload Component JavaScript -->

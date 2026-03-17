@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Set
 from uuid import UUID
 from datetime import date
 from sqlalchemy import select, and_, or_, desc, delete, func
@@ -12,8 +12,10 @@ from app.models.giornale_cantiere import (
     MezzoCantiere,
     giornale_operatori_association,
     giornale_mezzi_association,
+    giornale_foto_association,
 )
 from app.models.cantiere import Cantiere
+from app.models.documentation_and_field import Photo
 
 class GiornaleRepository(BaseRepository[GiornaleCantiere]):
     def __init__(self, db_session: AsyncSession):
@@ -280,7 +282,6 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
 
     async def unlink_photo(self, giornale_id: UUID, foto_id: UUID) -> bool:
         """Unlink a photo"""
-        from app.models.giornale_cantiere import giornale_foto_association
         stmt = giornale_foto_association.delete().where(
             and_(
                 giornale_foto_association.c.giornale_id == str(giornale_id),
@@ -289,6 +290,159 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
         )
         result = await self.db_session.execute(stmt)
         return result.rowcount > 0
+
+    async def list_photo_archive_for_giornale(
+        self,
+        site_id: UUID,
+        giornale_id: UUID,
+        skip: int = 0,
+        limit: int = 40,
+        search: Optional[str] = None,
+        link_state: str = "all",
+        sort_by: str = "created_desc",
+    ) -> Dict[str, Any]:
+        """Elenco foto paginato per manager dedicato giornale."""
+        linked_subquery = select(giornale_foto_association.c.foto_id).where(
+            giornale_foto_association.c.giornale_id == str(giornale_id)
+        )
+
+        filters = [Photo.site_id == str(site_id)]
+
+        if search:
+            search_term = f"%{search.strip()}%"
+            filters.append(
+                or_(
+                    Photo.filename.ilike(search_term),
+                    Photo.original_filename.ilike(search_term),
+                    Photo.title.ilike(search_term),
+                    Photo.description.ilike(search_term),
+                )
+            )
+
+        if link_state == "linked":
+            filters.append(Photo.id.in_(linked_subquery))
+        elif link_state == "unlinked":
+            filters.append(~Photo.id.in_(linked_subquery))
+
+        where_clause = and_(*filters)
+
+        count_query = select(func.count(Photo.id)).where(where_clause)
+        total_result = await self.db_session.execute(count_query)
+        total = total_result.scalar() or 0
+
+        order_mappings = {
+            "created_desc": Photo.created_at.desc(),
+            "created_asc": Photo.created_at.asc(),
+            "filename_asc": Photo.filename.asc(),
+            "filename_desc": Photo.filename.desc(),
+        }
+        order_by = order_mappings.get(sort_by, Photo.created_at.desc())
+
+        items_query = (
+            select(Photo)
+            .where(where_clause)
+            .order_by(order_by)
+            .offset(skip)
+            .limit(limit)
+        )
+        items_result = await self.db_session.execute(items_query)
+        photos = items_result.scalars().all()
+
+        linked_ids_result = await self.db_session.execute(
+            select(giornale_foto_association.c.foto_id).where(
+                giornale_foto_association.c.giornale_id == str(giornale_id)
+            )
+        )
+        linked_ids = {str(row[0]) for row in linked_ids_result.fetchall()}
+
+        data = []
+        for photo in photos:
+            photo_id = str(photo.id)
+            data.append(
+                {
+                    "id": photo_id,
+                    "filename": photo.filename,
+                    "original_filename": photo.original_filename,
+                    "title": photo.title,
+                    "description": photo.description,
+                    "created_at": photo.created_at.isoformat() if photo.created_at else None,
+                    "thumbnail_url": f"/api/v1/photos/{photo_id}/thumbnail",
+                    "full_url": f"/api/v1/photos/{photo_id}/full",
+                    "linked": photo_id in linked_ids,
+                }
+            )
+
+        return {
+            "items": data,
+            "total": total,
+            "linked_count": len(linked_ids),
+        }
+
+    async def get_site_photo_ids(self, site_id: UUID, photo_ids: List[UUID]) -> Set[str]:
+        """Restituisce gli ID foto validi appartenenti al sito."""
+        normalized_ids = [str(photo_id) for photo_id in (photo_ids or []) if photo_id]
+        if not normalized_ids:
+            return set()
+
+        result = await self.db_session.execute(
+            select(Photo.id).where(
+                and_(
+                    Photo.site_id == str(site_id),
+                    Photo.id.in_(normalized_ids),
+                )
+            )
+        )
+        return {str(row[0]) for row in result.fetchall()}
+
+    async def bulk_link_photos(self, giornale_id: UUID, photo_ids: List[UUID]) -> Dict[str, int]:
+        """Collega in blocco foto a un giornale saltando quelle già associate."""
+        normalized_ids = [str(photo_id) for photo_id in (photo_ids or []) if photo_id]
+        if not normalized_ids:
+            return {"linked_count": 0, "already_linked": 0}
+
+        existing_result = await self.db_session.execute(
+            select(giornale_foto_association.c.foto_id).where(
+                and_(
+                    giornale_foto_association.c.giornale_id == str(giornale_id),
+                    giornale_foto_association.c.foto_id.in_(normalized_ids),
+                )
+            )
+        )
+        existing_ids = {str(row[0]) for row in existing_result.fetchall()}
+
+        to_insert = [
+            {
+                "giornale_id": str(giornale_id),
+                "foto_id": photo_id,
+                "ordine": 0,
+            }
+            for photo_id in normalized_ids
+            if photo_id not in existing_ids
+        ]
+
+        if to_insert:
+            await self.db_session.execute(giornale_foto_association.insert(), to_insert)
+
+        return {
+            "linked_count": len(to_insert),
+            "already_linked": len(existing_ids),
+        }
+
+    async def bulk_unlink_photos(self, giornale_id: UUID, photo_ids: List[UUID]) -> int:
+        """Scollega in blocco foto da un giornale."""
+        normalized_ids = [str(photo_id) for photo_id in (photo_ids or []) if photo_id]
+        if not normalized_ids:
+            return 0
+
+        result = await self.db_session.execute(
+            giornale_foto_association.delete().where(
+                and_(
+                    giornale_foto_association.c.giornale_id == str(giornale_id),
+                    giornale_foto_association.c.foto_id.in_(normalized_ids),
+                )
+            )
+        )
+        return result.rowcount or 0
 
     async def get_operators_with_stats(self, site_id: UUID, skip: int = 0, limit: int = 20, filters: Dict[str, Any] = None) -> Tuple[List[Any], int]:
         """

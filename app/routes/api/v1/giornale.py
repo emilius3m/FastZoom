@@ -25,6 +25,20 @@ from app.services.giornale_service import GiornaleService
 
 router = APIRouter()
 
+
+def _parse_uuid_list(values: Any) -> List[UUID]:
+    """Normalizza una lista di UUID da payload JSON."""
+    if not isinstance(values, list):
+        return []
+
+    parsed: List[UUID] = []
+    for value in values:
+        try:
+            parsed.append(UUID(str(value)))
+        except Exception:
+            continue
+    return parsed
+
 def normalize_site_id(site_id: str) -> Optional[str]:
     """
     Normalizza l'ID del sito per supportare diversi formati.
@@ -1550,6 +1564,97 @@ async def export_single_giornale_word(
 
 
 # ===== GESTIONE FOTO GIORNALE =====
+
+@router.get("/sites/{site_id}/giornali/{giornale_id}/foto/archive", summary="Archivio foto paginato per giornale", tags=["Giornale di Cantiere"])
+async def v1_get_giornale_photo_archive(
+    site_id: UUID,
+    giornale_id: UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(40, ge=1, le=200),
+    search: Optional[str] = Query(None),
+    link_state: str = Query("all", pattern="^(all|linked|unlinked)$"),
+    sort_by: str = Query("created_desc"),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """Elenco foto paginato per la pagina dedicata di gestione fotografica giornale."""
+    try:
+        verify_site_access(site_id, user_sites)
+        service = GiornaleService(db)
+        return await service.list_photo_archive_for_giornale(
+            site_id=site_id,
+            giornale_id=giornale_id,
+            user_id=current_user_id,
+            skip=skip,
+            limit=limit,
+            search=search,
+            link_state=link_state,
+            sort_by=sort_by,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore archivio foto giornale {giornale_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nel recupero archivio foto")
+
+
+@router.post("/sites/{site_id}/giornali/{giornale_id}/foto/bulk-link", summary="Collega foto in blocco", tags=["Giornale di Cantiere"])
+async def v1_bulk_link_foto_to_giornale(
+    site_id: UUID,
+    giornale_id: UUID,
+    payload: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """Collega più foto esistenti al giornale in una singola operazione."""
+    try:
+        verify_site_access(site_id, user_sites)
+        photo_ids = _parse_uuid_list(payload.get("photo_ids"))
+        if not photo_ids:
+            raise HTTPException(status_code=400, detail="photo_ids obbligatorio e non vuoto")
+
+        service = GiornaleService(db)
+        result = await service.bulk_link_photos(site_id, giornale_id, photo_ids, current_user_id)
+        return {
+            "message": "Collegamento foto completato",
+            **result,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore bulk link foto giornale {giornale_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nel collegamento massivo delle foto")
+
+
+@router.post("/sites/{site_id}/giornali/{giornale_id}/foto/bulk-unlink", summary="Scollega foto in blocco", tags=["Giornale di Cantiere"])
+async def v1_bulk_unlink_foto_from_giornale(
+    site_id: UUID,
+    giornale_id: UUID,
+    payload: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """Scollega più foto dal giornale in una singola operazione."""
+    try:
+        verify_site_access(site_id, user_sites)
+        photo_ids = _parse_uuid_list(payload.get("photo_ids"))
+        if not photo_ids:
+            raise HTTPException(status_code=400, detail="photo_ids obbligatorio e non vuoto")
+
+        service = GiornaleService(db)
+        result = await service.bulk_unlink_photos(site_id, giornale_id, photo_ids, current_user_id)
+        return {
+            "message": "Scollegamento foto completato",
+            **result,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore bulk unlink foto giornale {giornale_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nello scollegamento massivo delle foto")
 
 @router.post("/sites/{site_id}/giornali/{giornale_id}/foto/{foto_id}", summary="Link foto a giornale", tags=["Giornale di Cantiere"])
 async def v1_link_foto_to_giornale(

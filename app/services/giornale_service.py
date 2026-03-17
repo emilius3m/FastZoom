@@ -805,6 +805,103 @@ class GiornaleService:
             raise HTTPException(status_code=404, detail="Associazione non trovata")
         await self.db.commit()
 
+    async def list_photo_archive_for_giornale(
+        self,
+        site_id: UUID,
+        giornale_id: UUID,
+        user_id: UUID,
+        skip: int = 0,
+        limit: int = 40,
+        search: Optional[str] = None,
+        link_state: str = "all",
+        sort_by: str = "created_desc",
+    ) -> Dict[str, Any]:
+        """Elenco paginato foto per pagina dedicata gestione giornale."""
+        giornale = await self.repository.get(giornale_id)
+        if not giornale or str(giornale.site_id) != str(site_id):
+            raise HTTPException(status_code=404, detail="Giornale non trovato")
+
+        archive = await self.repository.list_photo_archive_for_giornale(
+            site_id=site_id,
+            giornale_id=giornale_id,
+            skip=skip,
+            limit=limit,
+            search=search,
+            link_state=link_state,
+            sort_by=sort_by,
+        )
+
+        return {
+            "giornale_id": str(giornale_id),
+            "site_id": str(site_id),
+            "items": archive["items"],
+            "total": archive["total"],
+            "skip": skip,
+            "limit": limit,
+            "linked_count": archive["linked_count"],
+        }
+
+    async def bulk_link_photos(
+        self,
+        site_id: UUID,
+        giornale_id: UUID,
+        photo_ids: List[UUID],
+        user_id: UUID,
+    ) -> Dict[str, Any]:
+        """Collega in blocco foto esistenti al giornale."""
+        giornale = await self.repository.get(giornale_id)
+        if not giornale or str(giornale.site_id) != str(site_id):
+            raise HTTPException(status_code=404, detail="Giornale non trovato")
+        await self._ensure_responsabile_or_superuser(giornale, user_id)
+        if giornale.validato:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Giornale validato: modifica allegati non consentita",
+            )
+
+        valid_site_photo_ids = await self.repository.get_site_photo_ids(site_id, photo_ids)
+        if not valid_site_photo_ids:
+            raise HTTPException(status_code=400, detail="Nessuna foto valida selezionata per questo sito")
+
+        normalized_ids = [UUID(photo_id) for photo_id in valid_site_photo_ids]
+        result = await self.repository.bulk_link_photos(giornale_id, normalized_ids)
+        await self.db.commit()
+
+        return {
+            "giornale_id": str(giornale_id),
+            "linked_count": result["linked_count"],
+            "already_linked": result["already_linked"],
+            "requested": len(photo_ids or []),
+            "valid_site_photos": len(valid_site_photo_ids),
+        }
+
+    async def bulk_unlink_photos(
+        self,
+        site_id: UUID,
+        giornale_id: UUID,
+        photo_ids: List[UUID],
+        user_id: UUID,
+    ) -> Dict[str, Any]:
+        """Scollega in blocco foto dal giornale."""
+        giornale = await self.repository.get(giornale_id)
+        if not giornale or str(giornale.site_id) != str(site_id):
+            raise HTTPException(status_code=404, detail="Giornale non trovato")
+        await self._ensure_responsabile_or_superuser(giornale, user_id)
+        if giornale.validato:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Giornale validato: modifica allegati non consentita",
+            )
+
+        unlinked_count = await self.repository.bulk_unlink_photos(giornale_id, photo_ids)
+        await self.db.commit()
+
+        return {
+            "giornale_id": str(giornale_id),
+            "unlinked_count": unlinked_count,
+            "requested": len(photo_ids or []),
+        }
+
     async def list_site_operators(self, site_id: UUID, skip: int = 0, limit: int = 20, filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """List operators with stats"""
         operators_with_stats, total = await self.repository.get_operators_with_stats(site_id, skip, limit, filters)
@@ -837,5 +934,4 @@ class GiornaleService:
             "data": operators_data,
             "count": total
         }
-
 

@@ -66,10 +66,23 @@ function photosManager() {
         viewMode: 'grid',
         selectedPhotos: [],
         userRole: window.userRole || 'user',
+        photosPageContext: window.photosPageContext || {},
+        photosMode: null,
+        giornaleId: null,
+        isGiornaleLinker: false,
+        giornaleLinkLoading: false,
+        giornaleUnlinkLoading: false,
 
         // Multi-edit state
         get isMultipleSelection() {
             return this.selectedPhotos.length > 1;
+        },
+
+        // Selected photo objects (derived from selected IDs)
+        get selectedPhotoObjects() {
+            return (this.selectedPhotos || [])
+                .map(photoId => this.photos.find(p => p && p.id === photoId))
+                .filter(Boolean);
         },
 
         // Modal States
@@ -205,6 +218,12 @@ function photosManager() {
 
             // Make this instance globally accessible
             window.photosManagerInstance = this;
+
+            // Page contextual mode (es. linker giornale)
+            const pageContext = window.photosPageContext || {};
+            this.photosMode = pageContext.mode || null;
+            this.giornaleId = pageContext.giornaleId || null;
+            this.isGiornaleLinker = Boolean(pageContext.isGiornaleLinker && this.giornaleId);
 
             // Voice Command Event Listeners
             window.addEventListener('photos-select-all', () => this.selectAllPhotos());
@@ -1385,6 +1404,128 @@ function photosManager() {
 
             console.error('Could not determine current site ID');
             return null;
+        },
+
+        getGiornaleBulkEndpoint(action) {
+            if (!this.isGiornaleLinker || !this.giornaleId) {
+                return null;
+            }
+
+            const siteId = this.getCurrentSiteId();
+            if (!siteId) {
+                return null;
+            }
+
+            return `/api/v1/giornale/sites/${siteId}/giornali/${this.giornaleId}/foto/${action}`;
+        },
+
+        async linkSelectedToGiornale() {
+            if (!this.isGiornaleLinker) {
+                this.showAlertMessage('Modalità linker giornale non attiva');
+                return;
+            }
+
+            if (!this.selectedPhotos.length) {
+                this.showAlertMessage('Seleziona almeno una foto da collegare');
+                return;
+            }
+
+            const endpoint = this.getGiornaleBulkEndpoint('bulk-link');
+            if (!endpoint) {
+                this.showAlertMessage('Contesto giornale non valido');
+                return;
+            }
+
+            this.giornaleLinkLoading = true;
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        photo_ids: this.selectedPhotos
+                    })
+                });
+
+                if (!response.ok) {
+                    const raw = await response.text();
+                    let message = 'Errore durante il collegamento delle foto';
+                    try {
+                        const data = JSON.parse(raw);
+                        message = data?.detail || data?.message || message;
+                    } catch (_) {
+                        if (raw) message = raw;
+                    }
+                    throw new Error(message);
+                }
+
+                const result = await response.json();
+                const linked = Number(result.linked_count || 0);
+                const already = Number(result.already_linked || 0);
+                this.selectedPhotos = [];
+                this.showAlertMessage(`Collegate ${linked} foto (${already} già collegate).`);
+            } catch (error) {
+                console.error('Errore link foto a giornale:', error);
+                this.showAlertMessage(error.message || 'Errore durante il collegamento delle foto');
+            } finally {
+                this.giornaleLinkLoading = false;
+            }
+        },
+
+        async unlinkSelectedFromGiornale() {
+            if (!this.isGiornaleLinker) {
+                this.showAlertMessage('Modalità linker giornale non attiva');
+                return;
+            }
+
+            if (!this.selectedPhotos.length) {
+                this.showAlertMessage('Seleziona almeno una foto da scollegare');
+                return;
+            }
+
+            const endpoint = this.getGiornaleBulkEndpoint('bulk-unlink');
+            if (!endpoint) {
+                this.showAlertMessage('Contesto giornale non valido');
+                return;
+            }
+
+            this.giornaleUnlinkLoading = true;
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        photo_ids: this.selectedPhotos
+                    })
+                });
+
+                if (!response.ok) {
+                    const raw = await response.text();
+                    let message = 'Errore durante lo scollegamento delle foto';
+                    try {
+                        const data = JSON.parse(raw);
+                        message = data?.detail || data?.message || message;
+                    } catch (_) {
+                        if (raw) message = raw;
+                    }
+                    throw new Error(message);
+                }
+
+                const result = await response.json();
+                const unlinked = Number(result.unlinked_count || 0);
+                this.selectedPhotos = [];
+                this.showAlertMessage(`Scollegate ${unlinked} foto dal giornale.`);
+            } catch (error) {
+                console.error('Errore unlink foto da giornale:', error);
+                this.showAlertMessage(error.message || 'Errore durante lo scollegamento delle foto');
+            } finally {
+                this.giornaleUnlinkLoading = false;
+            }
         },
 
         // destroyOpenSeadragon removed - now handled by the OpenSeadragon component

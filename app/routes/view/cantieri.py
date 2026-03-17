@@ -429,7 +429,6 @@ async def v1_cantiere_detail_view(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore nel caricamento della pagina dettaglio cantiere"
         )
-
 @router.get("/view/{site_id}/cantieri/nuovo", response_class=HTMLResponse, summary="Pagina nuovo cantiere", tags=["Cantieri - Views"])
 async def v1_nuovo_cantiere_view(
     request: Request,

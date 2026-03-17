@@ -31,6 +31,8 @@ async def site_photos(
         page: int = 1,
         per_page: int = 20,
         category: Optional[str] = None,
+        mode: Optional[str] = None,
+        giornale_id: Optional[UUID] = None,
         site_access: Tuple[ArchaeologicalSite, Optional[UserSitePermission], User, bool] = Depends(get_site_read_access),
         user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
@@ -73,6 +75,8 @@ async def site_photos(
     can_write = is_superuser or (permission.can_write() if permission else False)
     can_admin = is_superuser or (permission.can_admin() if permission else False)
     
+    is_giornale_linker = mode == "giornale_linker" and giornale_id is not None
+
     context = {
         "request": request,
         "site": site,
@@ -96,7 +100,10 @@ async def site_photos(
         "total_photos": total_photos,
         "total_pages": (total_photos + per_page - 1) // per_page,
         "current_photo_type": category,
-        "categories": categories
+        "categories": categories,
+        "photos_mode": mode,
+        "giornale_id": str(giornale_id) if giornale_id else None,
+        "is_giornale_linker": is_giornale_linker,
     }
 
     return templates.TemplateResponse("sites/photos.html", context)

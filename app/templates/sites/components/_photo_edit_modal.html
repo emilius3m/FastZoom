@@ -85,7 +85,7 @@
                     x-text="selectedPhotos.length + ' foto selezionate'"></h4>
             </div>
             <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2 max-h-40 overflow-y-auto">
-                <template x-for="photo in selectedPhotos.slice(0, 20)" :key="photo.id">
+                <template x-for="(photo, idx) in selectedPhotoObjects.slice(0, 20)" :key="`${photo.id}-${idx}`">
                     <div class="relative">
                         <img :src="photo.thumbnail_url || photo.file_url" :alt="photo.filename"
                             class="w-full h-16 object-cover rounded border-2 border-blue-200 dark:border-blue-600">
@@ -104,7 +104,7 @@
             @load-photo-data="loadPhotoData($event)" @submit-metadata-form="submitEditForm()"
             @reset-metadata-form="resetEditForm()" :data-mode="isMultipleSelection ? 'bulk-edit' : 'edit'"
             :data-photo="selectedPhoto ? JSON.stringify(selectedPhoto) : '{}'"
-            :data-photos="isMultipleSelection ? JSON.stringify(selectedPhotos) : '[]'">
+            :data-photos="isMultipleSelection ? JSON.stringify(selectedPhotoObjects) : '[]'">
 
             {% include 'sites/components/_metadata_form.html' %}
         </div>
