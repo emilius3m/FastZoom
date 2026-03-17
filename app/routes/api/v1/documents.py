@@ -333,7 +333,7 @@ async def v1_get_document(
         # Get document
         query = select(Document).where(
             and_(
-                Document.id == document_id,
+                Document.id == str(document_id),
                 Document.site_id == str(site_id),
                 Document.is_deleted == False
             )
@@ -389,7 +389,7 @@ async def v1_preview_document(
     try:
         query = select(Document).where(
             and_(
-                Document.id == document_id,
+                Document.id == str(document_id),
                 Document.site_id == str(site_id),
                 Document.is_deleted == False
             )
@@ -461,7 +461,7 @@ async def v1_update_document(
         # Get document
         query = select(Document).where(
             and_(
-                Document.id == document_id,
+                Document.id == str(document_id),
                 Document.site_id == str(site_id),
                 Document.is_deleted == False
             )
@@ -585,7 +585,7 @@ async def v1_delete_document(
         # Get document
         query = select(Document).where(
             and_(
-                Document.id == document_id,
+                Document.id == str(document_id),
                 Document.site_id == str(site_id),
                 Document.is_deleted == False
             )
@@ -676,7 +676,7 @@ async def v1_download_document(
         # Get document
         query = select(Document).where(
             and_(
-                Document.id == document_id,
+                Document.id == str(document_id),
                 Document.site_id == str(site_id),
                 Document.is_deleted == False
             )
