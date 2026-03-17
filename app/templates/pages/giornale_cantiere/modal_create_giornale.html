@@ -799,7 +799,7 @@
                         </p>
                     </div>
 
-                    <!-- Foto Documentation -->
+                    <!-- Documentazione Fotografica -->
                     <div class="mb-8">
                         <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
                             <i class="fas fa-camera mr-2 text-indigo-600"></i>
@@ -1066,6 +1066,66 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Documenti e Allegati (Direct Upload) -->
+                    <div class="mb-8">
+                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
+                            <i class="fas fa-file-alt mr-2 text-emerald-600"></i>
+                            Documenti e Allegati
+                            <span class="ml-2 text-sm font-normal text-gray-500"
+                                x-text="'(' + (formData.allegati_paths?.length || 0) + ' documenti caricati)'"></span>
+                        </h4>
+
+                        <div class="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-900/10 p-4">
+                            <!-- File Input Hidden -->
+                            <input type="file" x-ref="giornaleDocumentInput" @change="handleGiornaleDocumentSelected($event)" class="hidden">
+                            
+                            <div class="mb-4">
+                                <button type="button" @click="$refs.giornaleDocumentInput.click()"
+                                    class="inline-flex items-center px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">
+                                    <i class="fas fa-file-upload mr-2"></i>
+                                    Carica Nuovo Documento
+                                </button>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                    Puoi caricare bolle, fatture, relazioni o altri documenti PDF/Word direttamente nel giornale.
+                                </p>
+                            </div>
+
+                            <!-- Document List -->
+                            <div class="space-y-2 mt-4" x-show="formData.allegati_paths && formData.allegati_paths.length > 0">
+                                <template x-for="(doc, index) in formData.allegati_paths" :key="index">
+                                    <div class="flex items-center justify-between p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-sm">
+                                        <div class="flex items-center min-w-0 pr-4">
+                                            <div class="w-8 h-8 rounded bg-gray-100 dark:bg-gray-600 flex items-center justify-center mr-3 flex-shrink-0">
+                                                <i class="fas" :class="doc.includes('.pdf') ? 'fa-file-pdf text-red-500' : 'fa-file-word text-blue-500'"></i>
+                                            </div>
+                                            <div class="truncate">
+                                                <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" x-text="doc.split('/').pop()"></p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400 truncate" x-text="doc"></p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <a :href="doc" target="_blank" 
+                                                class="p-1.5 text-blue-600 hover:bg-blue-50 rounded dark:text-blue-400 dark:hover:bg-gray-600" title="Apri">
+                                                <i class="fas fa-external-link-alt"></i>
+                                            </a>
+                                            <button type="button" @click="removeGiornaleDocument(index)"
+                                                class="p-1.5 text-red-600 hover:bg-red-50 rounded dark:text-red-400 dark:hover:bg-gray-600" title="Rimuovi">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div x-show="!formData.allegati_paths || formData.allegati_paths.length === 0"
+                                class="text-center py-6 border-2 border-dashed border-emerald-100 dark:border-emerald-900/40 rounded-lg">
+                                <i class="fas fa-file-upload text-3xl text-gray-300 dark:text-gray-600 mb-2"></i>
+                                <p class="text-gray-500 dark:text-gray-400">Nessun documento caricato direttamente</p>
+                            </div>
+                        </div>
+                    </div>
+
 
                     <!-- Mezzi Utilizzati (selezione guidata) -->
                     <div class="mb-8">

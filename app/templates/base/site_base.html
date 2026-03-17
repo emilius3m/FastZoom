@@ -5,6 +5,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}Sistema Archeologico{% endblock %}</title>
+  <script>
+    // Inline blocking script to apply theme early and prevent flash
+    (function () {
+      const theme = localStorage.getItem('theme');
+      if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+        document.documentElement.style.backgroundColor = '#111827';
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.style.backgroundColor = '#f9fafb';
+      }
+    })();
+  </script>
 
   <!-- CSS and JavaScript resources organized by category for better maintainability -->
 

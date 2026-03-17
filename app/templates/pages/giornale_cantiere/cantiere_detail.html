@@ -133,7 +133,7 @@
     </div>
 
     <!-- Alert Flowbite -->
-    <div x-show="alert.show" x-transition class="mb-6">
+    <div x-show="alert.show" x-cloak x-transition class="mb-6">
         <div :class="alert.type === 'success' ? 'text-green-800 bg-green-50 dark:bg-gray-800 dark:text-green-400' : 'text-red-800 bg-red-50 dark:bg-gray-800 dark:text-red-400'"
             class="flex items-center p-4 rounded-lg" role="alert">
             <i :class="alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'"
@@ -967,7 +967,8 @@
                 mezzi_utilizzati: '',
                 apparecchiature_input: '',
                 operatori_ids: [],
-                mezzi_ids: []
+                mezzi_ids: [],
+                allegati_paths: []
             },
             legalData: {
                 signature_type: '',
@@ -1023,7 +1024,10 @@
                 this.modalMode = data.modalMode;
                 this.editingGiornale = data.editingGiornale;
                 this.editingGiornaleData = data.editingGiornaleData;
-                this.formData = data.formData;
+                this.formData = {
+                    ...data.formData,
+                    allegati_paths: data.editingGiornaleData?.allegati_paths || []
+                };
                 this.legalData = this.prepareLegalDataFromGiornale(data.editingGiornaleData);
                 this.showPhotoSelector = false;
                 this.photoSearchQuery = '';
@@ -1228,7 +1232,8 @@
                         mezzi_utilizzati: '',
                         apparecchiature_input: '',
                         operatori_ids: [],
-                        mezzi_ids: []
+                        mezzi_ids: [],
+                        allegati_paths: []
                     };
                     this.legalData = this.prepareLegalDataFromGiornale(null);
 
@@ -2742,7 +2747,8 @@
                         obiettivi: giornale.obiettivi || '',
                         interpretazione: giornale.interpretazione || '',
                         campioni_prelevati: giornale.campioni_prelevati || '',
-                        strutture: giornale.strutture || ''
+                        strutture: giornale.strutture || '',
+                        allegati_paths: giornale.allegati_paths || []
                     }
                 });
             },
@@ -2772,6 +2778,52 @@
                 } catch (error) {
                     this.error = error.message || 'Errore nell\'eliminazione del giornale';
                     console.error('Error deleting giornale:', error);
+                }
+            },
+            async handleGiornaleDocumentSelected(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('title', file.name);
+                formData.append('category', 'documentazione_tecnica');
+                formData.append('site_id', '{{ site.id }}');
+
+                this.saving = true;
+                try {
+                    const response = await fetch(`/api/v1/sites/{{ site.id }}/documents`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Errore durante il caricamento del documento');
+                    }
+
+                    const result = await response.json();
+                    
+                    if (!this.formData.allegati_paths) {
+                        this.formData.allegati_paths = [];
+                    }
+                    
+                    // Add the new file path to allegati_paths
+                    // The API returns the document object which should have the path or url
+                    this.formData.allegati_paths.push(result.file_path || result.url || result.path);
+                    
+                    this.showAlert('success', 'Documento caricato con successo');
+                } catch (error) {
+                    this.showAlert('error', error.message);
+                } finally {
+                    this.saving = false;
+                    // Reset input
+                    event.target.value = '';
+                }
+            },
+
+            removeGiornaleDocument(index) {
+                if (confirm('Sei sicuro di voler rimuovere questo documento?')) {
+                    this.formData.allegati_paths.splice(index, 1);
                 }
             }
         }

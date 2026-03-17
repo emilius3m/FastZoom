@@ -3,336 +3,515 @@
 {% block title %}{{ title or "Mezzi di Cantiere" }}{% endblock %}
 
 {% block content %}
-<div x-data="mezziApp()" x-init="init()" class="container mx-auto px-4 py-6 min-h-screen bg-gray-50 dark:bg-gray-900">
-    <div class="mb-6">
-        <nav class="flex mb-4" aria-label="Breadcrumb">
-            <ol class="inline-flex items-center space-x-1 md:space-x-3">
-                <li class="inline-flex items-center">
-                    <a href="/dashboard" class="text-gray-700 hover:text-blue-600"><i class="fas fa-home mr-2"></i>Dashboard</a>
-                </li>
-                <li>
-                    <div class="flex items-center">
-                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <a href="/giornale-cantiere" class="text-gray-700 hover:text-blue-600">Giornale Cantiere</a>
-                    </div>
-                </li>
-                {% if site %}
-                <li>
-                    <div class="flex items-center">
-                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <a href="/view/{{ site.id }}/dashboard" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">{{ site.name if site else "Sito" }}</a>
-                    </div>
-                </li>
-                {% endif %}
-                <li aria-current="page">
-                    <div class="flex items-center">
-                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <span class="text-gray-500 dark:text-gray-400">Mezzi</span>
-                    </div>
-                </li>
-            </ol>
-        </nav>
+<div class="w-full px-4 pt-8 pb-8 sm:px-6 lg:px-8" x-data="mezziApp()" x-init="init()" x-cloak>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-6 py-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex flex-col">
+                    <nav class="flex items-center space-x-4 text-sm mb-2" aria-label="Breadcrumb">
+                        <i class="fas fa-home text-gray-500 text-lg"></i>
+                        <div class="flex items-center space-x-4">
+                            <span class="text-gray-400 text-lg">→</span>
+                            <a href="/view/{{ site.id }}/dashboard"
+                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
+                                {{ site.name if site else "Sito" }}
+                            </a>
+                            <span class="text-gray-400 text-lg">→</span>
+                            <a href="/view/{{ site_id }}/cantieri"
+                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
+                                Gestione Cantieri
+                            </a>
+                            <span class="text-gray-400 text-lg">→</span>
+                            <span class="text-gray-700 dark:text-gray-300 font-semibold px-2 py-1">Gestione Mezzi</span>
+                        </div>
+                    </nav>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Mezzi di Cantiere</h1>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                        Gestione mezzi e attrezzature meccaniche del sito selezionato
+                    </p>
+                </div>
 
-        <div class="flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-white"><i class="fas fa-truck-monster mr-3 text-amber-600 dark:text-amber-500"></i>Mezzi di Cantiere</h1>
-                <p class="text-xl text-gray-600 dark:text-gray-400 mt-1">Gestione mezzi e attrezzature meccaniche</p>
-            </div>
+                <div class="flex flex-wrap items-center justify-end gap-3 ml-auto">
+                    <div class="inline-flex rounded-lg shadow-sm" role="group">
+                        <button @click="setViewMode('cards')" type="button"
+                            :class="viewMode === 'cards'
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'"
+                            class="px-3 py-2 text-sm font-medium border rounded-l-lg hover:bg-blue-50 dark:hover:bg-gray-600">
+                            <i class="fas fa-th-large mr-1"></i>Card
+                        </button>
+                        <button @click="setViewMode('table')" type="button"
+                            :class="viewMode === 'table'
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'"
+                            class="px-3 py-2 text-sm font-medium border border-l-0 rounded-r-lg hover:bg-blue-50 dark:hover:bg-gray-600">
+                            <i class="fas fa-table mr-1"></i>Tabella
+                        </button>
+                    </div>
 
-            <div class="flex gap-3">
-                <a href="/view/{{ site_id }}/cantieri" class="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-4 py-2 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800/40 transition">
-                    <i class="fas fa-arrow-left mr-2"></i>Torna ai Cantieri
-                </a>
-                <button @click="showFilters = !showFilters" class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition">
-                    <i class="fas fa-filter mr-2"></i>Filtri
-                </button>
-                <button @click="openCreateModal()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
-                    <i class="fas fa-plus mr-2"></i>Nuovo Mezzo
-                </button>
+                    <a href="/view/{{ site_id }}/cantieri"
+                        class="inline-flex items-center px-4 py-2 bg-orange-600 dark:bg-orange-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-orange-700 dark:hover:bg-orange-800">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Torna ai Cantieri
+                    </a>
+
+                    <button @click="openCreateModal()" type="button"
+                        class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800">
+                        <i class="fas fa-plus mr-2"></i>
+                        Nuovo Mezzo
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-amber-500">
-            <p class="text-sm text-gray-600 dark:text-gray-400">Mezzi Totali</p>
-            <p class="text-2xl font-bold text-amber-600 dark:text-amber-400" x-text="stats.totali"></p>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-truck-monster text-amber-600 text-3xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Mezzi Totali</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="stats.totali"></p>
+                </div>
+            </div>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-green-500">
-            <p class="text-sm text-gray-600 dark:text-gray-400">Attivi</p>
-            <p class="text-2xl font-bold text-green-600 dark:text-green-400" x-text="stats.attivi"></p>
+
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-check-circle text-green-600 text-3xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Attivi</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="stats.attivi"></p>
+                </div>
+            </div>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-blue-500">
-            <p class="text-sm text-gray-600 dark:text-gray-400">Tipologie</p>
-            <p class="text-2xl font-bold text-blue-600 dark:text-blue-400" x-text="stats.tipologie"></p>
+
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-layer-group text-blue-600 text-3xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tipologie</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="stats.tipologie"></p>
+                </div>
+            </div>
         </div>
-        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-purple-500">
-            <p class="text-sm text-gray-600 dark:text-gray-400">Con Targa</p>
-            <p class="text-2xl font-bold text-purple-600 dark:text-purple-400" x-text="stats.con_targa"></p>
+
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-id-card text-purple-600 text-3xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Con Targa</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" x-text="stats.con_targa"></p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div x-show="showFilters" x-cloak class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ricerca</label>
-                <input type="text" x-model="filters.search" placeholder="Nome, marca, modello, targa..." class="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-md px-3 py-2">
+    <!-- Search and Filter (compact) -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+            <div class="lg:col-span-5">
+                <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">Cerca</label>
+                <input type="text" x-model="filters.search" placeholder="Nome, marca, modello, targa..."
+                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo</label>
-                <input type="text" x-model="filters.tipo" placeholder="Es. escavatore, bobcat" class="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-md px-3 py-2">
+
+            <div class="lg:col-span-3">
+                <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">Tipo</label>
+                <input type="text" x-model="filters.tipo" placeholder="Es. escavatore, bobcat"
+                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Stato</label>
-                <select x-model="filters.stato" class="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-md px-3 py-2">
+
+            <div class="lg:col-span-2">
+                <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">Stato</label>
+                <select x-model="filters.stato"
+                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
                     <option value="">Tutti</option>
                     <option value="attivo">Attivo</option>
                     <option value="inattivo">Inattivo</option>
                 </select>
             </div>
-            <div class="flex items-end gap-2">
-                <button @click="applyFilters()" class="w-full bg-amber-600 text-white px-4 py-2 rounded-md hover:bg-amber-700">Applica</button>
-                <button @click="resetFilters()" class="w-full bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 px-4 py-2 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500">Reset</button>
+
+            <div class="lg:col-span-2 flex gap-2">
+                <button @click="applyFilters()" type="button"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-3 py-2">
+                    Applica
+                </button>
+                <button @click="resetFilters()" type="button"
+                    class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-medium rounded-lg px-3 py-2 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-white">
+                    Reset
+                </button>
             </div>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" x-show="!loading">
+    <div x-show="alert.show" x-transition :class="{
+                'text-green-800 bg-green-50 dark:bg-gray-800 dark:text-green-400': alert.type === 'success',
+                'text-red-800 bg-red-50 dark:bg-gray-800 dark:text-red-400': alert.type === 'error'
+            }" class="flex items-center p-4 mb-4 rounded-lg" role="alert">
+        <i :class="alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'"
+            class="fas flex-shrink-0 w-4 h-4"></i>
+        <div class="ms-3 text-sm font-medium" x-text="alert.message"></div>
+        <button @click="alert.show = false" type="button"
+            class="ms-auto -mx-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5 inline-flex items-center justify-center h-8 w-8">
+            <span class="sr-only">Chiudi</span>
+            <i class="fas fa-times w-3 h-3"></i>
+        </button>
+    </div>
+
+    <div x-show="loading" class="text-center py-12">
+        <div role="status">
+            <svg aria-hidden="true" class="inline w-16 h-16 text-gray-200 animate-spin dark:text-gray-600 fill-blue-600"
+                viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                    d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z"
+                    fill="currentColor" />
+                <path
+                    d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z"
+                    fill="currentFill" />
+            </svg>
+            <span class="sr-only">Loading...</span>
+        </div>
+        <p class="text-gray-600 dark:text-gray-400 mt-4">Caricamento mezzi...</p>
+    </div>
+
+    <template x-if="!loading && mezziList.length === 0">
+        <div class="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
+            <i class="fas fa-truck-monster text-gray-300 dark:text-gray-600 text-6xl mb-4"></i>
+            <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">Nessun mezzo trovato</h3>
+            <p class="text-gray-500 dark:text-gray-400 mb-6">Aggiungi il primo mezzo per questo sito.</p>
+            <button @click="openCreateModal()" type="button"
+                class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
+                <i class="fas fa-plus mr-2"></i>Nuovo Mezzo
+            </button>
+        </div>
+    </template>
+
+    <!-- Cards view (default) -->
+    <div x-show="!loading && mezziList.length > 0 && viewMode === 'cards'"
+        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <template x-for="mezzo in mezziList" :key="mezzo.id">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow border-l-4" :class="mezzo.stato === 'attivo' ? 'border-green-500' : 'border-gray-400'">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow duration-200 border-l-4"
+                :class="mezzo.stato === 'attivo' ? 'border-green-500' : 'border-gray-400'">
                 <div class="p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="mezzo.nome"></h3>
-                        <span class="px-2 py-1 text-xs rounded-full" :class="mezzo.stato === 'attivo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'" x-text="mezzo.stato"></span>
+                        <span class="px-2 py-1 text-xs rounded-full"
+                            :class="mezzo.stato === 'attivo' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'"
+                            x-text="formatStato(mezzo.stato)"></span>
                     </div>
                     <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300 mb-4">
-                        <p><strong>Tipo:</strong> <span x-text="mezzo.tipo || '-'"></span></p>
-                        <p><strong>Marca/Modello:</strong> <span x-text="[mezzo.marca, mezzo.modello].filter(Boolean).join(' ') || '-' "></span></p>
+                        <p><strong>Tipo:</strong> <span x-text="mezzo.tipo || '-' "></span></p>
+                        <p><strong>Marca/Modello:</strong> <span
+                                x-text="[mezzo.marca, mezzo.modello].filter(Boolean).join(' ') || '-' "></span></p>
                         <p><strong>Targa:</strong> <span x-text="mezzo.targa || '-' "></span></p>
                         <p><strong>Matricola:</strong> <span x-text="mezzo.matricola || '-' "></span></p>
                     </div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4" x-text="mezzo.note || 'Nessuna nota'"></p>
-                    <button @click="editMezzo(mezzo)" class="w-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4" x-text="mezzo.note || 'Nessuna nota'">
+                    </p>
+                    <button @click="editMezzo(mezzo)"
+                        class="w-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
                         <i class="fas fa-edit mr-1"></i>Modifica
                     </button>
                 </div>
             </div>
         </template>
-
-        <div x-show="mezziList.length === 0 && !loading" class="col-span-full text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-            <i class="fas fa-truck-monster text-5xl text-gray-300 dark:text-gray-600 mb-3"></i>
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Nessun mezzo trovato</h3>
-            <p class="text-gray-500 dark:text-gray-400 mb-4">Aggiungi il primo mezzo per questo sito.</p>
-            <button @click="openCreateModal()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800">Nuovo Mezzo</button>
-        </div>
     </div>
 
-    <div x-show="loading" class="text-center py-12">
-        <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-4"></i>
-        <p class="text-gray-600 dark:text-gray-400">Caricamento mezzi...</p>
+    <!-- Table view -->
+    <div x-show="!loading && mezziList.length > 0 && viewMode === 'table'"
+        class="relative overflow-x-auto shadow-md sm:rounded-lg">
+        <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                <tr>
+                    <th class="px-6 py-3">Nome</th>
+                    <th class="px-6 py-3">Tipo</th>
+                    <th class="px-6 py-3">Marca/Modello</th>
+                    <th class="px-6 py-3">Targa</th>
+                    <th class="px-6 py-3">Matricola</th>
+                    <th class="px-6 py-3">Stato</th>
+                    <th class="px-6 py-3">Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="mezzo in mezziList" :key="mezzo.id">
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                        <td class="px-6 py-4 font-medium text-gray-900 dark:text-white" x-text="mezzo.nome"></td>
+                        <td class="px-6 py-4" x-text="mezzo.tipo || '-' "></td>
+                        <td class="px-6 py-4" x-text="[mezzo.marca, mezzo.modello].filter(Boolean).join(' ') || '-' "></td>
+                        <td class="px-6 py-4" x-text="mezzo.targa || '-' "></td>
+                        <td class="px-6 py-4" x-text="mezzo.matricola || '-' "></td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full"
+                                :class="mezzo.stato === 'attivo' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'"
+                                x-text="formatStato(mezzo.stato)"></span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <button @click="editMezzo(mezzo)"
+                                class="inline-flex items-center justify-center w-8 h-8 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded p-1"
+                                title="Modifica">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
     </div>
 
+    <!-- Modal -->
     <div x-show="showModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto">
         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75" @click="closeModal()"></div>
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
-            <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+            <div
+                class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
                 <form @submit.prevent="submitMezzo()">
                     <div class="px-4 pt-5 pb-4 sm:p-6">
                         <div class="flex items-start mb-4">
                             <div class="flex-1">
-                                <h3 class="text-lg font-medium text-gray-900 dark:text-white" x-text="modalMode === 'create' ? 'Nuovo Mezzo' : 'Modifica Mezzo'"></h3>
+                                <h3 class="text-lg font-medium text-gray-900 dark:text-white"
+                                    x-text="modalMode === 'create' ? 'Nuovo Mezzo' : 'Modifica Mezzo'"></h3>
                             </div>
-                            <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+                            <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-600"><i
+                                    class="fas fa-times"></i></button>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="md:col-span-2">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome *</label>
-                                <input type="text" x-model="formData.nome" required class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                <input type="text" x-model="formData.nome" required
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo</label>
-                                <input type="text" x-model="formData.tipo" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                <input type="text" x-model="formData.tipo"
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Marca</label>
-                                <input type="text" x-model="formData.marca" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                <input type="text" x-model="formData.marca"
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Modello</label>
-                                <input type="text" x-model="formData.modello" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                <label
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Modello</label>
+                                <input type="text" x-model="formData.modello"
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Targa</label>
-                                <input type="text" x-model="formData.targa" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                <input type="text" x-model="formData.targa"
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Matricola</label>
-                                <input type="text" x-model="formData.matricola" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
+                                <label
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Matricola</label>
+                                <input type="text" x-model="formData.matricola"
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2">
                             </div>
                             <div class="md:col-span-2">
                                 <label class="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                    <input type="checkbox" x-model="formData.is_active" class="dark:bg-gray-700 dark:border-gray-600">
+                                    <input type="checkbox" x-model="formData.is_active"
+                                        class="dark:bg-gray-700 dark:border-gray-600">
                                     <span>Mezzo attivo</span>
                                 </label>
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note</label>
-                                <textarea x-model="formData.note" rows="3" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2"></textarea>
+                                <textarea x-model="formData.note" rows="3"
+                                    class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-2"></textarea>
                             </div>
                         </div>
 
-                        <div x-show="errorMessage" class="mt-3 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-sm" x-text="errorMessage"></div>
+                        <div x-show="errorMessage"
+                            class="mt-3 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-sm"
+                            x-text="errorMessage"></div>
                     </div>
                     <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button type="submit" :disabled="saving" class="w-full sm:w-auto bg-amber-600 text-white px-4 py-2 rounded-md hover:bg-amber-700 disabled:opacity-50">
+                        <button type="submit" :disabled="saving"
+                            class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
                             <i class="fas fa-spinner fa-spin mr-2" x-show="saving"></i>
                             <span x-text="saving ? 'Salvataggio...' : 'Salva' "></span>
                         </button>
-                        <button type="button" @click="closeModal()" class="mt-2 sm:mt-0 sm:mr-2 w-full sm:w-auto bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700">Annulla</button>
+                        <button type="button" @click="closeModal()"
+                            class="mt-2 sm:mt-0 sm:mr-2 w-full sm:w-auto bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700">Annulla</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block additional_scripts %}
 <script>
-function mezziApp() {
-    return {
-        mezziList: [],
-        loading: false,
-        showFilters: false,
-        showModal: false,
-        modalMode: 'create',
-        currentMezzoId: null,
-        saving: false,
-        errorMessage: '',
-        stats: { totali: 0, attivi: 0, tipologie: 0, con_targa: 0 },
-        filters: { search: '', tipo: '', stato: '' },
-        formData: {
-            nome: '', tipo: '', marca: '', modello: '', targa: '', matricola: '', is_active: true, note: ''
-        },
+    function mezziApp() {
+        return {
+            mezziList: [],
+            loading: false,
+            showModal: false,
+            modalMode: 'create',
+            currentMezzoId: null,
+            saving: false,
+            errorMessage: '',
+            viewMode: 'cards',
+            alert: {
+                show: false,
+                type: 'success',
+                message: ''
+            },
+            stats: { totali: 0, attivi: 0, tipologie: 0, con_targa: 0 },
+            filters: { search: '', tipo: '', stato: '' },
+            formData: {
+                nome: '', tipo: '', marca: '', modello: '', targa: '', matricola: '', is_active: true, note: ''
+            },
 
-        async init() {
-            await this.loadMezzi();
-        },
-
-        calculateStats() {
-            const types = new Set(this.mezziList.map(m => (m.tipo || '').trim()).filter(Boolean));
-            this.stats = {
-                totali: this.mezziList.length,
-                attivi: this.mezziList.filter(m => m.stato === 'attivo').length,
-                tipologie: types.size,
-                con_targa: this.mezziList.filter(m => (m.targa || '').trim() !== '').length
-            };
-        },
-
-        async loadMezzi() {
-            this.loading = true;
-            try {
-                const siteId = '{{ site_id | default("null") | safe }}';
-                const params = new URLSearchParams();
-                if (this.filters.search) params.append('search', this.filters.search);
-                if (this.filters.tipo) params.append('tipo', this.filters.tipo);
-                if (this.filters.stato) params.append('stato', this.filters.stato);
-
-                const response = await fetch(`/api/v1/giornale/sites/${siteId}/mezzi?${params.toString()}`);
-                const data = await response.json();
-
-                if (response.ok && data.mezzi && Array.isArray(data.mezzi)) {
-                    this.mezziList = data.mezzi;
-                } else {
-                    this.mezziList = [];
+            async init() {
+                const storedView = localStorage.getItem('mezziViewMode');
+                if (storedView === 'cards' || storedView === 'table') {
+                    this.viewMode = storedView;
                 }
-                this.calculateStats();
-            } catch (e) {
-                console.error(e);
-                this.mezziList = [];
-                this.calculateStats();
-            } finally {
-                this.loading = false;
-            }
-        },
-
-        openCreateModal() {
-            this.modalMode = 'create';
-            this.currentMezzoId = null;
-            this.formData = { nome: '', tipo: '', marca: '', modello: '', targa: '', matricola: '', is_active: true, note: '' };
-            this.errorMessage = '';
-            this.showModal = true;
-        },
-
-        editMezzo(mezzo) {
-            this.modalMode = 'edit';
-            this.currentMezzoId = mezzo.id;
-            this.formData = {
-                nome: mezzo.nome || '',
-                tipo: mezzo.tipo || '',
-                marca: mezzo.marca || '',
-                modello: mezzo.modello || '',
-                targa: mezzo.targa || '',
-                matricola: mezzo.matricola || '',
-                is_active: mezzo.stato === 'attivo',
-                note: mezzo.note || ''
-            };
-            this.errorMessage = '';
-            this.showModal = true;
-        },
-
-        closeModal() {
-            this.showModal = false;
-            this.errorMessage = '';
-        },
-
-        async submitMezzo() {
-            this.saving = true;
-            this.errorMessage = '';
-            try {
-                const siteId = '{{ site_id | default("null") | safe }}';
-                const isCreate = this.modalMode === 'create';
-                const url = isCreate
-                    ? `/api/v1/giornale/sites/${siteId}/mezzi`
-                    : `/api/v1/giornale/mezzi/${this.currentMezzoId}`;
-                const method = isCreate ? 'POST' : 'PUT';
-
-                const response = await fetch(url, {
-                    method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(this.formData)
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    this.errorMessage = error.detail || 'Errore durante il salvataggio';
-                    return;
-                }
-
                 await this.loadMezzi();
-                this.closeModal();
-            } catch (e) {
-                console.error(e);
-                this.errorMessage = 'Errore di connessione al server';
-            } finally {
-                this.saving = false;
+            },
+
+            setViewMode(mode) {
+                this.viewMode = mode;
+                localStorage.setItem('mezziViewMode', mode);
+            },
+
+            showAlert(type, message) {
+                this.alert = { show: true, type, message };
+                setTimeout(() => {
+                    this.alert.show = false;
+                }, 5000);
+            },
+
+            calculateStats() {
+                const types = new Set(this.mezziList.map(m => (m.tipo || '').trim()).filter(Boolean));
+                this.stats = {
+                    totali: this.mezziList.length,
+                    attivi: this.mezziList.filter(m => m.stato === 'attivo').length,
+                    tipologie: types.size,
+                    con_targa: this.mezziList.filter(m => (m.targa || '').trim() !== '').length
+                };
+            },
+
+            async loadMezzi() {
+                this.loading = true;
+                try {
+                    const siteId = '{{ site_id | default("null") | safe }}';
+                    const params = new URLSearchParams();
+                    if (this.filters.search) params.append('search', this.filters.search);
+                    if (this.filters.tipo) params.append('tipo', this.filters.tipo);
+                    if (this.filters.stato) params.append('stato', this.filters.stato);
+
+                    const response = await fetch(`/api/v1/giornale/sites/${siteId}/mezzi?${params.toString()}`);
+                    const data = await response.json();
+
+                    if (response.ok && data.mezzi && Array.isArray(data.mezzi)) {
+                        this.mezziList = data.mezzi;
+                    } else {
+                        this.mezziList = [];
+                        this.showAlert('error', 'Errore nel caricamento mezzi');
+                    }
+                    this.calculateStats();
+                } catch (e) {
+                    console.error(e);
+                    this.mezziList = [];
+                    this.calculateStats();
+                    this.showAlert('error', 'Errore di connessione durante il caricamento mezzi');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            openCreateModal() {
+                this.modalMode = 'create';
+                this.currentMezzoId = null;
+                this.formData = { nome: '', tipo: '', marca: '', modello: '', targa: '', matricola: '', is_active: true, note: '' };
+                this.errorMessage = '';
+                this.showModal = true;
+            },
+
+            editMezzo(mezzo) {
+                this.modalMode = 'edit';
+                this.currentMezzoId = mezzo.id;
+                this.formData = {
+                    nome: mezzo.nome || '',
+                    tipo: mezzo.tipo || '',
+                    marca: mezzo.marca || '',
+                    modello: mezzo.modello || '',
+                    targa: mezzo.targa || '',
+                    matricola: mezzo.matricola || '',
+                    is_active: mezzo.stato === 'attivo',
+                    note: mezzo.note || ''
+                };
+                this.errorMessage = '';
+                this.showModal = true;
+            },
+
+            closeModal() {
+                this.showModal = false;
+                this.errorMessage = '';
+            },
+
+            formatStato(stato) {
+                return stato === 'attivo' ? 'Attivo' : 'Inattivo';
+            },
+
+            async submitMezzo() {
+                this.saving = true;
+                this.errorMessage = '';
+                try {
+                    const siteId = '{{ site_id | default("null") | safe }}';
+                    const isCreate = this.modalMode === 'create';
+                    const url = isCreate
+                        ? `/api/v1/giornale/sites/${siteId}/mezzi`
+                        : `/api/v1/giornale/mezzi/${this.currentMezzoId}`;
+                    const method = isCreate ? 'POST' : 'PUT';
+
+                    const response = await fetch(url, {
+                        method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.formData)
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        this.errorMessage = error.detail || 'Errore durante il salvataggio';
+                        return;
+                    }
+
+                    await this.loadMezzi();
+                    this.closeModal();
+                    this.showAlert('success', isCreate ? 'Mezzo creato con successo' : 'Mezzo aggiornato con successo');
+                } catch (e) {
+                    console.error(e);
+                    this.errorMessage = 'Errore di connessione al server';
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            async applyFilters() {
+                await this.loadMezzi();
+            },
+
+            async resetFilters() {
+                this.filters = { search: '', tipo: '', stato: '' };
+                await this.loadMezzi();
             }
-        },
-
-        async applyFilters() {
-            await this.loadMezzi();
-        },
-
-        async resetFilters() {
-            this.filters = { search: '', tipo: '', stato: '' };
-            await this.loadMezzi();
         }
     }
-}
 </script>
-
-<style>
-[x-cloak] { display: none !important; }
-</style>
 {% endblock %}

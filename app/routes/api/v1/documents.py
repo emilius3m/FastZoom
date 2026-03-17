@@ -301,6 +301,7 @@ async def v1_upload_document(
                 "id": str(new_document.id),
                 "title": new_document.title,
                 "filename": new_document.filename,
+                "file_path": new_document.filepath,
                 "uploaded_at": new_document.uploaded_at.isoformat()
             }
         })

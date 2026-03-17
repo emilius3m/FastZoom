@@ -179,6 +179,7 @@ class GiornaleCantiereCreate(GiornaleCantiereBase):
     """Schema per creazione giornale di cantiere"""
     site_id: UUID = Field(..., description="ID del sito archeologico")
     operatori_ids: List[UUID] = Field(default_factory=list, description="Lista ID degli operatori presenti")
+    allegati_paths: Optional[str] = Field(None, description="Percorsi dei file allegati (JSON array in formato stringa)")
 
 
 class GiornaleCantiereUpdate(BaseModel):
@@ -211,6 +212,7 @@ class GiornaleCantiereUpdate(BaseModel):
     incidenti: Optional[str] = Field(None, max_length=1000)
     forniture: Optional[str] = Field(None, max_length=500)
     operatori_ids: Optional[List[UUID]] = None
+    allegati_paths: Optional[str] = Field(None, description="Percorsi dei file allegati (JSON array in formato stringa)")
 
 
 class GiornaleCantiereOut(GiornaleCantiereBase):

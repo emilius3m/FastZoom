@@ -418,6 +418,7 @@ class GiornaleService:
             strutture=giornale_data.get("strutture"),
             us_elaborate=giornale_data.get("us_elaborate_input", ""),
             attrezzatura_utilizzata=giornale_data.get("apparecchiature_input", ""),
+            allegati_paths=giornale_data.get("allegati_paths"),
             validato=False
         )
         
