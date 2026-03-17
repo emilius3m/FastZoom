@@ -16,6 +16,61 @@ class GiornaleService:
         self.repository = GiornaleRepository(db_session)
         self.db = db_session
 
+    @staticmethod
+    def _normalize_allegati_paths_for_db(value: Any) -> Optional[str]:
+        """Normalizza allegati_paths in JSON string per persistenza su colonna TEXT."""
+        if value is None:
+            return None
+
+        def _clean(items: List[Any]) -> List[str]:
+            return [str(item).strip() for item in items if item is not None and str(item).strip()]
+
+        if isinstance(value, list):
+            return json.dumps(_clean(value), ensure_ascii=False)
+
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return json.dumps([], ensure_ascii=False)
+
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return json.dumps(_clean(parsed), ensure_ascii=False)
+                if isinstance(parsed, str) and parsed.strip():
+                    return json.dumps([parsed.strip()], ensure_ascii=False)
+            except Exception:
+                pass
+
+            return json.dumps([raw], ensure_ascii=False)
+
+        return json.dumps([str(value)], ensure_ascii=False)
+
+    @staticmethod
+    def _parse_allegati_paths_from_db(value: Any) -> List[str]:
+        """Converte il valore persistito in lista per il frontend."""
+        if value is None:
+            return []
+
+        if isinstance(value, list):
+            return [str(v).strip() for v in value if v is not None and str(v).strip()]
+
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return []
+
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return [str(v).strip() for v in parsed if v is not None and str(v).strip()]
+                if isinstance(parsed, str) and parsed.strip():
+                    return [parsed.strip()]
+            except Exception:
+                return [raw]
+
+        return [str(value)]
+
     async def _is_superuser(self, user_id: UUID) -> bool:
         user = await self.db.get(User, str(user_id))
         return bool(user and user.is_superuser)
@@ -320,7 +375,7 @@ class GiornaleService:
             "protocol_number": g.protocol_number,
             "protocol_date": g.protocol_date.isoformat() if g.protocol_date else None,
             "legal_status": g.legal_status,
-            "allegati_paths": g.allegati_paths,
+            "allegati_paths": self._parse_allegati_paths_from_db(g.allegati_paths),
             "created_at": g.created_at.isoformat() if g.created_at else None,
             "updated_at": g.updated_at.isoformat() if g.updated_at else None,
             "version": g.version or 1,
@@ -418,7 +473,7 @@ class GiornaleService:
             strutture=giornale_data.get("strutture"),
             us_elaborate=giornale_data.get("us_elaborate_input", ""),
             attrezzatura_utilizzata=giornale_data.get("apparecchiature_input", ""),
-            allegati_paths=giornale_data.get("allegati_paths"),
+            allegati_paths=self._normalize_allegati_paths_for_db(giornale_data.get("allegati_paths")),
             validato=False
         )
         
@@ -564,6 +619,10 @@ class GiornaleService:
         for list_field in ["us_elaborate", "usm_elaborate", "usr_elaborate"]:
             if list_field in update_dict and isinstance(update_dict[list_field], list):
                 update_dict[list_field] = ", ".join(update_dict[list_field]) if update_dict[list_field] else ""
+
+        # Persist allegati_paths come JSON string su colonna TEXT
+        if "allegati_paths" in update_dict:
+            update_dict["allegati_paths"] = self._normalize_allegati_paths_for_db(update_dict.get("allegati_paths"))
 
         # Cleanup fields we processed manually
         for field in ["operatori", "mezzi", "mezzi_ids", "mezzi_utilizzati", "id", "site_id"]:

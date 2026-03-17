@@ -1,14 +1,10 @@
 {% extends "base/site_base.html" %}
+{% set layout_type = 'full' %}
 
 {% block title %}{{ cantiere.nome }} - {{ site.name }}{% endblock %}
 
-{% block extra_css %}
+{% block additional_head %}
 <style>
-    /* Custom styles che integrano con Flowbite */
-    .cantiere-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-
     .stat-card {
         transition: transform 0.2s;
     }
@@ -16,133 +12,122 @@
     .stat-card:hover {
         transform: translateY(-2px);
     }
+
+    /* Keep sidebar hidden until full page load to avoid startup flash */
+    html.hide-sidebar-boot #logo-sidebar {
+        display: none !important;
+    }
 </style>
+<script>
+    document.documentElement.classList.add('hide-sidebar-boot');
+    window.addEventListener('load', function () {
+        document.documentElement.classList.remove('hide-sidebar-boot');
+    });
+</script>
 {% endblock %}
 
 {% block content %}
-<div class="w-full px-4 py-8 sm:px-6 lg:px-8" x-data="cantiereDetailApp()"
+<div class="w-full px-4 py-8 sm:px-6 lg:px-8" x-data="cantiereDetailApp()" x-cloak
     @open-edit-giornale-modal.window="handleEditGiornaleEvent($event)">
 
-    <!-- Breadcrumb Flowbite -->
-    <!-- Breadcrumb Standard -->
-    <nav class="flex mb-4" aria-label="Breadcrumb">
-        <ol class="inline-flex items-center space-x-1 md:space-x-3">
-            <li class="inline-flex items-center">
-                <a href="/dashboard"
-                    class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                    <i class="fas fa-home mr-2"></i>Dashboard
-                </a>
-            </li>
-            <li>
-                <div class="flex items-center">
-                    <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                    <a href="/view/{{ site.id }}/dashboard"
-                        class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                        {{ site.name }}
-                    </a>
+    <!-- Header stile cantieri -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-6 py-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex flex-col">
+                    <nav class="flex items-center space-x-4 text-sm mb-2" aria-label="Breadcrumb">
+                        <i class="fas fa-home text-gray-500 text-lg"></i>
+                        <div class="flex items-center space-x-4">
+                            <span class="text-gray-400 text-lg">→</span>
+                            <a href="/dashboard"
+                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
+                                Dashboard
+                            </a>
+                            <span class="text-gray-400 text-lg">→</span>
+                            <a href="/view/{{ site.id }}/dashboard"
+                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
+                                {{ site.name }}
+                            </a>
+                            <span class="text-gray-400 text-lg">→</span>
+                            <a href="/view/{{ site.id }}/cantieri"
+                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
+                                Gestione Cantieri
+                            </a>
+                            <span class="text-gray-400 text-lg">→</span>
+                            <span class="text-gray-700 dark:text-gray-300 font-semibold px-2 py-1">{{ cantiere.nome }}</span>
+                        </div>
+                    </nav>
+
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ cantiere.nome }}</h1>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ cantiere.descrizione or "Nessuna descrizione disponibile" }}</p>
                 </div>
-            </li>
-            <li>
-                <div class="flex items-center">
-                    <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                    <a href="/view/{{ site.id }}/cantieri"
-                        class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                        Cantieri
-                    </a>
-                </div>
-            </li>
-            <li aria-current="page">
-                <div class="flex items-center">
-                    <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                    <span class="text-gray-500 dark:text-gray-400">
-                        {{ cantiere.nome }}
+
+                <div class="flex flex-wrap items-center justify-end gap-3 ml-auto">
+                    <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                        <i class="fas fa-flag mr-2"></i>Priorità: {{ cantiere.priorita or "-" }}
                     </span>
-                </div>
-            </li>
-        </ol>
-    </nav>
+                    <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap
+                        {% if cantiere.stato == 'pianificato' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300
+                        {% elif cantiere.stato == 'in_corso' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
+                        {% elif cantiere.stato == 'sospeso' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300
+                        {% elif cantiere.stato == 'completato' %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300
+                        {% elif cantiere.stato == 'annullato' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300
+                        {% endif %}">
+                        <span class="w-2 h-2 mr-2 bg-current rounded-full"></span>
+                        {{ cantiere.stato_formattato }}
+                    </span>
 
-    <!-- Header Card con gradiente -->
-    <div class="cantiere-header rounded-lg shadow-md px-6 py-4 md:px-8 md:py-5 mb-5 text-white">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-            <div class="flex-1">
-                <h1 class="text-2xl md:text-3xl font-bold mb-1">{{ cantiere.nome }}</h1>
-                <p class="text-white/90 text-base">{{ cantiere.descrizione or "Nessuna descrizione disponibile" }}</p>
-                {% if cantiere.codice %}
-                <p class="text-white/70 text-sm mt-1">Codice: {{ cantiere.codice }}</p>
-                {% endif %}
-            </div>
-            <div class="flex items-center gap-3">
-                <!-- Badge stato con Flowbite -->
-                <span class="inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap
-                    {% if cantiere.stato == 'pianificato' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300
-                    {% elif cantiere.stato == 'in_corso' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
-                    {% elif cantiere.stato == 'sospeso' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300
-                    {% elif cantiere.stato == 'completato' %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300
-                    {% elif cantiere.stato == 'annullato' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300
-                    {% endif %}">
-                    <span class="w-2 h-2 mr-2 bg-current rounded-full"></span>
-                    {{ cantiere.stato_formattato }}
-                </span>
+                    <button @click="openEditModal()" type="button"
+                        class="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 border border-transparent rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">
+                        <i class="fas fa-edit mr-2"></i>
+                        Modifica
+                    </button>
 
-                <!-- Dropdown menu azioni Flowbite -->
-                <button id="dropdownMenuIconButton" data-dropdown-toggle="dropdownDots"
-                    class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-white/20 hover:bg-white/30 rounded-lg backdrop-blur-sm"
-                    type="button">
-                    <i class="fas fa-ellipsis-v"></i>
-                </button>
+                    <button @click="exportGiornaliPDF()" type="button"
+                        class="inline-flex items-center px-4 py-2 bg-red-600 dark:bg-red-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-800">
+                        <i class="fas fa-file-pdf mr-2"></i>
+                        PDF
+                    </button>
 
-                <!-- Dropdown menu -->
-                <div id="dropdownDots"
-                    class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600">
-                    <ul class="py-2 text-sm text-gray-700 dark:text-gray-200">
-                        <li>
-                            <a href="#" @click.prevent="openEditModal()"
-                                class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
-                                <i class="fas fa-edit mr-2"></i>Modifica Cantiere
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" @click.prevent="exportGiornaliPDF()"
-                                class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
-                                <i class="fas fa-file-pdf mr-2"></i>Esporta PDF
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#" @click.prevent="exportGiornaliWord()"
-                                class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
-                                <i class="fas fa-file-word mr-2"></i>Esporta Word
-                            </a>
-                        </li>
-                        <li>
-                            <a href="#"
-                                class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">
-                                <i class="fas fa-archive mr-2"></i>Archivia
-                            </a>
-                        </li>
-                    </ul>
-                    <div class="py-2">
-                        <a href="#" @click.prevent="deleteCantiere()"
-                            class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-red-500">
-                            <i class="fas fa-trash mr-2"></i>Elimina
-                        </a>
-                    </div>
+                    <button @click="exportGiornaliWord()" type="button"
+                        class="inline-flex items-center px-4 py-2 bg-indigo-600 dark:bg-indigo-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-indigo-700 dark:hover:bg-indigo-800">
+                        <i class="fas fa-file-word mr-2"></i>
+                        Word
+                    </button>
+
+                    <button @click="deleteCantiere()" type="button"
+                        class="inline-flex items-center px-4 py-2 bg-red-100 dark:bg-red-900/40 border border-transparent rounded-lg text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/60">
+                        <i class="fas fa-trash mr-2"></i>
+                        Elimina
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Alert Flowbite -->
-    <div x-show="alert.show" x-cloak x-transition class="mb-6">
-        <div :class="alert.type === 'success' ? 'text-green-800 bg-green-50 dark:bg-gray-800 dark:text-green-400' : 'text-red-800 bg-red-50 dark:bg-gray-800 dark:text-red-400'"
-            class="flex items-center p-4 rounded-lg" role="alert">
-            <i :class="alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'"
-                class="fas flex-shrink-0 w-4 h-4"></i>
+    <!-- Alert Toast (sempre visibile anche quando si è in fondo pagina) -->
+    <div x-show="alert.show" x-cloak x-transition.opacity.duration.200ms
+        class="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-full sm:max-w-md z-[70] pointer-events-none">
+        <div :class="{
+                'text-green-800 bg-green-50 dark:bg-gray-800 dark:text-green-400 border-green-200 dark:border-green-800': alert.type === 'success',
+                'text-blue-800 bg-blue-50 dark:bg-gray-800 dark:text-blue-400 border-blue-200 dark:border-blue-800': alert.type === 'info',
+                'text-red-800 bg-red-50 dark:bg-gray-800 dark:text-red-400 border-red-200 dark:border-red-800': alert.type !== 'success' && alert.type !== 'info'
+            }"
+            class="pointer-events-auto flex items-center p-4 rounded-lg border shadow-lg" role="alert">
+            <i :class="{
+                    'fa-check-circle': alert.type === 'success',
+                    'fa-info-circle': alert.type === 'info',
+                    'fa-exclamation-circle': alert.type !== 'success' && alert.type !== 'info'
+                }" class="fas flex-shrink-0 w-4 h-4"></i>
             <span class="sr-only" x-text="alert.type"></span>
             <div class="ms-3 text-sm font-medium" x-text="alert.message"></div>
             <button @click="alert.show = false" type="button"
                 class="ms-auto -mx-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5 inline-flex items-center justify-center h-8 w-8"
-                :class="alert.type === 'success' ? 'bg-green-50 text-green-500 hover:bg-green-200 dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700' : 'bg-red-50 text-red-500 hover:bg-red-200 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700'">
+                :class="{
+                    'bg-green-50 text-green-500 hover:bg-green-200 dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700': alert.type === 'success',
+                    'bg-blue-50 text-blue-500 hover:bg-blue-200 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700': alert.type === 'info',
+                    'bg-red-50 text-red-500 hover:bg-red-200 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700': alert.type !== 'success' && alert.type !== 'info'
+                }">
                 <span class="sr-only">Chiudi</span>
                 <i class="fas fa-times w-3 h-3"></i>
             </button>
@@ -150,14 +135,11 @@
     </div>
 
     <!-- Stats Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <!-- Giornali Card -->
-        <div class="stat-card bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="p-3 bg-blue-100 rounded-lg dark:bg-blue-900">
-                        <i class="fas fa-book text-blue-600 dark:text-blue-300 text-2xl"></i>
-                    </div>
+                    <i class="fas fa-book text-blue-600 text-3xl"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Giornali</p>
@@ -166,13 +148,10 @@
             </div>
         </div>
 
-        <!-- Operatori Card -->
-        <div class="stat-card bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="p-3 bg-green-100 rounded-lg dark:bg-green-900">
-                        <i class="fas fa-users text-green-600 dark:text-green-300 text-2xl"></i>
-                    </div>
+                    <i class="fas fa-users text-green-600 text-3xl"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Operatori</p>
@@ -181,13 +160,10 @@
             </div>
         </div>
 
-        <!-- Documenti Card -->
-        <div class="stat-card bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="p-3 bg-indigo-100 rounded-lg dark:bg-indigo-900">
-                        <i class="fas fa-file-invoice text-indigo-600 dark:text-indigo-300 text-2xl"></i>
-                    </div>
+                    <i class="fas fa-file-invoice text-indigo-600 text-3xl"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Documenti</p>
@@ -196,36 +172,18 @@
             </div>
         </div>
 
-        <!-- Durata Card -->
-        <div class="stat-card bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <div class="p-3 bg-yellow-100 rounded-lg dark:bg-yellow-900">
-                        <i class="fas fa-calendar-alt text-yellow-600 dark:text-yellow-300 text-2xl"></i>
-                    </div>
+                    <i class="fas fa-calendar-alt text-yellow-600 text-3xl"></i>
                 </div>
                 <div class="ml-4">
                     <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Durata</p>
                     <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ cantiere.durata_giorni or "-" }}</p>
-                    <p class="text-xs text-gray-500">giorni</p>
                 </div>
             </div>
         </div>
 
-        <!-- Priorità Card -->
-        <div class="stat-card bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="p-3 bg-purple-100 rounded-lg dark:bg-purple-900">
-                        <i class="fas fa-flag text-purple-600 dark:text-purple-300 text-2xl"></i>
-                    </div>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Priorità</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ cantiere.priorita or "-" }}</p>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Tabs Flowbite -->
@@ -268,55 +226,74 @@
         <div id="default-tab-content">
             <!-- Tab Giornali -->
             <div class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800" id="giornali" role="tabpanel"
-                aria-labelledby="giornali-tab">
-                <div class="flex justify-between items-center mb-4">
+                aria-labelledby="giornali-tab" x-data="giornaliListApp()">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                     <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Giornali di Cantiere</h3>
-                    <button @click="openGiornaleModal()" type="button"
-                        class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
-                        <i class="fas fa-plus mr-2"></i>Nuovo Giornale
-                    </button>
+                    <div class="w-full sm:w-auto flex items-center justify-end gap-2">
+                        <div class="inline-flex rounded-lg shadow-sm" role="group">
+                            <button @click="setViewMode('cards')" type="button"
+                                :class="viewMode === 'cards'
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-white text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'"
+                                class="px-3 py-2 text-sm font-medium border rounded-l-lg hover:bg-blue-50 dark:hover:bg-gray-600">
+                                <i class="fas fa-th-large mr-1"></i>Card
+                            </button>
+                            <button @click="setViewMode('table')" type="button"
+                                :class="viewMode === 'table'
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-white text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'"
+                                class="px-3 py-2 text-sm font-medium border border-l-0 rounded-r-lg hover:bg-blue-50 dark:hover:bg-gray-600">
+                                <i class="fas fa-table mr-1"></i>Tabella
+                            </button>
+                        </div>
+                        <button @click="openGiornaleModal()" type="button"
+                            class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
+                            <i class="fas fa-plus mr-2"></i>Nuovo Giornale
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Lista Giornali -->
-                <div class="space-y-4" x-data="giornaliListApp()">
+                <div class="space-y-4">
 
                     <!-- Filters & Controls -->
-                    <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow mb-4">
-                        <div class="flex flex-col md:flex-row gap-4 items-end">
-                            <!-- Search -->
-                            <div class="flex-1 w-full">
+                    <div class="bg-white dark:bg-gray-700 p-3 rounded-lg shadow mb-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+                            <div class="lg:col-span-6">
                                 <label for="giornale-search"
-                                    class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Cerca</label>
+                                    class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">Cerca</label>
                                 <div class="relative">
                                     <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                                         <i class="fas fa-search text-gray-500 dark:text-gray-400"></i>
                                     </div>
-                                    <input type="text" id="giornale-search" x-model="filters.search"
-                                        @input="updateFilters()"
-                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 py-2.5 pr-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                                    <input type="text" id="giornale-search" x-model="filters.search" @input="updateFilters()"
+                                        class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
                                         placeholder="Cerca nella descrizione...">
                                 </div>
                             </div>
 
-                            <!-- Date Filters -->
-                            <div class="w-full md:w-auto">
-                                <label
-                                    class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Dal</label>
+                            <div class="lg:col-span-2">
+                                <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">Dal</label>
                                 <input type="date" x-model="filters.dateFrom" @change="updateFilters()"
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
-                            </div>
-                            <div class="w-full md:w-auto">
-                                <label
-                                    class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Al</label>
-                                <input type="date" x-model="filters.dateTo" @change="updateFilters()"
-                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white">
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
                             </div>
 
-                            <!-- Refresh Button -->
-                            <button @click="loadGiornali(true)" type="button"
-                                class="text-blue-700 hover:text-white border border-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2.5 text-center dark:border-blue-500 dark:text-blue-500 dark:hover:text-white dark:hover:bg-blue-500 dark:focus:ring-blue-800">
-                                <i class="fas fa-sync-alt"></i>
-                            </button>
+                            <div class="lg:col-span-2">
+                                <label class="block mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">Al</label>
+                                <input type="date" x-model="filters.dateTo" @change="updateFilters()"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                            </div>
+
+                            <div class="lg:col-span-2 flex gap-2">
+                                <button @click="loadGiornali(true)" type="button"
+                                    class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg px-3 py-2">
+                                    Applica
+                                </button>
+                                <button @click="resetFilters()" type="button"
+                                    class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-medium rounded-lg px-3 py-2 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-white">
+                                    Reset
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -337,7 +314,7 @@
 
                     <!-- Giornali list -->
                     <div x-show="!loading || page > 1">
-                        <div class="space-y-3">
+                        <div x-show="viewMode === 'cards'" class="space-y-3">
                             <template x-for="giornale in giornali" :key="giornale.id">
                                 <div class="bg-white dark:bg-gray-700 rounded-lg shadow hover:shadow-md transition-shadow duration-200 overflow-hidden border-l-4"
                                     :class="{
@@ -441,6 +418,68 @@
                                     </div>
                                 </div>
                             </template>
+                        </div>
+
+                        <div x-show="viewMode === 'table'" class="relative overflow-x-auto shadow-md sm:rounded-lg">
+                            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                                    <tr>
+                                        <th class="px-6 py-3">Data</th>
+                                        <th class="px-6 py-3">Descrizione</th>
+                                        <th class="px-6 py-3">Meteo</th>
+                                        <th class="px-6 py-3">Responsabile</th>
+                                        <th class="px-6 py-3">Operatori</th>
+                                        <th class="px-6 py-3">Stato</th>
+                                        <th class="px-6 py-3">Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="giornale in giornali" :key="`row-${giornale.id}`">
+                                        <tr
+                                            class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                            <td class="px-6 py-4"
+                                                x-text="new Date(giornale.data).toLocaleDateString('it-IT')"></td>
+                                            <td class="px-6 py-4 max-w-md truncate"
+                                                x-text="giornale.descrizione_lavori || 'Nessuna descrizione'"></td>
+                                            <td class="px-6 py-4" x-text="giornale.condizioni_meteo || '-' "></td>
+                                            <td class="px-6 py-4" x-text="giornale.responsabile_nome || '-' "></td>
+                                            <td class="px-6 py-4"
+                                                x-text="giornale.operatori_presenti ? giornale.operatori_presenti.length : 0"></td>
+                                            <td class="px-6 py-4">
+                                                <span class="px-2 py-1 text-xs rounded-full"
+                                                    :class="giornale.validato ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'"
+                                                    x-text="giornale.validato ? 'Validato' : 'Bozza'"></span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="flex items-center gap-1">
+                                                    <button type="button"
+                                                        class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg dark:text-blue-400 dark:hover:bg-gray-600 transition-colors"
+                                                        @click="editGiornale(giornale)" title="Modifica">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button type="button"
+                                                        class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg dark:text-purple-400 dark:hover:bg-gray-600 transition-colors"
+                                                        @click="exportSingleGiornalePDF(giornale)" :disabled="loadingExport"
+                                                        title="Esporta PDF">
+                                                        <i class="fas fa-file-pdf"></i>
+                                                    </button>
+                                                    <button type="button"
+                                                        class="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg dark:text-indigo-400 dark:hover:bg-gray-600 transition-colors"
+                                                        @click="exportSingleGiornaleWord(giornale)"
+                                                        :disabled="loadingExportWord" title="Esporta Word">
+                                                        <i class="fas fa-file-word"></i>
+                                                    </button>
+                                                    <button type="button"
+                                                        class="p-2 text-red-600 hover:bg-red-50 rounded-lg dark:text-red-400 dark:hover:bg-gray-600 transition-colors"
+                                                        @click="deleteGiornale(giornale)" title="Elimina">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
                         </div>
 
                         <!-- Load More Button -->
@@ -1352,7 +1391,9 @@
                     // Ricarica pagina per mostrare le modifiche
                     setTimeout(() => location.reload(), 1500);
                 } catch (error) {
-                    this.errorMessage = error.message || 'Errore durante aggiornamento del giornale';
+                    const message = error.message || 'Errore durante aggiornamento del giornale';
+                    this.errorMessage = message;
+                    this.showAlert('error', message);
                     console.error('Error updating giornale:', error);
                 } finally {
                     this.saving = false;
@@ -1396,7 +1437,9 @@
                     // Ricarica pagina per mostrare le modifiche
                     setTimeout(() => location.reload(), 1500);
                 } catch (error) {
-                    this.errorMessage = error.message || 'Errore durante il salvataggio del cantiere';
+                    const message = error.message || 'Errore durante il salvataggio del cantiere';
+                    this.errorMessage = message;
+                    this.showAlert('error', message);
                     console.error('Error saving cantiere:', error);
                 } finally {
                     this.saving = false;
@@ -1449,7 +1492,9 @@
                     // Ricarica pagina per mostrare il nuovo giornale
                     setTimeout(() => location.reload(), 1500);
                 } catch (error) {
-                    this.errorMessage = error.message || 'Errore durante il salvataggio del giornale';
+                    const message = error.message || 'Errore durante il salvataggio del giornale';
+                    this.errorMessage = message;
+                    this.showAlert('error', message);
                     console.error('Error saving giornale:', error);
                 } finally {
                     this.saving = false;
@@ -1633,6 +1678,73 @@
                     this.showAlert('error', error.message || 'Errore durante il caricamento del documento');
                 } finally {
                     this.uploadingCantiereDocument = false;
+                }
+            },
+
+            async handleGiornaleDocumentSelected(event) {
+                const file = event?.target?.files?.[0];
+                if (!file) return;
+
+                this.saving = true;
+                try {
+                    const tags = [`cantiere:{{ cantiere.id }}`];
+                    if (this.editingGiornaleData?.id) {
+                        tags.push(`giornale:${this.editingGiornaleData.id}`);
+                    }
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
+                    formData.append('category', 'documentazione');
+                    formData.append('site_id', '{{ site.id }}');
+                    formData.append('doc_type', this.guessDocumentTypeFromFile(file));
+                    formData.append('tags', tags.join(','));
+
+                    const response = await fetch(`/api/v1/sites/{{ site.id }}/documents`, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'include'
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(await this.parseApiError(response, 'Errore durante il caricamento del documento'));
+                    }
+
+                    const result = await response.json();
+                    const uploaded = result?.document || result || {};
+
+                    if (!Array.isArray(this.formData.allegati_paths)) {
+                        this.formData.allegati_paths = [];
+                    }
+
+                    const storedPath =
+                        uploaded.file_path ||
+                        uploaded.storage_path ||
+                        uploaded.url ||
+                        uploaded.download_url ||
+                        (uploaded.id ? `/api/v1/sites/{{ site.id }}/documents/${uploaded.id}/download` : '') ||
+                        file.name;
+
+                    this.formData.allegati_paths.push(storedPath);
+                    this.showAlert('success', 'Documento caricato con successo');
+                } catch (error) {
+                    const message = error.message || 'Errore durante il caricamento del documento';
+                    this.errorMessage = message;
+                    this.showAlert('error', message);
+                } finally {
+                    this.saving = false;
+                    if (event?.target) {
+                        event.target.value = '';
+                    }
+                }
+            },
+
+            removeGiornaleDocument(index) {
+                if (confirm('Sei sicuro di voler rimuovere questo documento?')) {
+                    if (!Array.isArray(this.formData.allegati_paths)) {
+                        this.formData.allegati_paths = [];
+                    }
+                    this.formData.allegati_paths.splice(index, 1);
                 }
             },
 
@@ -2309,7 +2421,9 @@
                     }
 
                 } catch (error) {
-                    this.errorMessage = error.message || 'Errore durante la validazione del giornale';
+                    const message = error.message || 'Errore durante la validazione del giornale';
+                    this.errorMessage = message;
+                    this.showAlert('error', message);
                     console.error('Error validating giornale:', error);
                 } finally {
                     this.saving = false;
@@ -2363,7 +2477,9 @@
 
                     this.showAlert('success', 'Metadati legali aggiornati');
                 } catch (error) {
-                    this.errorMessage = error.message || 'Errore durante il salvataggio dei metadati legali';
+                    const message = error.message || 'Errore durante il salvataggio dei metadati legali';
+                    this.errorMessage = message;
+                    this.showAlert('error', message);
                     console.error('Error saving legal metadata:', error);
                 } finally {
                     this.saving = false;
@@ -2475,7 +2591,9 @@
                     this.showAlert('success', 'Foto rimossa con successo');
 
                 } catch (error) {
-                    this.errorMessage = error.message || 'Errore durante la rimozione della foto';
+                    const message = error.message || 'Errore durante la rimozione della foto';
+                    this.errorMessage = message;
+                    this.showAlert('error', message);
                     console.error('Error unlinking foto:', error);
                 }
             },
@@ -2569,7 +2687,9 @@
                     this.showAlert('success', 'Foto collegata con successo');
 
                 } catch (error) {
-                    this.errorMessage = error.message || 'Errore durante il collegamento della foto';
+                    const message = error.message || 'Errore durante il collegamento della foto';
+                    this.errorMessage = message;
+                    this.showAlert('error', message);
                     console.error('Error linking foto:', error);
                 }
             },
@@ -2585,12 +2705,13 @@
     }
 
     // Second Alpine.js component for giornali list
-    function giornaliListApp() {
+function giornaliListApp() {
         return {
             loading: false,
             loadingMore: false,
             error: '',
             giornali: [],
+            viewMode: 'cards',
 
             // Pagination
             page: 1,
@@ -2610,6 +2731,11 @@
 
             // Init
             init() {
+                const storedView = localStorage.getItem('giornaliViewMode');
+                if (storedView === 'cards' || storedView === 'table') {
+                    this.viewMode = storedView;
+                }
+
                 this.loadGiornali(true);
 
                 // Listen for validation updates
@@ -2627,11 +2753,25 @@
             },
 
             // Watch filters
+            setViewMode(mode) {
+                this.viewMode = mode;
+                localStorage.setItem('giornaliViewMode', mode);
+            },
+
             updateFilters() {
                 if (this.searchTimeout) clearTimeout(this.searchTimeout);
                 this.searchTimeout = setTimeout(() => {
                     this.loadGiornali(true);
                 }, 300);
+            },
+
+            resetFilters() {
+                this.filters = {
+                    search: '',
+                    dateFrom: '',
+                    dateTo: ''
+                };
+                this.loadGiornali(true);
             },
 
             // Load giornali from API
@@ -2778,52 +2918,6 @@
                 } catch (error) {
                     this.error = error.message || 'Errore nell\'eliminazione del giornale';
                     console.error('Error deleting giornale:', error);
-                }
-            },
-            async handleGiornaleDocumentSelected(event) {
-                const file = event.target.files[0];
-                if (!file) return;
-
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('title', file.name);
-                formData.append('category', 'documentazione_tecnica');
-                formData.append('site_id', '{{ site.id }}');
-
-                this.saving = true;
-                try {
-                    const response = await fetch(`/api/v1/sites/{{ site.id }}/documents`, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (!response.ok) {
-                        throw new Error('Errore durante il caricamento del documento');
-                    }
-
-                    const result = await response.json();
-                    
-                    if (!this.formData.allegati_paths) {
-                        this.formData.allegati_paths = [];
-                    }
-                    
-                    // Add the new file path to allegati_paths
-                    // The API returns the document object which should have the path or url
-                    this.formData.allegati_paths.push(result.file_path || result.url || result.path);
-                    
-                    this.showAlert('success', 'Documento caricato con successo');
-                } catch (error) {
-                    this.showAlert('error', error.message);
-                } finally {
-                    this.saving = false;
-                    // Reset input
-                    event.target.value = '';
-                }
-            },
-
-            removeGiornaleDocument(index) {
-                if (confirm('Sei sicuro di voler rimuovere questo documento?')) {
-                    this.formData.allegati_paths.splice(index, 1);
                 }
             }
         }
