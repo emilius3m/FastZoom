@@ -960,6 +960,20 @@
                 protocol_date: ''
             },
 
+            // Draft workflow state
+            draftId: null,
+            draftLinkedPhotoIds: [],
+            draftDirty: false,
+            draftStatus: {
+                state: 'idle', // idle | dirty | saving | saved | error
+                message: '',
+                savedAt: null
+            },
+            draftAutosaveTimer: null,
+            draftWatchTimer: null,
+            restoringDraft: false,
+            lastDraftFingerprint: '',
+
             // Available options (these would normally be loaded from API)
             condizioni_meteo: [
                 { value: 'Sereno', label: 'Sereno' },
@@ -990,6 +1004,285 @@
                 console.log('Cantiere detail initialized');
             },
 
+            getEditingGiornaleId() {
+                return this.editingGiornaleData && this.editingGiornaleData.id ? String(this.editingGiornaleData.id) : null;
+            },
+
+            getDraftStorageKey() {
+                return `fastzoom_open_giornale_draft_id`; 
+            },
+
+            setDraftStatus(state, message = '') {
+                this.draftStatus = {
+                    state,
+                    message,
+                    savedAt: state === 'saved' ? new Date().toISOString() : this.draftStatus?.savedAt || null
+                };
+            },
+
+            buildGiornaleApiPayload() {
+                return {
+                    ...this.formData,
+                    ora_inizio: this.formData.ora_inizio || null,
+                    ora_fine: this.formData.ora_fine || null,
+                    temperatura_min: this.formData.temperatura_min || null,
+                    temperatura_max: this.formData.temperatura_max || null,
+                    operatori: this.getEnhancedOperatoriData(),
+                    mezzi: this.getEnhancedMezziData()
+                };
+            },
+
+            getCurrentLinkedPhotoIds() {
+                const fromDraft = Array.isArray(this.draftLinkedPhotoIds)
+                    ? this.draftLinkedPhotoIds.filter(Boolean).map(v => String(v))
+                    : [];
+
+                if (fromDraft.length > 0) {
+                    return [...new Set(fromDraft)];
+                }
+
+                if (this.editingGiornaleData && Array.isArray(this.editingGiornaleData.foto)) {
+                    const existing = this.editingGiornaleData.foto
+                        .map(f => f && f.id ? String(f.id) : null)
+                        .filter(Boolean);
+                    return [...new Set(existing)];
+                }
+
+                return [];
+            },
+
+            getLinkedPhotoCount() {
+                return this.getCurrentLinkedPhotoIds().length;
+            },
+
+            getDisplayedLinkedPhotos() {
+                const linkedIds = this.getCurrentLinkedPhotoIds();
+                const existingPhotos = (this.editingGiornaleData && Array.isArray(this.editingGiornaleData.foto))
+                    ? this.editingGiornaleData.foto
+                    : [];
+
+                if (linkedIds.length === 0) {
+                    return existingPhotos;
+                }
+
+                const existingById = new Map(
+                    existingPhotos
+                        .filter(photo => photo && photo.id)
+                        .map(photo => [String(photo.id), photo])
+                );
+
+                return linkedIds.map(photoId => existingById.get(String(photoId)) || { id: String(photoId) });
+            },
+
+            computeDraftFingerprint(payload = null) {
+                const normalizedPayload = payload || this.buildGiornaleApiPayload();
+                const linkedPhotoIds = this.getCurrentLinkedPhotoIds().slice().sort();
+                return JSON.stringify({
+                    payload: normalizedPayload,
+                    linked_photo_ids: linkedPhotoIds,
+                    giornale_id: this.getEditingGiornaleId()
+                });
+            },
+
+            scheduleDraftAutosave() {
+                if (this.modalMode !== 'giornale' || this.restoringDraft) {
+                    return;
+                }
+                if (this.draftAutosaveTimer) {
+                    clearTimeout(this.draftAutosaveTimer);
+                }
+                this.draftAutosaveTimer = setTimeout(async () => {
+                    try {
+                        await this.saveDraftSnapshot();
+                    } catch (_) {
+                        // status gestito in saveDraftSnapshot
+                    }
+                }, 1200);
+            },
+
+            startDraftWatcher() {
+                this.stopDraftWatcher();
+                if (this.modalMode !== 'giornale') {
+                    return;
+                }
+                this.lastDraftFingerprint = this.computeDraftFingerprint();
+                this.draftWatchTimer = setInterval(() => {
+                    if (!this.showCreateModal || this.modalMode !== 'giornale' || this.restoringDraft) {
+                        return;
+                    }
+                    const currentFingerprint = this.computeDraftFingerprint();
+                    if (currentFingerprint !== this.lastDraftFingerprint) {
+                        this.draftDirty = true;
+                        this.setDraftStatus('dirty', 'Modifiche non salvate');
+                        this.scheduleDraftAutosave();
+                    }
+                }, 1000);
+            },
+
+            stopDraftWatcher() {
+                if (this.draftWatchTimer) {
+                    clearInterval(this.draftWatchTimer);
+                    this.draftWatchTimer = null;
+                }
+                if (this.draftAutosaveTimer) {
+                    clearTimeout(this.draftAutosaveTimer);
+                    this.draftAutosaveTimer = null;
+                }
+            },
+
+            async fetchDraft({ draftId = null, giornaleId = null } = {}) {
+                const params = new URLSearchParams();
+                if (draftId) params.set('draft_id', String(draftId));
+                if (giornaleId) params.set('giornale_id', String(giornaleId));
+                const query = params.toString();
+                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali-drafts${query ? '?' + query : ''}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin'
+                });
+                if (!response.ok) {
+                    throw new Error(await this.parseApiError(response, 'Errore nel recupero bozza'));
+                }
+                return await response.json();
+            },
+
+            applyDraftPayloadToForm(payload) {
+                const data = (payload && typeof payload === 'object') ? payload : {};
+                this.formData = {
+                    ...this.formData,
+                    ...data,
+                    allegati_paths: Array.isArray(data.allegati_paths) ? data.allegati_paths : (this.formData.allegati_paths || [])
+                };
+
+                if (Array.isArray(data.operatori)) {
+                    this.formData.operatori_ids = data.operatori
+                        .map(op => op && op.id ? String(op.id) : null)
+                        .filter(Boolean);
+                    this.operatori_data = {};
+                    data.operatori.forEach(op => {
+                        if (!op || !op.id) return;
+                        this.operatori_data[String(op.id)] = {
+                            ore_lavorate: op.ore_lavorate ?? null,
+                            note_presenza: op.note_presenza || ''
+                        };
+                    });
+                }
+
+                if (Array.isArray(data.mezzi)) {
+                    this.formData.mezzi_ids = data.mezzi
+                        .map(m => m && m.id ? String(m.id) : null)
+                        .filter(Boolean);
+                    this.mezzi_data = {};
+                    data.mezzi.forEach(m => {
+                        if (!m || !m.id) return;
+                        this.mezzi_data[String(m.id)] = {
+                            ore_utilizzo: m.ore_utilizzo ?? null,
+                            note_utilizzo: m.note_utilizzo || ''
+                        };
+                    });
+                    this.syncMezziUtilizzatiFromSelection();
+                }
+            },
+
+            async restoreDraftForCurrentModal(preferredDraftId = null) {
+                if (this.modalMode !== 'giornale') return;
+
+                const storedDraftId = (() => {
+                    try {
+                        return localStorage.getItem(this.getDraftStorageKey());
+                    } catch (_) {
+                        return null;
+                    }
+                })();
+
+                const giornaleId = this.getEditingGiornaleId();
+                const queryDraftId = preferredDraftId || (!giornaleId ? storedDraftId : null);
+
+                let result;
+                try {
+                    result = await this.fetchDraft({
+                        draftId: queryDraftId,
+                        giornaleId
+                    });
+                } catch (error) {
+                    console.warn('Draft restore skipped:', error);
+                    return;
+                }
+
+                const draft = result?.draft || null;
+                if (!draft) {
+                    return;
+                }
+
+                this.restoringDraft = true;
+                try {
+                    this.draftId = draft.id || null;
+                    this.draftLinkedPhotoIds = Array.isArray(draft.linked_photo_ids)
+                        ? draft.linked_photo_ids.map(v => String(v))
+                        : [];
+                    this.applyDraftPayloadToForm(draft.payload || {});
+                    this.draftDirty = false;
+                    this.setDraftStatus('saved', 'Bozza ripristinata');
+                    this.lastDraftFingerprint = this.computeDraftFingerprint();
+
+                    try {
+                        if (this.draftId) localStorage.setItem(this.getDraftStorageKey(), String(this.draftId));
+                    } catch (_) {
+                        // ignore storage errors
+                    }
+                } finally {
+                    this.restoringDraft = false;
+                }
+            },
+
+            async saveDraftSnapshot(payloadOverride = null) {
+                if (this.modalMode !== 'giornale') return null;
+
+                const payload = payloadOverride || this.buildGiornaleApiPayload();
+                const linkedPhotoIds = this.getCurrentLinkedPhotoIds();
+                const giornaleId = this.getEditingGiornaleId();
+
+                this.setDraftStatus('saving', 'Salvataggio bozza...');
+                const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali-drafts`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        draft_id: this.draftId,
+                        giornale_id: giornaleId,
+                        payload,
+                        linked_photo_ids: linkedPhotoIds,
+                        base_version: this.editingGiornaleData?.version || null
+                    })
+                });
+
+                if (!response.ok) {
+                    this.setDraftStatus('error', 'Errore salvataggio bozza');
+                    throw new Error(await this.parseApiError(response, 'Errore salvataggio bozza'));
+                }
+
+                const result = await response.json();
+                const draft = result?.draft || null;
+                if (draft && draft.id) {
+                    this.draftId = draft.id;
+                    this.draftLinkedPhotoIds = Array.isArray(draft.linked_photo_ids)
+                        ? draft.linked_photo_ids.map(v => String(v))
+                        : linkedPhotoIds;
+                    try {
+                        localStorage.setItem(this.getDraftStorageKey(), String(this.draftId));
+                    } catch (_) {
+                        // ignore storage errors
+                    }
+                }
+
+                this.draftDirty = false;
+                this.lastDraftFingerprint = this.computeDraftFingerprint(payload);
+                this.setDraftStatus('saved', 'Bozza salvata');
+                return draft;
+            },
+
             // Handle event from giornaliListApp component
             async handleEditGiornaleEvent(event) {
                 const data = event.detail;
@@ -1010,6 +1303,9 @@
                 this.loadMezziDataForEditing(this.editingGiornaleData);
 
                 this.showCreateModal = true;
+
+                await this.restoreDraftForCurrentModal(data?.preferredDraftId || null);
+                this.startDraftWatcher();
             },
 
             // Helper methods for modal title and button text
@@ -1034,9 +1330,15 @@
                 this.modalMode = 'giornale';
                 this.showCreateModal = true;
                 this.editingGiornale = false;
+                this.editingGiornaleData = null;
+                this.draftId = null;
+                this.draftLinkedPhotoIds = [];
                 this.resetForm();
                 await this.loadOperatoriDisponibili();
                 await this.loadMezziDisponibili();
+
+                await this.restoreDraftForCurrentModal();
+                this.startDraftWatcher();
             },
 
             async openEditModal() {
@@ -1047,6 +1349,7 @@
             },
 
             closeModal() {
+                this.stopDraftWatcher();
                 this.showCreateModal = false;
                 this.errorMessage = '';
             },
@@ -1261,11 +1564,70 @@
                 if (this.modalMode === 'edit-cantiere') {
                     await this.saveCantiere();
                 } else {
-                    if (this.editingGiornale) {
-                        await this.updateGiornale();
-                    } else {
-                        await this.saveGiornale();
+                    await this.finalizeDraftAndSave();
+                }
+            },
+
+            async finalizeDraftAndSave() {
+                if (!this.formData.data) {
+                    this.errorMessage = 'La data è obbligatoria';
+                    return;
+                }
+
+                this.saving = true;
+                this.errorMessage = '';
+
+                try {
+                    await this.saveDraftSnapshot(this.buildGiornaleApiPayload());
+
+                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali-drafts/finalize`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            draft_id: this.draftId,
+                            giornale_id: this.getEditingGiornaleId()
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(await this.parseApiError(response, 'Errore finalizzazione giornale da bozza'));
                     }
+
+                    const result = await response.json();
+                    const finalizedGiornaleId = result?.giornale_id || null;
+
+                    this.draftId = null;
+                    this.draftLinkedPhotoIds = [];
+                    this.draftDirty = false;
+                    this.setDraftStatus('idle', '');
+                    try {
+                        localStorage.removeItem(this.getDraftStorageKey());
+                    } catch (_) {
+                        // ignore storage failures
+                    }
+
+                    this.showAlert('success', this.editingGiornale ? 'Giornale aggiornato con successo' : 'Giornale creato con successo');
+                    this.closeModal();
+
+                    if (finalizedGiornaleId) {
+                        try {
+                            localStorage.setItem('fastzoom_open_giornale_id', String(finalizedGiornaleId));
+                        } catch (_) {
+                            // ignore storage failures
+                        }
+                    }
+
+                    setTimeout(() => location.reload(), 900);
+                } catch (error) {
+                    const message = error.message || 'Errore durante il salvataggio del giornale';
+                    this.errorMessage = message;
+                    this.showAlert('error', message);
+                    console.error('Error finalizing giornale draft:', error);
+                } finally {
+                    this.saving = false;
                 }
             },
 
@@ -2412,6 +2774,16 @@
             // ===== FOTO DOCUMENTATION FUNCTIONS =====
 
             resolvePhotoUrl(rawUrl, photoId, variant = 'full') {
+                if (!photoId && variant === 'thumbnail') {
+                    return '#';
+                }
+
+                // Forza SEMPRE l'endpoint thumbnail quando richiesto,
+                // così in "Documentazione Fotografica" non scarichiamo immagini full.
+                if (variant === 'thumbnail' && photoId) {
+                    return `/api/v1/photos/${photoId}/thumbnail`;
+                }
+
                 if (rawUrl) {
                     const url = String(rawUrl).trim();
 
@@ -2447,6 +2819,16 @@
                 return `/api/v1/photos/${photoId}/${variant}`;
             },
 
+            resolvePhotoThumbnailUrl(photo) {
+                const photoId = photo && photo.id ? String(photo.id) : null;
+                return this.resolvePhotoUrl(photo?.thumbnail_url, photoId, 'thumbnail');
+            },
+
+            resolvePhotoFullUrl(photo) {
+                const photoId = photo && photo.id ? String(photo.id) : null;
+                return this.resolvePhotoUrl(photo?.full_url, photoId, 'full');
+            },
+
             getPhotoDisplayName(photo) {
                 if (!photo) return 'Foto';
                 return photo.title || photo.original_filename || photo.filename || `Foto ${String(photo.id || '').slice(0, 8)}`;
@@ -2462,17 +2844,40 @@
             },
 
             openPhotoManager() {
-                if (!this.editingGiornaleData || !this.editingGiornaleData.id) {
-                    this.errorMessage = 'Salva prima il giornale per poter gestire le foto';
-                    return;
-                }
+                this.openPhotoManagerAsync();
+            },
 
-                const managerUrl = `/view/{{ site.id }}/photos?mode=giornale_linker&giornale_id=${this.editingGiornaleData.id}`;
-                window.open(managerUrl, '_blank');
+            async openPhotoManagerAsync() {
+                try {
+                    const payload = this.buildGiornaleApiPayload();
+                    const draft = await this.saveDraftSnapshot(payload);
+                    const currentDraftId = draft?.id || this.draftId;
+                    const currentGiornaleId = this.getEditingGiornaleId();
+
+                    if (!currentDraftId && !currentGiornaleId) {
+                        this.errorMessage = 'Impossibile aprire la gestione foto: bozza non disponibile';
+                        return;
+                    }
+
+                    const returnTo = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
+                    const params = new URLSearchParams({
+                        mode: 'giornale_linker',
+                        return_to: decodeURIComponent(returnTo)
+                    });
+                    if (currentGiornaleId) params.set('giornale_id', currentGiornaleId);
+                    if (currentDraftId) params.set('draft_id', currentDraftId);
+
+                    const managerUrl = `/view/{{ site.id }}/photos?${params.toString()}`;
+                    window.open(managerUrl, '_blank');
+                } catch (error) {
+                    const message = error.message || 'Errore apertura gestione foto';
+                    this.errorMessage = message;
+                    this.showAlert('error', message);
+                }
             },
 
             async unlinkFoto(fotoId) {
-                if (!this.editingGiornaleData || !this.editingGiornaleData.id) {
+                if ((!this.editingGiornaleData || !this.editingGiornaleData.id) && !this.draftId) {
                     this.errorMessage = 'Nessun giornale selezionato';
                     return;
                 }
@@ -2482,22 +2887,37 @@
                 }
 
                 try {
-                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}/foto/${fotoId}`, {
-                        method: 'DELETE',
-                        credentials: 'same-origin',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        }
-                    });
+                    let response;
+                    if (this.draftId) {
+                        response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/drafts/${this.draftId}/foto/bulk-unlink`, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ photo_ids: [fotoId] })
+                        });
+                    } else {
+                        response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}/foto/${fotoId}`, {
+                            method: 'DELETE',
+                            credentials: 'same-origin',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            }
+                        });
+                    }
 
                     if (!response.ok) {
                         throw new Error(await this.parseApiError(response, 'Errore durante la rimozione della foto'));
                     }
 
                     // Remove foto from local data
-                    if (this.editingGiornaleData.foto) {
+                    if (this.editingGiornaleData?.foto) {
                         this.editingGiornaleData.foto = this.editingGiornaleData.foto.filter(f => f.id !== fotoId);
                     }
+                    this.draftLinkedPhotoIds = (this.draftLinkedPhotoIds || []).filter(id => String(id) !== String(fotoId));
+                    this.draftDirty = true;
+                    this.scheduleDraftAutosave();
 
                     this.showAlert('success', 'Foto rimossa con successo');
 
@@ -2545,6 +2965,8 @@ function giornaliListApp() {
 
                 this.loadGiornali(true);
 
+                this.openRequestedGiornaleFromQuery();
+
                 // Listen for validation updates
                 window.addEventListener('giornale-validated', (e) => {
                     const giornaleId = e.detail.giornaleId;
@@ -2557,6 +2979,77 @@ function giornaliListApp() {
                         // Optional: reload specific item or just update UI flag
                     }
                 });
+            },
+
+            async openRequestedGiornaleFromQuery() {
+                const params = new URLSearchParams(window.location.search);
+                let requestedId = params.get('edit_giornale');
+                let requestedDraftId = params.get('edit_draft');
+                const requestedNew = params.get('new_giornale') === '1';
+                if (!requestedId) {
+                    try {
+                        requestedId = localStorage.getItem('fastzoom_open_giornale_id');
+                    } catch (_) {
+                        requestedId = null;
+                    }
+                }
+                if (!requestedDraftId) {
+                    try {
+                        requestedDraftId = localStorage.getItem('fastzoom_open_giornale_draft_id');
+                    } catch (_) {
+                        requestedDraftId = null;
+                    }
+                }
+
+                if (!requestedId && !requestedDraftId && !requestedNew) {
+                    return;
+                }
+
+                try {
+                    if (requestedNew && !requestedId) {
+                        const root = document.querySelector('[x-data*="cantiereDetailApp"]');
+                        if (root && root._x_dataStack && root._x_dataStack[0]) {
+                            const app = root._x_dataStack[0];
+                            await app.openGiornaleModal();
+                            if (requestedDraftId) {
+                                await app.restoreDraftForCurrentModal(requestedDraftId);
+                            }
+                        }
+                        return;
+                    }
+
+                    let target = this.giornali.find(g => g.id === requestedId);
+
+                    if (!target) {
+                        const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${requestedId}`);
+                        if (response.ok) {
+                            target = await response.json();
+                            if (target && target.id && !this.giornali.some(g => g.id === target.id)) {
+                                this.giornali.unshift(target);
+                            }
+                        }
+                    }
+
+                    if (target) {
+                        this.editGiornale(target, requestedDraftId);
+                    }
+                } catch (error) {
+                    console.error('Errore apertura giornale da query:', error);
+                } finally {
+                    try {
+                        localStorage.removeItem('fastzoom_open_giornale_id');
+                        localStorage.removeItem('fastzoom_open_giornale_draft_id');
+                    } catch (_) {
+                        // ignore storage failures
+                    }
+
+                    params.delete('edit_giornale');
+                    params.delete('edit_draft');
+                    params.delete('new_giornale');
+                    const newQuery = params.toString();
+                    const newUrl = `${window.location.pathname}${newQuery ? '?' + newQuery : ''}${window.location.hash || ''}`;
+                    window.history.replaceState({}, '', newUrl);
+                }
             },
 
             // Watch filters
@@ -2652,11 +3145,12 @@ function giornaliListApp() {
             },
 
             // Edit giornale
-            editGiornale(giornale) {
+            editGiornale(giornale, preferredDraftId = null) {
                 this.$dispatch('open-edit-giornale-modal', {
                     modalMode: 'giornale',
                     editingGiornale: true,
                     editingGiornaleData: giornale,
+                    preferredDraftId: preferredDraftId || null,
                     formData: {
                         data: giornale.data,
                         ora_inizio: giornale.ora_inizio,

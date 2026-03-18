@@ -69,6 +69,7 @@ function photosManager() {
         photosPageContext: window.photosPageContext || {},
         photosMode: null,
         giornaleId: null,
+        draftId: null,
         isGiornaleLinker: false,
         giornaleLinkLoading: false,
         giornaleUnlinkLoading: false,
@@ -223,7 +224,8 @@ function photosManager() {
             const pageContext = window.photosPageContext || {};
             this.photosMode = pageContext.mode || null;
             this.giornaleId = pageContext.giornaleId || null;
-            this.isGiornaleLinker = Boolean(pageContext.isGiornaleLinker && this.giornaleId);
+            this.draftId = pageContext.draftId || null;
+            this.isGiornaleLinker = Boolean(pageContext.isGiornaleLinker && (this.giornaleId || this.draftId));
 
             // Voice Command Event Listeners
             window.addEventListener('photos-select-all', () => this.selectAllPhotos());
@@ -260,6 +262,11 @@ function photosManager() {
 
             try {
                 await this.loadPhotos();
+
+                if (this.isGiornaleLinker) {
+                    await this.preloadGiornaleLinkedSelection();
+                }
+
                 this.updateStatistics();
                 this.extractAvailableTags();
 
@@ -1407,7 +1414,7 @@ function photosManager() {
         },
 
         getGiornaleBulkEndpoint(action) {
-            if (!this.isGiornaleLinker || !this.giornaleId) {
+            if (!this.isGiornaleLinker) {
                 return null;
             }
 
@@ -1416,7 +1423,188 @@ function photosManager() {
                 return null;
             }
 
+            if (this.draftId) {
+                return `/api/v1/giornale/sites/${siteId}/giornali/drafts/${this.draftId}/foto/${action}`;
+            }
+
+            if (!this.giornaleId) {
+                return null;
+            }
+
             return `/api/v1/giornale/sites/${siteId}/giornali/${this.giornaleId}/foto/${action}`;
+        },
+
+        returnToGiornale() {
+            if (!this.isGiornaleLinker) {
+                window.location.href = '/view/' + this.getCurrentSiteId() + '/cantieri';
+                return;
+            }
+
+            const pageContext = window.photosPageContext || {};
+            const fallbackUrl = `/view/${this.getCurrentSiteId()}/cantieri`;
+            const baseReturnUrl = pageContext.giornaleReturnUrl || fallbackUrl;
+
+            if (this.giornaleId) {
+                try {
+                    localStorage.setItem('fastzoom_open_giornale_id', String(this.giornaleId));
+                    if (this.draftId) {
+                        localStorage.setItem('fastzoom_open_giornale_draft_id', String(this.draftId));
+                    }
+                } catch (_) {
+                    // ignore storage failures
+                }
+
+                const separator = baseReturnUrl.includes('?') ? '&' : '?';
+                let returnUrl = `${baseReturnUrl}${separator}edit_giornale=${encodeURIComponent(this.giornaleId)}`;
+                if (this.draftId) {
+                    returnUrl += `&edit_draft=${encodeURIComponent(this.draftId)}`;
+                }
+                window.location.href = returnUrl;
+                return;
+            }
+
+            if (this.draftId) {
+                try {
+                    localStorage.setItem('fastzoom_open_giornale_draft_id', String(this.draftId));
+                } catch (_) {
+                    // ignore storage failures
+                }
+
+                const separator = baseReturnUrl.includes('?') ? '&' : '?';
+                window.location.href = `${baseReturnUrl}${separator}edit_draft=${encodeURIComponent(this.draftId)}&new_giornale=1`;
+                return;
+            }
+
+            window.location.href = baseReturnUrl;
+        },
+
+        async fetchLinkedPhotoIdsForGiornale() {
+            if (!this.isGiornaleLinker) {
+                return [];
+            }
+
+            const siteId = this.getCurrentSiteId();
+            if (!siteId) {
+                return [];
+            }
+
+            if (this.draftId) {
+                const params = new URLSearchParams({
+                    draft_id: String(this.draftId)
+                });
+                const response = await fetch(
+                    `/api/v1/giornale/sites/${siteId}/giornali-drafts?${params.toString()}`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        },
+                        credentials: 'same-origin'
+                    }
+                );
+
+                if (!response.ok) {
+                    const raw = await response.text();
+                    let message = 'Errore nel recupero delle foto già collegate alla bozza';
+                    try {
+                        const data = JSON.parse(raw);
+                        message = data?.detail || data?.message || message;
+                    } catch (_) {
+                        if (raw) message = raw;
+                    }
+                    throw new Error(message);
+                }
+
+                const payload = await response.json();
+                const draft = payload?.draft || null;
+                return Array.isArray(draft?.linked_photo_ids) ? draft.linked_photo_ids.map(id => String(id)) : [];
+            }
+
+            if (!this.giornaleId) {
+                return [];
+            }
+
+            const limit = 200;
+            let skip = 0;
+            let total = null;
+            let guard = 0;
+            const linkedIds = new Set();
+
+            while ((total === null || skip < total) && guard < 100) {
+                const params = new URLSearchParams({
+                    skip: String(skip),
+                    limit: String(limit),
+                    link_state: 'linked',
+                    sort_by: 'created_desc'
+                });
+
+                const response = await fetch(
+                    `/api/v1/giornale/sites/${siteId}/giornali/${this.giornaleId}/foto/archive?${params.toString()}`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        },
+                        credentials: 'same-origin'
+                    }
+                );
+
+                if (!response.ok) {
+                    const raw = await response.text();
+                    let message = 'Errore nel recupero delle foto già collegate al giornale';
+                    try {
+                        const data = JSON.parse(raw);
+                        message = data?.detail || data?.message || message;
+                    } catch (_) {
+                        if (raw) message = raw;
+                    }
+                    throw new Error(message);
+                }
+
+                const payload = await response.json();
+                const items = Array.isArray(payload.items) ? payload.items : [];
+
+                items.forEach(item => {
+                    if (item && item.id) {
+                        linkedIds.add(String(item.id));
+                    }
+                });
+
+                total = Number(payload.total ?? linkedIds.size);
+                skip += items.length;
+                guard += 1;
+
+                if (items.length === 0) {
+                    break;
+                }
+            }
+
+            return Array.from(linkedIds);
+        },
+
+        async preloadGiornaleLinkedSelection() {
+            if (!this.isGiornaleLinker) {
+                return;
+            }
+
+            try {
+                const linkedPhotoIds = await this.fetchLinkedPhotoIdsForGiornale();
+
+                if (!linkedPhotoIds.length) {
+                    this.selectedPhotos = [];
+                    return;
+                }
+
+                const availablePhotoIds = new Set(
+                    (this.photos || [])
+                        .filter(photo => photo && photo.id)
+                        .map(photo => String(photo.id))
+                );
+
+                this.selectedPhotos = linkedPhotoIds.filter(photoId => availablePhotoIds.has(String(photoId)));
+            } catch (error) {
+                console.error('Errore preload selezione foto giornale:', error);
+            }
         },
 
         async linkSelectedToGiornale() {

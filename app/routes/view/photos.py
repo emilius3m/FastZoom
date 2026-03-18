@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from uuid import UUID
 from typing import List, Dict, Any, Tuple, Optional
+from urllib.parse import urlparse
 
 from app.database.session import get_async_session
 from app.core.security import get_current_user_sites_with_blacklist
@@ -33,6 +34,8 @@ async def site_photos(
         category: Optional[str] = None,
         mode: Optional[str] = None,
         giornale_id: Optional[UUID] = None,
+        draft_id: Optional[UUID] = None,
+        return_to: Optional[str] = None,
         site_access: Tuple[ArchaeologicalSite, Optional[UserSitePermission], User, bool] = Depends(get_site_read_access),
         user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
         db: AsyncSession = Depends(get_async_session)
@@ -75,7 +78,21 @@ async def site_photos(
     can_write = is_superuser or (permission.can_write() if permission else False)
     can_admin = is_superuser or (permission.can_admin() if permission else False)
     
-    is_giornale_linker = mode == "giornale_linker" and giornale_id is not None
+    is_giornale_linker = mode == "giornale_linker" and (giornale_id is not None or draft_id is not None)
+
+    giornale_return_url = f"/view/{site_id}/cantieri"
+    if is_giornale_linker:
+        if return_to and return_to.startswith("/view/"):
+            giornale_return_url = return_to
+
+        referer_url = request.headers.get("referer")
+        if referer_url and giornale_return_url == f"/view/{site_id}/cantieri":
+            parsed_referer = urlparse(referer_url)
+            same_host = (not parsed_referer.netloc) or (parsed_referer.netloc == request.url.netloc)
+            if same_host and parsed_referer.path and parsed_referer.path.startswith("/view/"):
+                giornale_return_url = parsed_referer.path
+                if parsed_referer.query:
+                    giornale_return_url = f"{giornale_return_url}?{parsed_referer.query}"
 
     context = {
         "request": request,
@@ -103,7 +120,9 @@ async def site_photos(
         "categories": categories,
         "photos_mode": mode,
         "giornale_id": str(giornale_id) if giornale_id else None,
+        "draft_id": str(draft_id) if draft_id else None,
         "is_giornale_linker": is_giornale_linker,
+        "giornale_return_url": giornale_return_url,
     }
 
     return templates.TemplateResponse("sites/photos.html", context)

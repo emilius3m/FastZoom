@@ -39,6 +39,16 @@ def _parse_uuid_list(values: Any) -> List[UUID]:
             continue
     return parsed
 
+
+def _parse_optional_uuid(value: Any) -> Optional[UUID]:
+    """Converte un valore opzionale in UUID, restituendo None se vuoto/non valido."""
+    if value in (None, "", "null"):
+        return None
+    try:
+        return UUID(str(value))
+    except Exception:
+        return None
+
 def normalize_site_id(site_id: str) -> Optional[str]:
     """
     Normalizza l'ID del sito per supportare diversi formati.
@@ -261,6 +271,28 @@ async def v1_get_cantiere_giornali(
         logger.error(f"Errore recupero giornali cantiere {cantiere_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get("/sites/{site_id}/giornali/{giornale_id}", summary="Dettaglio giornale", tags=["Giornale di Cantiere"])
+async def v1_get_giornale(
+    site_id: UUID,
+    giornale_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """Recupera un singolo giornale di cantiere con dati completi."""
+    try:
+        verify_site_access(site_id, user_sites)
+        service = GiornaleService(db)
+        return await service.get_giornale(site_id, giornale_id)
+    except (InsufficientPermissionsError, SiteNotFoundError, ResourceNotFoundError):
+        raise
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore recupero dettaglio giornale {giornale_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nel recupero del giornale")
+
 @router.post("/sites/{site_id}/giornali", summary="Crea nuovo giornale", tags=["Giornale di Cantiere"])
 async def v1_create_giornale(
     site_id: UUID,
@@ -319,6 +351,142 @@ async def v1_update_giornale(
     except Exception as e:
         logger.error(f"Errore aggiornamento giornale: {str(e)}")
         raise HTTPException(status_code=500, detail="Errore nell'aggiornamento del giornale")
+
+
+@router.get("/sites/{site_id}/giornali-drafts", summary="Recupera bozza giornale utente", tags=["Giornale di Cantiere"])
+async def v1_get_giornale_draft(
+    site_id: UUID,
+    draft_id: Optional[UUID] = Query(None),
+    giornale_id: Optional[UUID] = Query(None),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session),
+):
+    """Recupera la bozza corrente dell'utente per sito/giornale."""
+    try:
+        verify_site_access(site_id, user_sites)
+        service = GiornaleService(db)
+        draft = await service.get_draft(
+            site_id=site_id,
+            user_id=current_user_id,
+            draft_id=draft_id,
+            giornale_id=giornale_id,
+        )
+        return {"draft": draft}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore recupero bozza giornale: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nel recupero della bozza")
+
+
+@router.post("/sites/{site_id}/giornali-drafts", summary="Salva bozza giornale", tags=["Giornale di Cantiere"])
+async def v1_save_giornale_draft(
+    site_id: UUID,
+    draft_payload: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session),
+):
+    """Crea/aggiorna una bozza giornale (autosave esplicito)."""
+    try:
+        verify_site_access(site_id, user_sites)
+
+        draft_id = _parse_optional_uuid(draft_payload.get("draft_id"))
+        giornale_id = _parse_optional_uuid(draft_payload.get("giornale_id"))
+        payload = draft_payload.get("payload") if isinstance(draft_payload.get("payload"), dict) else {}
+        linked_photo_ids = draft_payload.get("linked_photo_ids") if isinstance(draft_payload.get("linked_photo_ids"), list) else None
+        base_version = draft_payload.get("base_version")
+        if base_version is not None:
+            try:
+                base_version = int(base_version)
+            except Exception:
+                base_version = None
+
+        service = GiornaleService(db)
+        draft = await service.save_draft(
+            site_id=site_id,
+            user_id=current_user_id,
+            payload=payload,
+            draft_id=draft_id,
+            giornale_id=giornale_id,
+            linked_photo_ids=linked_photo_ids,
+            base_version=base_version,
+        )
+        return {
+            "message": "Bozza salvata con successo",
+            "draft": draft,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore salvataggio bozza giornale: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nel salvataggio della bozza")
+
+
+@router.delete("/sites/{site_id}/giornali-drafts", summary="Elimina bozza giornale", tags=["Giornale di Cantiere"])
+async def v1_discard_giornale_draft(
+    site_id: UUID,
+    draft_id: Optional[UUID] = Query(None),
+    giornale_id: Optional[UUID] = Query(None),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session),
+):
+    """Elimina una bozza giornale utente."""
+    try:
+        verify_site_access(site_id, user_sites)
+        service = GiornaleService(db)
+        deleted = await service.discard_draft(
+            site_id=site_id,
+            user_id=current_user_id,
+            draft_id=draft_id,
+            giornale_id=giornale_id,
+        )
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Bozza non trovata")
+        return {
+            "message": "Bozza eliminata con successo",
+            "deleted": True,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore eliminazione bozza giornale: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nell'eliminazione della bozza")
+
+
+@router.post("/sites/{site_id}/giornali-drafts/finalize", summary="Finalizza bozza giornale", tags=["Giornale di Cantiere"])
+async def v1_finalize_giornale_draft(
+    site_id: UUID,
+    payload: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session),
+):
+    """Finalizza la bozza creando/aggiornando il giornale definitivo."""
+    try:
+        verify_site_access(site_id, user_sites)
+
+        draft_id = _parse_optional_uuid(payload.get("draft_id"))
+        giornale_id = _parse_optional_uuid(payload.get("giornale_id"))
+
+        service = GiornaleService(db)
+        result = await service.finalize_draft(
+            site_id=site_id,
+            user_id=current_user_id,
+            draft_id=draft_id,
+            giornale_id=giornale_id,
+        )
+        return {
+            "message": "Bozza finalizzata con successo",
+            **result,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore finalizzazione bozza giornale: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nella finalizzazione della bozza")
 
 @router.post("/sites/{site_id}/giornali/{giornale_id}/validate", summary="Valida giornale", tags=["Giornale di Cantiere"])
 async def v1_validate_giornale(
@@ -1628,6 +1796,40 @@ async def v1_bulk_link_foto_to_giornale(
         raise HTTPException(status_code=500, detail="Errore nel collegamento massivo delle foto")
 
 
+@router.post("/sites/{site_id}/giornali/drafts/{draft_id}/foto/bulk-link", summary="Collega foto in blocco alla bozza", tags=["Giornale di Cantiere"])
+async def v1_bulk_link_foto_to_draft(
+    site_id: UUID,
+    draft_id: UUID,
+    payload: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session),
+):
+    """Collega più foto esistenti alla bozza giornale in una singola operazione."""
+    try:
+        verify_site_access(site_id, user_sites)
+        photo_ids = _parse_uuid_list(payload.get("photo_ids"))
+        if not photo_ids:
+            raise HTTPException(status_code=400, detail="photo_ids obbligatorio e non vuoto")
+
+        service = GiornaleService(db)
+        result = await service.bulk_link_photos_to_draft(
+            site_id=site_id,
+            user_id=current_user_id,
+            draft_id=draft_id,
+            photo_ids=photo_ids,
+        )
+        return {
+            "message": "Collegamento foto alla bozza completato",
+            **result,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore bulk link foto bozza {draft_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nel collegamento massivo delle foto alla bozza")
+
+
 @router.post("/sites/{site_id}/giornali/{giornale_id}/foto/bulk-unlink", summary="Scollega foto in blocco", tags=["Giornale di Cantiere"])
 async def v1_bulk_unlink_foto_from_giornale(
     site_id: UUID,
@@ -1655,6 +1857,40 @@ async def v1_bulk_unlink_foto_from_giornale(
     except Exception as e:
         logger.error(f"Errore bulk unlink foto giornale {giornale_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Errore nello scollegamento massivo delle foto")
+
+
+@router.post("/sites/{site_id}/giornali/drafts/{draft_id}/foto/bulk-unlink", summary="Scollega foto in blocco dalla bozza", tags=["Giornale di Cantiere"])
+async def v1_bulk_unlink_foto_from_draft(
+    site_id: UUID,
+    draft_id: UUID,
+    payload: Dict[str, Any],
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session),
+):
+    """Scollega più foto dalla bozza giornale in una singola operazione."""
+    try:
+        verify_site_access(site_id, user_sites)
+        photo_ids = _parse_uuid_list(payload.get("photo_ids"))
+        if not photo_ids:
+            raise HTTPException(status_code=400, detail="photo_ids obbligatorio e non vuoto")
+
+        service = GiornaleService(db)
+        result = await service.bulk_unlink_photos_from_draft(
+            site_id=site_id,
+            user_id=current_user_id,
+            draft_id=draft_id,
+            photo_ids=photo_ids,
+        )
+        return {
+            "message": "Scollegamento foto dalla bozza completato",
+            **result,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore bulk unlink foto bozza {draft_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Errore nello scollegamento massivo delle foto dalla bozza")
 
 @router.post("/sites/{site_id}/giornali/{giornale_id}/foto/{foto_id}", summary="Link foto a giornale", tags=["Giornale di Cantiere"])
 async def v1_link_foto_to_giornale(

@@ -8,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from app.repositories.giornale_repository import GiornaleRepository
-from app.models.giornale_cantiere import GiornaleCantiere
+from app.models.giornale_cantiere import GiornaleCantiere, GiornaleCantiereDraft
 from app.models.users import User
+from app.models.documentation_and_field import Photo
 
 class GiornaleService:
     def __init__(self, db_session: AsyncSession):
@@ -70,6 +71,178 @@ class GiornaleService:
                 return [raw]
 
         return [str(value)]
+
+    @staticmethod
+    def _normalize_photo_ids(values: Any) -> List[str]:
+        if not isinstance(values, list):
+            return []
+        result: List[str] = []
+        seen = set()
+        for value in values:
+            if not value:
+                continue
+            try:
+                normalized = str(UUID(str(value)))
+            except Exception:
+                continue
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            result.append(normalized)
+        return result
+
+    @staticmethod
+    def _build_giornale_photo_tag(giornale_id: UUID) -> str:
+        return f"giornale:{str(giornale_id)}"
+
+    @staticmethod
+    def _build_cantiere_photo_tag(cantiere_id: Any) -> Optional[str]:
+        if not cantiere_id:
+            return None
+        try:
+            return f"cantiere:{str(UUID(str(cantiere_id)))}"
+        except Exception:
+            return None
+
+    @staticmethod
+    def _parse_photo_keywords(raw_keywords: Any) -> List[str]:
+        if raw_keywords is None:
+            return []
+
+        if isinstance(raw_keywords, list):
+            return [str(tag).strip() for tag in raw_keywords if str(tag).strip()]
+
+        if isinstance(raw_keywords, str):
+            value = raw_keywords.strip()
+            if not value:
+                return []
+
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return [str(tag).strip() for tag in parsed if str(tag).strip()]
+            except Exception:
+                pass
+
+            return [part.strip() for part in value.split(",") if part and part.strip()]
+
+        return [str(raw_keywords).strip()]
+
+    @staticmethod
+    def _serialize_photo_keywords(tags: List[str]) -> Optional[str]:
+        cleaned = [str(tag).strip() for tag in (tags or []) if str(tag).strip()]
+        return ", ".join(cleaned) if cleaned else None
+
+    async def _add_giornale_tag_to_photos(
+        self,
+        site_id: UUID,
+        giornale_id: UUID,
+        photo_ids: List[Any],
+        cantiere_id: Optional[Any] = None,
+    ) -> None:
+        normalized_photo_ids = self._normalize_photo_ids(photo_ids)
+        if not normalized_photo_ids:
+            return
+
+        giornale_tag = self._build_giornale_photo_tag(giornale_id)
+        cantiere_tag = self._build_cantiere_photo_tag(cantiere_id)
+        tags_to_add = [giornale_tag]
+        if cantiere_tag:
+            tags_to_add.append(cantiere_tag)
+
+        result = await self.db.execute(
+            select(Photo).where(
+                and_(
+                    Photo.site_id == str(site_id),
+                    Photo.id.in_(normalized_photo_ids),
+                )
+            )
+        )
+        photos = result.scalars().all()
+
+        for photo in photos:
+            tags = self._parse_photo_keywords(photo.keywords)
+            for tag in tags_to_add:
+                if tag not in tags:
+                    tags.append(tag)
+            if tags:
+                photo.keywords = self._serialize_photo_keywords(tags)
+
+    async def _remove_giornale_tag_from_photos(
+        self,
+        site_id: UUID,
+        giornale_id: UUID,
+        photo_ids: List[Any],
+    ) -> None:
+        normalized_photo_ids = self._normalize_photo_ids(photo_ids)
+        if not normalized_photo_ids:
+            return
+
+        giornale_tag = self._build_giornale_photo_tag(giornale_id)
+        result = await self.db.execute(
+            select(Photo).where(
+                and_(
+                    Photo.site_id == str(site_id),
+                    Photo.id.in_(normalized_photo_ids),
+                )
+            )
+        )
+        photos = result.scalars().all()
+
+        for photo in photos:
+            tags = self._parse_photo_keywords(photo.keywords)
+            filtered = [tag for tag in tags if tag != giornale_tag]
+            if len(filtered) != len(tags):
+                photo.keywords = self._serialize_photo_keywords(filtered)
+
+    @staticmethod
+    def _sanitize_draft_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Sanitizza payload bozza mantenendo forma compatibile con create/update giornale."""
+        if not isinstance(payload, dict):
+            return {}
+
+        cleaned = dict(payload)
+
+        if "operatori_presenti" in cleaned and "operatori" not in cleaned:
+            cleaned["operatori"] = cleaned.get("operatori_presenti") or []
+        if "mezzi_presenti" in cleaned and "mezzi" not in cleaned:
+            cleaned["mezzi"] = cleaned.get("mezzi_presenti") or []
+
+        cleaned.pop("id", None)
+        cleaned.pop("site_id", None)
+        cleaned.pop("created_at", None)
+        cleaned.pop("updated_at", None)
+        cleaned.pop("version", None)
+        cleaned.pop("foto", None)
+
+        return cleaned
+
+    def _draft_to_response(self, draft: GiornaleCantiereDraft) -> Dict[str, Any]:
+        try:
+            payload = json.loads(draft.payload_json) if draft.payload_json else {}
+            if not isinstance(payload, dict):
+                payload = {}
+        except Exception:
+            payload = {}
+
+        try:
+            linked_ids_raw = json.loads(draft.linked_photo_ids_json) if draft.linked_photo_ids_json else []
+            linked_photo_ids = self._normalize_photo_ids(linked_ids_raw)
+        except Exception:
+            linked_photo_ids = []
+
+        return {
+            "id": str(draft.id),
+            "site_id": str(draft.site_id),
+            "user_id": str(draft.user_id),
+            "giornale_id": str(draft.giornale_id) if draft.giornale_id else None,
+            "payload": payload,
+            "linked_photo_ids": linked_photo_ids,
+            "base_version": draft.base_version,
+            "draft_version": draft.draft_version,
+            "created_at": draft.created_at.isoformat() if draft.created_at else None,
+            "updated_at": draft.updated_at.isoformat() if draft.updated_at else None,
+        }
 
     async def _is_superuser(self, user_id: UUID) -> bool:
         user = await self.db.get(User, str(user_id))
@@ -388,6 +561,7 @@ class GiornaleService:
                     "full_url": f"/api/v1/photos/{f.id}/full",
                     "title": f.title,
                     "description": f.description,
+                    "tags": f.get_keywords_list() if hasattr(f, "get_keywords_list") else [],
                 }
                 for f in (g.foto or [])
             ],
@@ -749,10 +923,147 @@ class GiornaleService:
                 detail="Giornale validato: eliminazione non consentita (record congelato legalmente)",
             )
 
+        linked_photo_ids = await self.repository.get_linked_photo_ids(giornale.id)
+        await self._remove_giornale_tag_from_photos(site_id, giornale.id, sorted(linked_photo_ids))
+
         await self.repository.clear_operatore_associations(giornale.id)
         await self.repository.clear_mezzo_associations(giornale.id)
+        await self.repository.clear_photo_associations(giornale.id)
         await self.repository.remove(giornale.id)
+        await self.db.commit()
         return True
+
+    async def get_draft(
+        self,
+        site_id: UUID,
+        user_id: UUID,
+        draft_id: Optional[UUID] = None,
+        giornale_id: Optional[UUID] = None,
+    ) -> Optional[Dict[str, Any]]:
+        draft = await self.repository.get_draft(
+            site_id=site_id,
+            user_id=user_id,
+            draft_id=draft_id,
+            giornale_id=giornale_id,
+        )
+        if not draft:
+            return None
+        return self._draft_to_response(draft)
+
+    async def save_draft(
+        self,
+        site_id: UUID,
+        user_id: UUID,
+        payload: Dict[str, Any],
+        *,
+        draft_id: Optional[UUID] = None,
+        giornale_id: Optional[UUID] = None,
+        linked_photo_ids: Optional[List[Any]] = None,
+        base_version: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        if giornale_id:
+            giornale = await self.repository.get(giornale_id)
+            if not giornale or str(giornale.site_id) != str(site_id):
+                raise HTTPException(status_code=404, detail="Giornale non trovato")
+            await self._ensure_responsabile_or_superuser(giornale, user_id)
+
+        payload_clean = self._sanitize_draft_payload(payload or {})
+        payload_json = json.dumps(payload_clean, ensure_ascii=False)
+
+        linked_ids = self._normalize_photo_ids(linked_photo_ids or [])
+        linked_ids_json = json.dumps(linked_ids, ensure_ascii=False) if linked_photo_ids is not None else None
+
+        draft = await self.repository.save_draft(
+            site_id=site_id,
+            user_id=user_id,
+            payload_json=payload_json,
+            linked_photo_ids_json=linked_ids_json,
+            giornale_id=giornale_id,
+            draft_id=draft_id,
+            base_version=base_version,
+        )
+        await self.db.commit()
+        await self.db.refresh(draft)
+        return self._draft_to_response(draft)
+
+    async def discard_draft(
+        self,
+        site_id: UUID,
+        user_id: UUID,
+        *,
+        draft_id: Optional[UUID] = None,
+        giornale_id: Optional[UUID] = None,
+    ) -> bool:
+        deleted = await self.repository.delete_draft(
+            site_id=site_id,
+            user_id=user_id,
+            draft_id=draft_id,
+            giornale_id=giornale_id,
+        )
+        if deleted:
+            await self.db.commit()
+        return deleted
+
+    async def finalize_draft(
+        self,
+        site_id: UUID,
+        user_id: UUID,
+        *,
+        draft_id: Optional[UUID] = None,
+        giornale_id: Optional[UUID] = None,
+    ) -> Dict[str, Any]:
+        draft = await self.repository.get_draft(
+            site_id=site_id,
+            user_id=user_id,
+            draft_id=draft_id,
+            giornale_id=giornale_id,
+        )
+        if not draft:
+            raise HTTPException(status_code=404, detail="Bozza non trovata")
+
+        draft_data = self._draft_to_response(draft)
+        payload = self._sanitize_draft_payload(draft_data.get("payload") or {})
+        linked_photo_ids = draft_data.get("linked_photo_ids") or []
+
+        target_giornale_id = draft.giornale_id
+        if target_giornale_id:
+            giornale = await self.update_giornale(site_id, UUID(str(target_giornale_id)), payload, user_id)
+        else:
+            giornale = await self.create_giornale(site_id, payload, user_id)
+
+        previous_photo_ids = await self.repository.get_linked_photo_ids(giornale.id)
+
+        valid_site_photo_ids = await self.repository.get_site_photo_ids(
+            site_id,
+            [UUID(photo_id) for photo_id in linked_photo_ids],
+        ) if linked_photo_ids else set()
+
+        await self.repository.clear_photo_associations(giornale.id)
+        if valid_site_photo_ids:
+            await self.repository.bulk_link_photos(
+                giornale.id,
+                [UUID(photo_id) for photo_id in valid_site_photo_ids],
+            )
+
+        current_photo_ids = set(valid_site_photo_ids)
+        removed_photo_ids = sorted(previous_photo_ids - current_photo_ids)
+
+        await self._add_giornale_tag_to_photos(
+            site_id,
+            giornale.id,
+            sorted(current_photo_ids),
+            cantiere_id=giornale.cantiere_id,
+        )
+        await self._remove_giornale_tag_from_photos(site_id, giornale.id, removed_photo_ids)
+
+        await self.repository.delete_draft(site_id=site_id, user_id=user_id, draft_id=UUID(str(draft.id)))
+        await self.db.commit()
+
+        return {
+            "giornale_id": str(giornale.id),
+            "draft_id": str(draft.id),
+            "linked_photo_ids": sorted(valid_site_photo_ids),
+        }
 
     async def link_photo(
         self,
@@ -777,7 +1088,6 @@ class GiornaleService:
 
         # Verify photo (generic repo check or direct query)
         # Using direct query for simplicity as we don't have PhotoService injected yet
-        from app.models.documentation_and_field import Photo
         photo_res = await self.db.execute(select(Photo).where(and_(Photo.id == str(foto_id), Photo.site_id == str(site_id))))
         if not photo_res.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="Foto non trovata")
@@ -786,6 +1096,12 @@ class GiornaleService:
              raise HTTPException(status_code=400, detail="Foto giÃ  collegata")
 
         await self.repository.link_photo(giornale_id, foto_id, didascalia, ordine)
+        await self._add_giornale_tag_to_photos(
+            site_id,
+            giornale_id,
+            [foto_id],
+            cantiere_id=giornale.cantiere_id,
+        )
         await self.db.commit()
 
     async def unlink_photo(self, site_id: UUID, giornale_id: UUID, foto_id: UUID, user_id: UUID):
@@ -803,6 +1119,7 @@ class GiornaleService:
         success = await self.repository.unlink_photo(giornale_id, foto_id)
         if not success:
             raise HTTPException(status_code=404, detail="Associazione non trovata")
+        await self._remove_giornale_tag_from_photos(site_id, giornale_id, [foto_id])
         await self.db.commit()
 
     async def list_photo_archive_for_giornale(
@@ -865,6 +1182,12 @@ class GiornaleService:
 
         normalized_ids = [UUID(photo_id) for photo_id in valid_site_photo_ids]
         result = await self.repository.bulk_link_photos(giornale_id, normalized_ids)
+        await self._add_giornale_tag_to_photos(
+            site_id,
+            giornale_id,
+            sorted(valid_site_photo_ids),
+            cantiere_id=giornale.cantiere_id,
+        )
         await self.db.commit()
 
         return {
@@ -873,6 +1196,39 @@ class GiornaleService:
             "already_linked": result["already_linked"],
             "requested": len(photo_ids or []),
             "valid_site_photos": len(valid_site_photo_ids),
+        }
+
+    async def bulk_link_photos_to_draft(
+        self,
+        site_id: UUID,
+        *,
+        user_id: UUID,
+        draft_id: UUID,
+        photo_ids: List[UUID],
+    ) -> Dict[str, Any]:
+        draft = await self.repository.get_draft(site_id=site_id, user_id=user_id, draft_id=draft_id)
+        if not draft:
+            raise HTTPException(status_code=404, detail="Bozza non trovata")
+
+        valid_site_photo_ids = await self.repository.get_site_photo_ids(site_id, photo_ids)
+        if not valid_site_photo_ids:
+            raise HTTPException(status_code=400, detail="Nessuna foto valida selezionata per questo sito")
+
+        current_ids = await self.repository.get_draft_photo_ids(draft)
+        to_add = set(valid_site_photo_ids)
+        merged = list(current_ids.union(to_add))
+
+        await self.repository.replace_draft_photo_ids(draft, sorted(merged))
+        await self.db.commit()
+        await self.db.refresh(draft)
+
+        return {
+            "draft_id": str(draft.id),
+            "linked_count": len(merged) - len(current_ids),
+            "already_linked": len(current_ids.intersection(to_add)),
+            "requested": len(photo_ids or []),
+            "valid_site_photos": len(valid_site_photo_ids),
+            "total_linked": len(merged),
         }
 
     async def bulk_unlink_photos(
@@ -894,12 +1250,53 @@ class GiornaleService:
             )
 
         unlinked_count = await self.repository.bulk_unlink_photos(giornale_id, photo_ids)
+        await self._remove_giornale_tag_from_photos(
+            site_id,
+            giornale_id,
+            [str(photo_id) for photo_id in (photo_ids or [])],
+        )
         await self.db.commit()
 
         return {
             "giornale_id": str(giornale_id),
             "unlinked_count": unlinked_count,
             "requested": len(photo_ids or []),
+        }
+
+    async def bulk_unlink_photos_from_draft(
+        self,
+        site_id: UUID,
+        *,
+        user_id: UUID,
+        draft_id: UUID,
+        photo_ids: List[UUID],
+    ) -> Dict[str, Any]:
+        draft = await self.repository.get_draft(site_id=site_id, user_id=user_id, draft_id=draft_id)
+        if not draft:
+            raise HTTPException(status_code=404, detail="Bozza non trovata")
+
+        to_remove = {str(pid) for pid in photo_ids or []}
+        if not to_remove:
+            return {
+                "draft_id": str(draft.id),
+                "unlinked_count": 0,
+                "requested": 0,
+                "total_linked": len(await self.repository.get_draft_photo_ids(draft)),
+            }
+
+        current_ids = await self.repository.get_draft_photo_ids(draft)
+        remaining = sorted([pid for pid in current_ids if pid not in to_remove])
+        unlinked_count = len(current_ids) - len(remaining)
+
+        await self.repository.replace_draft_photo_ids(draft, remaining)
+        await self.db.commit()
+        await self.db.refresh(draft)
+
+        return {
+            "draft_id": str(draft.id),
+            "unlinked_count": unlinked_count,
+            "requested": len(photo_ids or []),
+            "total_linked": len(remaining),
         }
 
     async def list_site_operators(self, site_id: UUID, skip: int = 0, limit: int = 20, filters: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -934,4 +1331,3 @@ class GiornaleService:
             "data": operators_data,
             "count": total
         }
-

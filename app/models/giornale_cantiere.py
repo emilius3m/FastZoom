@@ -389,6 +389,46 @@ class GiornaleCantiere(Base):
         self.attrezzatura_utilizzata = ', '.join(apparecchiature_list) if apparecchiature_list else None
 
 
+class GiornaleCantiereDraft(Base):
+    """
+    Bozza utente del giornale di cantiere.
+
+    Supporta sia:
+    - modifica di un giornale esistente (giornale_id valorizzato)
+    - creazione di un nuovo giornale non ancora persistito (giornale_id nullo)
+    """
+    __tablename__ = "giornali_cantiere_drafts"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()), index=True)
+
+    site_id = Column(String(36), ForeignKey("archaeological_sites.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    giornale_id = Column(String(36), ForeignKey("giornali_cantiere.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    # Snapshot JSON completo del form/modal (campi base + operatori + mezzi + allegati + eventuale metadato foto)
+    payload_json = Column(Text, nullable=False)
+
+    # Foto collegate in modalità draft linker (JSON array di UUID string)
+    linked_photo_ids_json = Column(Text, nullable=True)
+
+    # Versioni per controllo conflitti lato applicativo
+    base_version = Column(Integer, nullable=True)
+    draft_version = Column(Integer, nullable=False, default=1)
+
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    site = relationship("ArchaeologicalSite")
+    user = relationship("User")
+    giornale = relationship("GiornaleCantiere")
+
+    def __repr__(self):
+        return (
+            f"<GiornaleCantiereDraft(id='{self.id}', site_id='{self.site_id}', "
+            f"user_id='{self.user_id}', giornale_id='{self.giornale_id}')>"
+        )
+
+
 # ===== AGGIORNAMENTO DEL MODELLO ARCHAEOLOGICALSITE =====
 # Questo codice va aggiunto al file app/models/sites.py nella classe ArchaeologicalSite:
 
@@ -407,4 +447,9 @@ def init_giornale_cantiere_models():
     Da aggiungere alla funzione init_models() in app/database/base.py
     """
     # Import per assicurarsi che i modelli siano registrati
-    from app.models.giornale_cantiere import GiornaleCantiere, OperatoreCantiere, MezzoCantiere  # noqa: F401
+    from app.models.giornale_cantiere import (  # noqa: F401
+        GiornaleCantiere,
+        OperatoreCantiere,
+        MezzoCantiere,
+        GiornaleCantiereDraft,
+    )

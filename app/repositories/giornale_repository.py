@@ -1,6 +1,7 @@
 from typing import List, Dict, Any, Optional, Tuple, Set
 from uuid import UUID
 from datetime import date
+import json
 from sqlalchemy import select, and_, or_, desc, delete, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,7 @@ from app.models.giornale_cantiere import (
     GiornaleCantiere,
     OperatoreCantiere,
     MezzoCantiere,
+    GiornaleCantiereDraft,
     giornale_operatori_association,
     giornale_mezzi_association,
     giornale_foto_association,
@@ -444,6 +446,24 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
         )
         return result.rowcount or 0
 
+    async def clear_photo_associations(self, giornale_id: UUID) -> int:
+        """Rimuove tutte le associazioni foto di un giornale."""
+        result = await self.db_session.execute(
+            giornale_foto_association.delete().where(
+                giornale_foto_association.c.giornale_id == str(giornale_id)
+            )
+        )
+        return result.rowcount or 0
+
+    async def get_linked_photo_ids(self, giornale_id: UUID) -> Set[str]:
+        """Restituisce gli ID foto attualmente collegati al giornale."""
+        result = await self.db_session.execute(
+            select(giornale_foto_association.c.foto_id).where(
+                giornale_foto_association.c.giornale_id == str(giornale_id)
+            )
+        )
+        return {str(row[0]) for row in result.fetchall()}
+
     async def get_operators_with_stats(self, site_id: UUID, skip: int = 0, limit: int = 20, filters: Dict[str, Any] = None) -> Tuple[List[Any], int]:
         """
         Custom query logic for operators with journal counts
@@ -510,4 +530,108 @@ class GiornaleRepository(BaseRepository[GiornaleCantiere]):
                 )
         result = await self.db_session.execute(query)
         return result.scalar() or 0
+
+    async def get_draft(
+        self,
+        site_id: UUID,
+        user_id: UUID,
+        draft_id: Optional[UUID] = None,
+        giornale_id: Optional[UUID] = None,
+    ) -> Optional[GiornaleCantiereDraft]:
+        """Recupera una bozza utente per sito/giornale oppure per draft_id esplicito."""
+        query = select(GiornaleCantiereDraft).where(
+            and_(
+                GiornaleCantiereDraft.site_id == str(site_id),
+                GiornaleCantiereDraft.user_id == str(user_id),
+            )
+        )
+
+        if draft_id:
+            query = query.where(GiornaleCantiereDraft.id == str(draft_id))
+        elif giornale_id:
+            query = query.where(GiornaleCantiereDraft.giornale_id == str(giornale_id))
+        else:
+            query = query.where(GiornaleCantiereDraft.giornale_id.is_(None))
+
+        query = query.order_by(desc(GiornaleCantiereDraft.updated_at), desc(GiornaleCantiereDraft.created_at)).limit(1)
+        result = await self.db_session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def save_draft(
+        self,
+        *,
+        site_id: UUID,
+        user_id: UUID,
+        payload_json: str,
+        linked_photo_ids_json: Optional[str] = None,
+        giornale_id: Optional[UUID] = None,
+        draft_id: Optional[UUID] = None,
+        base_version: Optional[int] = None,
+    ) -> GiornaleCantiereDraft:
+        """Upsert bozza incrementando draft_version ad ogni salvataggio."""
+        draft = await self.get_draft(
+            site_id=site_id,
+            user_id=user_id,
+            draft_id=draft_id,
+            giornale_id=giornale_id,
+        )
+
+        if draft:
+            draft.payload_json = payload_json
+            if linked_photo_ids_json is not None:
+                draft.linked_photo_ids_json = linked_photo_ids_json
+            if base_version is not None:
+                draft.base_version = base_version
+            draft.draft_version = (draft.draft_version or 0) + 1
+            return draft
+
+        draft = GiornaleCantiereDraft(
+            site_id=str(site_id),
+            user_id=str(user_id),
+            giornale_id=str(giornale_id) if giornale_id else None,
+            payload_json=payload_json,
+            linked_photo_ids_json=linked_photo_ids_json,
+            base_version=base_version,
+            draft_version=1,
+        )
+        self.db_session.add(draft)
+        await self.db_session.flush()
+        return draft
+
+    async def delete_draft(
+        self,
+        site_id: UUID,
+        user_id: UUID,
+        draft_id: Optional[UUID] = None,
+        giornale_id: Optional[UUID] = None,
+    ) -> bool:
+        """Elimina una bozza utente specifica se esistente."""
+        draft = await self.get_draft(site_id=site_id, user_id=user_id, draft_id=draft_id, giornale_id=giornale_id)
+        if not draft:
+            return False
+
+        await self.db_session.delete(draft)
+        return True
+
+    async def replace_draft_photo_ids(
+        self,
+        draft: GiornaleCantiereDraft,
+        photo_ids: List[str],
+    ) -> None:
+        """Sostituisce l'elenco foto collegate in bozza e incrementa versione."""
+        draft.linked_photo_ids_json = json.dumps(photo_ids, ensure_ascii=False)
+        draft.draft_version = (draft.draft_version or 0) + 1
+
+    async def get_draft_photo_ids(self, draft: GiornaleCantiereDraft) -> Set[str]:
+        """Restituisce gli ID foto collegati alla bozza."""
+        raw = draft.linked_photo_ids_json
+        if not raw:
+            return set()
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return {str(item) for item in parsed if item}
+        except Exception:
+            return set()
+        return set()
 
