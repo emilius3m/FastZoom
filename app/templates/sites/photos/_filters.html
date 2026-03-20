@@ -44,6 +44,20 @@
                 </select>
             </div>
 
+            <!-- Tag Filter Dropdown (unique tags) -->
+            <div>
+                <label for="tagsSearch" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tag</label>
+                <select id="tagsSearch"
+                        x-model="filters.tags"
+                        @change="applyFilters()"
+                        class="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm">
+                    <option value="">Tutti i tag</option>
+                    <template x-for="tag in availableTags" :key="tag">
+                        <option :value="tag" x-text="tag"></option>
+                    </template>
+                </select>
+            </div>
+
             <!-- Photo Type -->
             <div>
                 <label for="photoType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo Foto</label>

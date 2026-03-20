@@ -142,6 +142,7 @@ function photosManager() {
         filters: {
             // Basic filters
             search: '',
+            tags: '',
             photo_type: '',
             material: '',
 
@@ -435,6 +436,7 @@ function photosManager() {
 
                 // Basic filters
                 if (this.filters.search?.trim()) params.append('search', this.filters.search.trim());
+                if (this.filters.tags?.trim()) params.append('tags', this.filters.tags.trim());
                 if (this.filters.photo_type) params.append('photo_type', this.filters.photo_type);
                 if (this.filters.material) params.append('material', this.filters.material);
 
@@ -543,7 +545,19 @@ function photosManager() {
                 }
 
                 const data = await response.json();
-                this.photos = Array.isArray(data) ? data.filter(photo => photo && photo.id) : [];
+                let loadedPhotos = Array.isArray(data) ? data.filter(photo => photo && photo.id) : [];
+
+                // Client-side safety filter for tag dropdown (exact tag match, case-insensitive)
+                // Keeps UI behavior correct even if backend/proxy cache serves stale responses.
+                const selectedTag = (this.filters.tags || '').trim().toLowerCase();
+                if (selectedTag) {
+                    loadedPhotos = loadedPhotos.filter(photo => {
+                        const tags = Array.isArray(photo?.tags) ? photo.tags : [];
+                        return tags.some(tag => String(tag).trim().toLowerCase() === selectedTag);
+                    });
+                }
+
+                this.photos = loadedPhotos;
                 this.filteredPhotos = this.photos;
                 this.currentPage = 1;
                 this.updatePagination();
@@ -581,6 +595,7 @@ function photosManager() {
         getActiveFiltersCount() {
             let count = 0;
             if (this.filters.search?.trim()) count++;
+            if (this.filters.tags?.trim()) count++;
             if (this.filters.photo_type) count++;
             if (this.filters.material) count++;
             if (this.filters.excavation_area?.trim()) count++;
@@ -614,6 +629,7 @@ function photosManager() {
             const filtersList = [];
             const filterLabels = {
                 search: 'Ricerca',
+                tags: 'Tag',
                 photo_type: 'Tipo Foto',
                 material: 'Materiale',
                 excavation_area: 'Area Scavo',

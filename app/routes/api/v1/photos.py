@@ -188,6 +188,7 @@ async def get_site_photos_api(
         site_id: str,  # Changed from UUID to str to handle both formats
         # Basic filters
         search: str = None,
+        tags: str = None,
         photo_type: str = None,
 
         # Archaeological filters
@@ -251,6 +252,7 @@ async def get_site_photos_api(
     # Prepare query filters using Pydantic schema
     query_filters = PhotoQueryFilters(
         search=search,
+        tags=tags,
         photo_type=photo_type,
         material=material,
         conservation_status=conservation_status,

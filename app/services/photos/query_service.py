@@ -7,7 +7,7 @@ from collections import defaultdict
 import re
 from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import selectinload
 from loguru import logger
 
@@ -247,6 +247,11 @@ class PhotoQueryService:
         db: AsyncSession
     ) -> List[Dict]:
         """Query US photos from USFile table with applied filters."""
+
+        # USFile entries do not expose tag metadata; when tag filter is active,
+        # keep results coherent by excluding US photos.
+        if filters.tags and filters.tags.strip():
+            return []
         
         # Build base query for US files with eager loading
         us_files_query = select(USFile).where(
@@ -457,6 +462,22 @@ class PhotoQueryService:
                     Photo.keywords.ilike(search_term)
                 )
             )
+
+        if filters.tags:
+            # Support comma-separated tags; all provided tags must be present
+            requested_tags = [t.strip().lower() for t in filters.tags.split(',') if t and t.strip()]
+            if requested_tags:
+                normalized_keywords = func.lower(func.replace(func.coalesce(Photo.keywords, ''), ' ', ''))
+                for tag in requested_tags:
+                    normalized_tag = tag.replace(' ', '')
+                    query = query.where(
+                        or_(
+                            normalized_keywords == normalized_tag,
+                            normalized_keywords.like(f"{normalized_tag},%"),
+                            normalized_keywords.like(f"%,{normalized_tag},%"),
+                            normalized_keywords.like(f"%,{normalized_tag}")
+                        )
+                    )
 
         if filters.photo_type:
             try:

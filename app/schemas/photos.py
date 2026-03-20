@@ -374,6 +374,7 @@ class PhotoQueryFilters(BaseModel):
     
     # Basic filters
     search: Optional[str] = Field(None, description="Search in filename, title, description")
+    tags: Optional[str] = Field(None, description="Comma-separated tags filter")
     photo_type: Optional[str] = Field(None, description="Photo type filter")
     
     # Archaeological filters
