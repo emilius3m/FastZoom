@@ -67,9 +67,13 @@ class ThemeManager {
 
         if (theme === 'dark') {
             htmlElement.classList.add('dark');
+            htmlElement.style.colorScheme = 'dark';
+            htmlElement.style.backgroundColor = '#111827';
             this.showDarkIcon();
         } else {
             htmlElement.classList.remove('dark');
+            htmlElement.style.colorScheme = 'light';
+            htmlElement.style.backgroundColor = '#f9fafb';
             this.showLightIcon();
         }
 

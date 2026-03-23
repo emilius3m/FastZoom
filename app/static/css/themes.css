@@ -163,6 +163,12 @@
   @apply border-blue-500 bg-gray-600;
 }
 
+/* Ensure options and optgroups within selects are readable in dark mode */
+.dark select option,
+.dark select optgroup {
+  @apply bg-gray-700 text-white;
+}
+
 /* Enhanced button styles for dark mode */
 .dark .bg-blue-600 {
   @apply bg-blue-700;
