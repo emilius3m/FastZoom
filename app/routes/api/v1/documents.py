@@ -408,13 +408,17 @@ async def v1_preview_document(
         disposition_mode = "inline" if inline else "attachment"
         media_type = doc.mimetype or "application/octet-stream"
 
-        return StreamingResponse(
+        response = StreamingResponse(
             iter([file_data]),
             media_type=media_type,
             headers={
-                "Content-Disposition": f"{disposition_mode}; filename={doc.filename}"
+                "Content-Disposition": f"{disposition_mode}; filename={doc.filename}",
+                # Override CSP/X-Frame-Options to allow iframe embedding from same origin
+                "X-Frame-Options": "SAMEORIGIN",
+                "Content-Security-Policy": "frame-ancestors 'self';",
             }
         )
+        return response
     except HTTPException:
         raise
     except Exception as e:

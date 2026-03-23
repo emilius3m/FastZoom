@@ -213,6 +213,14 @@
                             <option value="altro">Altri</option>
                         </select>
 
+                        <select x-model="tagFilter" @change="filterDocuments"
+                            class="block w-full sm:w-auto pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                            <option value="">Tutti i tag</option>
+                            <template x-for="tag in uniqueTags" :key="tag">
+                                <option :value="tag" x-text="tag"></option>
+                            </template>
+                        </select>
+
                         <input type="number" x-model="yearFilter" @input="filterDocuments"
                             class="block w-full sm:w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             placeholder="Anno" min="1900" max="2100">
@@ -673,6 +681,7 @@
             searchTerm: '',
             categoryFilter: '',
             yearFilter: '',
+            tagFilter: '',
 
             // Pagination
             currentPage: 1,
@@ -719,6 +728,20 @@
             return Math.ceil(this.filteredDocuments.length / this.pageSize);
         },
 
+        get uniqueTags() {
+            if (!this.documents || !Array.isArray(this.documents)) return [];
+            const tagsSet = new Set();
+            this.documents.forEach(doc => {
+                if (doc.tags && typeof doc.tags === 'string') {
+                    doc.tags.split(',').forEach(tag => {
+                        const cleanTag = tag.trim().toLowerCase();
+                        if (cleanTag) tagsSet.add(cleanTag);
+                    });
+                }
+            });
+            return Array.from(tagsSet).sort();
+        },
+
         init() {
             // Initialize with defensive checks
             this.filteredDocuments = (this.documents && Array.isArray(this.documents)) ? [...this.documents] : [];
@@ -745,7 +768,8 @@
                 filtered = filtered.filter(doc =>
                     (doc.title && doc.title.toLowerCase().includes(term)) ||
                     (doc.author && doc.author.toLowerCase().includes(term)) ||
-                    (doc.description && doc.description.toLowerCase().includes(term))
+                    (doc.description && doc.description.toLowerCase().includes(term)) ||
+                    (doc.tags && doc.tags.toLowerCase().includes(term))
                 );
             }
 
@@ -759,6 +783,15 @@
                 filtered = filtered.filter(doc => doc.year == this.yearFilter);
             }
 
+            // Tag filter
+            if (this.tagFilter) {
+                filtered = filtered.filter(doc => {
+                    if (!doc.tags) return false;
+                    const dsTags = doc.tags.split(',').map(t => t.trim().toLowerCase());
+                    return dsTags.includes(this.tagFilter);
+                });
+            }
+
             this.filteredDocuments = filtered;
             this.currentPage = 1;
         },
@@ -769,19 +802,30 @@
         },
 
         hasActiveFilters() {
-            return !!(this.searchTerm || this.categoryFilter || this.yearFilter);
+            return !!(this.searchTerm || this.categoryFilter || this.yearFilter || this.tagFilter);
         },
 
         // Document actions
         previewDocument(document) {
             if (!document) return;
 
+            const mimeType = (document.mime_type || '').toLowerCase();
             const canInlinePreview = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
-                .includes((document.mime_type || '').toLowerCase());
+                .includes(mimeType);
+
+            // Determine preview URL based on source
+            let previewUrl;
+            if (document.source === 'us_file' || document.source === 'usm_file') {
+                // US/USM files have their own view endpoint
+                previewUrl = document.view_url || `/api/v1/us-files/${document.id}/view`;
+            } else {
+                // Standard documents use the documents API
+                previewUrl = `/api/v1/sites/${this.siteId}/documents/${document.id}/preview?inline=true`;
+            }
 
             this.selectedDocument = {
                 ...document,
-                preview_url: `/api/v1/documents/sites/${this.siteId}/documents/${document.id}/preview?inline=true`,
+                preview_url: previewUrl,
                 can_inline_preview: canInlinePreview
             };
             this.showPreviewModal = true;
@@ -1174,6 +1218,10 @@
 
         getDownloadUrl(document) {
             if (!document || !document.id) return '#';
+            // US/USM files have their own download endpoint
+            if (document.download_url) {
+                return document.download_url;
+            }
             return `/api/v1/sites/${this.siteId}/documents/${document.id}/download`;
         },
 

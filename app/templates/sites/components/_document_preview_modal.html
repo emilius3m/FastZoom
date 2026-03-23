@@ -3,77 +3,136 @@
     x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
     x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
     x-transition:leave-end="opacity-0" class="fixed inset-0 bg-black bg-opacity-75 overflow-y-auto h-full w-full z-50"
-    @click.self="showPreviewModal = false">
+    @click.self="showPreviewModal = false" @keydown.escape.window="showPreviewModal = false">
 
     <div class="relative min-h-full flex items-center justify-center p-4">
         <!-- Close Button -->
         <button @click="showPreviewModal = false"
-            class="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75">
+            class="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 transition-colors">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
         </button>
 
         <!-- Document Preview -->
-        <div class="w-full max-w-4xl bg-white rounded-lg shadow-2xl overflow-hidden">
+        <div class="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-lg shadow-2xl overflow-hidden">
             <!-- Header -->
-            <div class="px-6 py-4 border-b bg-gray-50">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                 <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900"
+                    <div class="min-w-0 flex-1 mr-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white truncate"
                             x-text="selectedDocument ? selectedDocument.title : ''"></h3>
-                        <div class="flex items-center space-x-4 mt-1 text-sm text-gray-500">
+                        <div class="flex items-center flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-gray-500 dark:text-gray-400">
                             <span x-show="selectedDocument && selectedDocument.author"
                                 x-text="'Autore: ' + (selectedDocument ? selectedDocument.author : '')"></span>
-                            <span x-show="selectedDocument && selectedDocument.year"
-                                x-text="'Anno: ' + (selectedDocument ? selectedDocument.year : '')"></span>
+                            <span x-show="selectedDocument && selectedDocument.filename"
+                                x-text="selectedDocument ? selectedDocument.filename : ''"
+                                class="font-mono text-xs"></span>
                             <span x-show="selectedDocument && selectedDocument.file_size"
-                                x-text="selectedDocument ? (selectedDocument.file_size / 1024 / 1024).toFixed(2) + ' MB' : ''"></span>
+                                x-text="selectedDocument ? formatFileSize(selectedDocument.file_size) : ''"></span>
+                            <span x-show="selectedDocument && selectedDocument.mime_type"
+                                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300"
+                                x-text="selectedDocument ? selectedDocument.mime_type : ''"></span>
                         </div>
                     </div>
-                    <a :href="selectedDocument ? (selectedDocument.preview_url || '#') : '#'"
-                        target="_blank"
-                        rel="noopener"
-                        class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                            </path>
-                        </svg>
-Apri Anteprima
-                    </a>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <a :href="selectedDocument ? getDownloadUrl(selectedDocument) : '#'"
+                            class="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 transition-colors"
+                            title="Scarica file">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                            Scarica
+                        </a>
+                    </div>
                 </div>
             </div>
 
             <!-- Preview Content -->
-            <div class="h-96 bg-gray-100 flex items-center justify-center">
-                <div class="text-center">
-                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                        </path>
-                    </svg>
-                    <h4 class="mt-2 text-sm font-medium text-gray-900">Anteprima Non Disponibile</h4>
-                    <p class="mt-1 text-sm text-gray-500">Clicca "Scarica" per visualizzare il documento completo</p>
-                </div>
+            <div class="bg-gray-100 dark:bg-gray-900 flex items-center justify-center" style="height: 70vh;">
+                <!-- PDF Preview -->
+                <template x-if="selectedDocument && selectedDocument.can_inline_preview && (selectedDocument.mime_type || '').toLowerCase() === 'application/pdf'">
+                    <iframe :src="selectedDocument.preview_url"
+                        class="w-full h-full border-0"
+                        title="Anteprima PDF"></iframe>
+                </template>
+
+                <!-- Image Preview -->
+                <template x-if="selectedDocument && selectedDocument.can_inline_preview && (selectedDocument.mime_type || '').toLowerCase().startsWith('image/')">
+                    <div class="w-full h-full flex items-center justify-center p-4 overflow-auto">
+                        <img :src="selectedDocument.preview_url"
+                             :alt="selectedDocument.title"
+                             class="max-w-full max-h-full object-contain rounded shadow-lg"
+                             onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'text-center text-gray-500 dark:text-gray-400\'><svg class=\'mx-auto h-16 w-16 mb-3\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\' /></svg><p class=\'text-lg font-medium\'>Errore nel caricamento immagine</p></div>'">
+                    </div>
+                </template>
+
+                <!-- Fallback: Not previewable -->
+                <template x-if="selectedDocument && !selectedDocument.can_inline_preview">
+                    <div class="text-center p-8">
+                        <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                            <svg class="h-10 w-10 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                        </div>
+                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Anteprima non disponibile per questo tipo di file</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1"
+                            x-text="selectedDocument ? (selectedDocument.mime_type || 'Tipo sconosciuto') : ''"></p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6"
+                            x-text="selectedDocument ? selectedDocument.filename : ''"></p>
+                        <a :href="selectedDocument ? getDownloadUrl(selectedDocument) : '#'"
+                            class="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                            Scarica Documento
+                        </a>
+                    </div>
+                </template>
+
+                <!-- Loading/No Selection State -->
+                <template x-if="!selectedDocument">
+                    <div class="text-center p-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                        <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Caricamento...</p>
+                    </div>
+                </template>
             </div>
 
-            <!-- Document Info -->
-            <div class="px-6 py-4 border-t bg-gray-50">
-                <div x-show="selectedDocument && selectedDocument.description" class="mb-4">
-                    <h4 class="text-sm font-medium text-gray-900 mb-2">Descrizione</h4>
-                    <p class="text-sm text-gray-700" x-text="selectedDocument ? selectedDocument.description : ''"></p>
+            <!-- Document Info Footer -->
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                <div x-show="selectedDocument && selectedDocument.description" class="mb-3">
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-1">Descrizione</h4>
+                    <p class="text-sm text-gray-700 dark:text-gray-300" x-text="selectedDocument ? selectedDocument.description : ''"></p>
                 </div>
 
                 <div x-show="selectedDocument && selectedDocument.tags && selectedDocument.tags.length > 0">
-                    <h4 class="text-sm font-medium text-gray-900 mb-2">Tag</h4>
+                    <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-1">Tag</h4>
                     <div class="flex flex-wrap gap-2">
                         <template x-for="tag in (selectedDocument ? selectedDocument.tags : [])" :key="tag">
                             <span
-                                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
                                 x-text="tag"></span>
                         </template>
                     </div>
+                </div>
+
+                <!-- Association Info (US/USM) -->
+                <div x-show="selectedDocument && selectedDocument.association_display" class="mt-3">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-semibold border"
+                        :class="selectedDocument && selectedDocument.association_type === 'USM'
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700'
+                            : 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700'"
+                        x-text="selectedDocument ? `${selectedDocument.association_type || 'US'}: ${selectedDocument.association_display || ''}` : ''"></span>
+                    <span x-show="selectedDocument && selectedDocument.association_kind_label"
+                        class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
+                        x-text="selectedDocument ? selectedDocument.association_kind_label : ''"></span>
                 </div>
             </div>
         </div>

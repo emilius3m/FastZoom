@@ -413,15 +413,27 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         response = await call_next(request)
         
+        # Check if this is a preview/inline-view endpoint that needs iframe embedding
+        path = request.url.path
+        is_preview_path = '/preview' in path or '/view' in path and '/api/' in path
+        
         # Security headers base
         response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(self), camera=()'
         
+        # Allow iframe embedding for preview endpoints (same origin only)
+        if is_preview_path:
+            response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        else:
+            response.headers['X-Frame-Options'] = 'DENY'
+        
         # Content Security Policy
-        if self.strict_csp:
+        if is_preview_path:
+            # Allow same-origin framing for document previews
+            csp = MiddlewareConfig.CSP_POLICY.replace("frame-ancestors 'none'", "frame-ancestors 'self'")
+        elif self.strict_csp:
             # CSP più restrittivo per produzione
             csp = (
                 "default-src 'self'; "
