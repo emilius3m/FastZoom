@@ -672,7 +672,7 @@ document.addEventListener('alpine:init', () => {
         exportUsers() {
             // Create CSV content
             const headers = ['Email', 'Nome', 'Cognome', 'Stato', 'Verificato', 'Superadmin', 'Siti', 'Creato', 'Ultimo Accesso'];
-            const csvContent = [
+            const csvContent = 'sep=,\\n' + [
                 headers.join(','),
                 ...this.filteredUsers.map(user => [
                     user.email,

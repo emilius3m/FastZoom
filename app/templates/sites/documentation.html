@@ -869,7 +869,7 @@
         exportDocuments() {
             // Generate CSV
             const headers = ['Titolo', 'Categoria', 'Autore', 'Anno', 'Descrizione', 'File', 'Data Aggiunta'];
-            const csvContent = [
+            const csvContent = 'sep=,\\n' + [
                 headers.join(','),
                 ...this.filteredDocuments.map(doc => [
                     doc.title || '',

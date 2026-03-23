@@ -724,7 +724,7 @@
 
         exportTeamData() {
             const headers = ['Nome', 'Email', 'Ruolo Archeologico', 'Permessi', 'Specializzazione', 'Istituzione', 'Stato', 'Accesso Dal', 'Foto Caricate', 'Ultimo Accesso'];
-            const csvContent = [
+            const csvContent = 'sep=,\\n' + [
                 headers.join(','),
                 ...this.filteredMembers.map(member => [
                     this.getUserDisplayName(member),

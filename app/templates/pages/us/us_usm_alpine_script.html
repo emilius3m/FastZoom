@@ -2639,7 +2639,7 @@
                 ];
 
                 const headers = ['Tipo', 'Codice', 'Tipo US', 'Definizione', 'Località', 'Data Rilevamento', 'Responsabile', 'Affidabilità', 'Aggiornato il'];
-                const csvContent = [
+                const csvContent = 'sep=,\\n' + [
                     headers.join(','),
                     ...allData.map(item => [
                         item.tipo,
