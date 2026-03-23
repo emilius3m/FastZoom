@@ -1872,6 +1872,24 @@
                 }
             },
 
+            resolveDocumentLink(rawPath) {
+                const value = String(rawPath || '').trim();
+                if (!value) return '#';
+
+                // Internal API links are already safe.
+                if (value.startsWith('/api/')) {
+                    return value;
+                }
+
+                // Other absolute app-relative paths can be preserved.
+                if (value.startsWith('/')) {
+                    return value;
+                }
+
+                // Legacy MinIO URL/object-path values are always routed through backend proxy.
+                return `/api/v1/sites/{{ site.id }}/documents/by-path/download?path=${encodeURIComponent(value)}`;
+            },
+
             getDocumentCategoryLabel(category) {
                 const labels = {
                     relazioni: 'Relazioni',
@@ -2003,11 +2021,12 @@
                     }
 
                     const storedPath =
+                        uploaded.download_url ||
+                        (uploaded.id ? `/api/v1/sites/{{ site.id }}/documents/${uploaded.id}/download` : '') ||
+                        uploaded.preview_url ||
                         uploaded.file_path ||
                         uploaded.storage_path ||
                         uploaded.url ||
-                        uploaded.download_url ||
-                        (uploaded.id ? `/api/v1/sites/{{ site.id }}/documents/${uploaded.id}/download` : '') ||
                         file.name;
 
                     this.formData.allegati_paths.push(storedPath);

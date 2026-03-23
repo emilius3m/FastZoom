@@ -3,6 +3,7 @@ from uuid import UUID
 from datetime import date, time, datetime
 import hashlib
 import json
+from urllib.parse import quote
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -71,6 +72,32 @@ class GiornaleService:
                 return [raw]
 
         return [str(value)]
+
+    @staticmethod
+    def _to_public_attachment_link(value: Any, site_id: Any) -> str:
+        """
+        Normalizza un path allegato in URL applicativa interna.
+
+        Obiettivo: non esporre direttamente URL MinIO al frontend.
+        """
+        if value is None:
+            return ""
+
+        raw = str(value).strip()
+        if not raw:
+            return ""
+
+        # Già endpoint applicativo interno
+        if raw.startswith("/api/"):
+            return raw
+
+        # Altri path assoluti applicativi
+        if raw.startswith("/"):
+            return raw
+
+        # Legacy minio URL/object path -> proxy interno
+        encoded = quote(raw, safe="")
+        return f"/api/v1/sites/{site_id}/documents/by-path/download?path={encoded}"
 
     @staticmethod
     def _normalize_photo_ids(values: Any) -> List[str]:
@@ -491,6 +518,12 @@ class GiornaleService:
             "display_value": ", ".join(mezzi_labels)
         }
 
+        allegati_paths = [
+            self._to_public_attachment_link(path, g.site_id)
+            for path in self._parse_allegati_paths_from_db(g.allegati_paths)
+            if str(path).strip()
+        ]
+
         # Format response dict
         return {
             "id": str(g.id),
@@ -548,7 +581,7 @@ class GiornaleService:
             "protocol_number": g.protocol_number,
             "protocol_date": g.protocol_date.isoformat() if g.protocol_date else None,
             "legal_status": g.legal_status,
-            "allegati_paths": self._parse_allegati_paths_from_db(g.allegati_paths),
+            "allegati_paths": allegati_paths,
             "created_at": g.created_at.isoformat() if g.created_at else None,
             "updated_at": g.updated_at.isoformat() if g.updated_at else None,
             "version": g.version or 1,

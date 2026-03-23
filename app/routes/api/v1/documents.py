@@ -301,7 +301,12 @@ async def v1_upload_document(
                 "id": str(new_document.id),
                 "title": new_document.title,
                 "filename": new_document.filename,
-                "file_path": new_document.filepath,
+                # NEVER expose direct MinIO URL to the frontend.
+                # Provide internal application endpoints and keep storage path separated.
+                "file_path": f"/api/v1/sites/{site_id}/documents/{new_document.id}/download",
+                "download_url": f"/api/v1/sites/{site_id}/documents/{new_document.id}/download",
+                "preview_url": f"/api/v1/sites/{site_id}/documents/{new_document.id}/preview?inline=true",
+                "storage_path": new_document.filepath,
                 "uploaded_at": new_document.uploaded_at.isoformat()
             }
         })
@@ -719,6 +724,59 @@ async def v1_download_document(
         raise
     except Exception as e:
         logger.error(f"Error downloading document {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore nel download: {str(e)}")
+
+
+@router.get("/sites/{site_id}/documents/by-path/download", summary="Download documento tramite path storage", tags=["Documents"])
+async def v1_download_document_by_path(
+    site_id: UUID,
+    path: str = Query(..., description="Path storage documento (legacy/minio URL/object path)"),
+    current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
+    user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
+    db: AsyncSession = Depends(get_database_session)
+):
+    """
+    Download documento tramite path storage per backward compatibility.
+
+    Sicurezza:
+    - Verifica accesso al sito
+    - Consente solo bucket documenti
+    - Consente solo oggetti del sito richiesto (prefix {site_id}/)
+    """
+    verify_site_access(site_id, user_sites)
+
+    normalized_path = (path or "").strip()
+    if not normalized_path:
+        raise HTTPException(status_code=400, detail="Parametro 'path' obbligatorio")
+
+    try:
+        bucket_name, object_name = archaeological_minio_service._parse_minio_path(normalized_path)
+        documents_bucket = archaeological_minio_service.buckets['documents']
+
+        if bucket_name != documents_bucket:
+            raise HTTPException(status_code=403, detail="Path non consentito")
+
+        expected_prefix = f"{site_id}/"
+        if not object_name.startswith(expected_prefix):
+            raise HTTPException(status_code=403, detail="Path non appartiene al sito richiesto")
+
+        file_data = await archaeological_minio_service.get_file(normalized_path)
+        if not file_data:
+            raise HTTPException(status_code=404, detail="Documento non trovato")
+
+        filename = Path(object_name).name or "document.bin"
+
+        return StreamingResponse(
+            iter([file_data]),
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading document by path for site {site_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Errore nel download: {str(e)}")
 
 # ENDPOINT DI BACKWARD COMPATIBILITY CON DEPRECAZIONE
