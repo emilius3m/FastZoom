@@ -95,11 +95,6 @@
                         Word
                     </button>
 
-                    <button @click="deleteCantiere()" type="button"
-                        class="inline-flex items-center px-4 py-2 bg-red-100 dark:bg-red-900/40 border border-transparent rounded-lg text-sm font-medium text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/60">
-                        <i class="fas fa-trash mr-2"></i>
-                        Elimina
-                    </button>
                 </div>
             </div>
         </div>
@@ -1784,18 +1779,6 @@
                 } finally {
                     this.saving = false;
                 }
-            },
-
-            // Delete
-            async deleteCantiere() {
-                if (!confirm('Sei sicuro di voler eliminare questo cantiere? Questa azione non può essere annullata.')) {
-                    return;
-                }
-
-                this.showAlert('success', 'Cantiere eliminato');
-                setTimeout(() => {
-                    window.location.href = '/view/{{ site.id }}/cantieri';
-                }, 1500);
             },
 
             // Helper

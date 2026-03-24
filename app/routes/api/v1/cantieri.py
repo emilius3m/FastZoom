@@ -721,51 +721,12 @@ async def v1_delete_cantiere(
     db: AsyncSession = Depends(get_database_session)
 ):
     """
-    Elimina un cantiere (soft delete).
+    Eliminazione cantiere disabilitata.
     """
-    try:
-        # Carica cantiere esistente
-        result = await db.execute(
-            select(Cantiere).where(Cantiere.id == str(cantiere_id))
-        )
-        cantiere = result.scalar_one_or_none()
-        
-        if not cantiere:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cantiere non trovato"
-            )
-        
-        # Verifica accesso al sito
-        verify_site_access(cantiere.site_id, user_sites)
-        
-        # Verifica che non ci siano giornali associati
-        giornali_count_result = await db.execute(
-            select(func.count(GiornaleCantiere.id)).where(
-                GiornaleCantiere.cantiere_id == str(cantiere_id)
-            )
-        )
-        giornali_count = giornali_count_result.scalar() or 0
-        
-        if giornali_count > 0:
-            raise DomainValidationError(f"Impossibile eliminare il cantiere: ci sono {giornali_count} giornali associati")
-        
-        # Soft delete
-        cantiere.is_active = False
-        cantiere.deleted_at = func.now()
-        await db.commit()
-        
-        return {
-            "message": "Cantiere eliminato con successo"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        from loguru import logger
-        logger.error(f"Errore eliminazione cantiere {cantiere_id}: {str(e)}")
-        logger.error(f"Unexpected error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="La cancellazione dei cantieri è disabilitata"
+    )
 
 @router.get("/stats/cantieri", summary="Statistiche cantieri", tags=["Cantieri - Stats"])
 async def v1_get_cantieri_stats(
