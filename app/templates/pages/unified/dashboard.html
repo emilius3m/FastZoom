@@ -104,7 +104,7 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="unifiedDashboard()" x-init="init()" class="min-h-screen bg-gray-50 dark:bg-gray-900">
+<div x-data="unifiedDashboard()" x-init="init()" x-cloak class="min-h-screen bg-gray-50 dark:bg-gray-900">
 
     <!-- Header Section -->
     <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-6 mb-6 shadow-lg">
@@ -471,7 +471,7 @@
 
     <!-- Loading Overlay -->
     <div x-show="loading.global" x-cloak
-        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        class="fixed inset-0 bg-gray-50 dark:bg-gray-900 flex items-center justify-center z-50">
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 flex flex-col items-center">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             <p class="mt-4 text-gray-700 dark:text-gray-300">Caricamento dati...</p>
