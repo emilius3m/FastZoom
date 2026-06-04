@@ -422,6 +422,15 @@ ACTIVITY_TYPES = {
     'user_update': 'Modifica utente',
     'permission_grant': 'Assegnazione permessi',
     'permission_revoke': 'Revoca permessi',
+
+    # Legacy/uppercase activity types used by older services
+    'UPLOAD': 'Caricamento',
+    'UPDATE': 'Modifica',
+    'DELETE': 'Eliminazione',
+    'BULK_UPDATE': 'Modifica massiva',
+    'TEAM_UPDATE': 'Modifica team',
+    'TILES_GENERATION': 'Generazione tile',
+    'TILES_REPAIR': 'Riparazione tile',
 }
 
 def get_activity_display_name(activity_type: str) -> str:

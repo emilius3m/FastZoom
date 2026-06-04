@@ -145,7 +145,9 @@ document.addEventListener("alpine:init", () => {
             { value: 'giornale', label: 'Giornale' },
             { value: 'documents', label: 'Documenti' },
             { value: 'photos', label: 'Fotografie' },
-            { value: 'users', label: 'Utenti' }
+            { value: 'records', label: 'Schede' },
+            { value: 'users', label: 'Utenti' },
+            { value: 'other', label: 'Altro' }
         ],
 
         // Tab management
@@ -523,7 +525,7 @@ document.addEventListener("alpine:init", () => {
             if (this.activityFilter === 'all') {
                 return this.activities;
             }
-            return this.activities.filter(activity => activity.type === this.activityFilter);
+            return this.activities.filter(activity => this.getActivityCategory(activity) === this.activityFilter);
         },
 
         setActivityFilter(filter) {
@@ -614,6 +616,82 @@ document.addEventListener("alpine:init", () => {
                 return (num / 1000).toFixed(1) + 'K';
             }
             return num.toString();
+        },
+
+        getActivityCategory(activity) {
+            const type = String(activity?.type || '').toLowerCase();
+            const description = String(activity?.description || '').toLowerCase();
+
+            if (activity?.category) return activity.category;
+            if (activity?.photo_id || type.startsWith('photo_') || description.includes('foto')) return 'photos';
+            if (type.includes('document') || description.includes('documento')) return 'documents';
+            if (activity?.us_id || activity?.usm_id || type.startsWith('us_') || type.startsWith('usm_')) return 'records';
+            if (activity?.tomba_id || activity?.reperto_id || type.startsWith('tma_')) return 'records';
+            if (type.includes('giornale') || description.includes('giornale') || description.includes('cantiere')) return 'giornale';
+            if (type.startsWith('site_') || description.includes('sito')) return 'sites';
+            if (type.startsWith('user_') || type.startsWith('permission_') || type.includes('team') || description.includes('utente') || description.includes('permess')) return 'users';
+            return 'other';
+        },
+
+        getActivityFilterLabel(filterValue = this.activityFilter) {
+            return this.activityFilters.find(filter => filter.value === filterValue)?.label || filterValue;
+        },
+
+        getActivityIcon(activity) {
+            const icons = {
+                sites: 'fa-map-marker-alt',
+                giornale: 'fa-book',
+                documents: 'fa-file-alt',
+                photos: 'fa-camera',
+                records: 'fa-layer-group',
+                users: 'fa-user',
+                other: 'fa-circle'
+            };
+            return icons[this.getActivityCategory(activity)] || icons.other;
+        },
+
+        getActivityIconClass(activity) {
+            const classes = {
+                sites: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300',
+                giornale: 'bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300',
+                documents: 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300',
+                photos: 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300',
+                records: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300',
+                users: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300',
+                other: 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-300'
+            };
+            return classes[this.getActivityCategory(activity)] || classes.other;
+        },
+
+        getActivityTypeLabel(activity) {
+            return this.getActivityFilterLabel(this.getActivityCategory(activity));
+        },
+
+        getActivityTypeClass(activity) {
+            const classes = {
+                sites: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+                giornale: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+                documents: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+                photos: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+                records: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
+                users: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+                other: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+            };
+            return classes[this.getActivityCategory(activity)] || classes.other;
+        },
+
+        getActivitySiteName(activity) {
+            const site = activity?.site;
+            if (!site) return '';
+            if (typeof site === 'string') return site;
+            return site.name || site.site_name || site.code || '';
+        },
+
+        getActivityUserName(activity) {
+            const user = activity?.user;
+            if (!user) return '';
+            if (typeof user === 'string') return user;
+            return user.name || user.full_name || user.email || 'Sistema';
         },
 
         formatTime(timestamp) {
@@ -1001,7 +1079,9 @@ document.addEventListener("alpine:init", () => {
             { value: 'giornale', label: 'Giornale' },
             { value: 'documents', label: 'Documenti' },
             { value: 'photos', label: 'Fotografie' },
-            { value: 'users', label: 'Utenti' }
+            { value: 'records', label: 'Schede' },
+            { value: 'users', label: 'Utenti' },
+            { value: 'other', label: 'Altro' }
         ],
 
         async init() {
@@ -1027,11 +1107,26 @@ document.addEventListener("alpine:init", () => {
             }
         },
 
+        getActivityCategory(activity) {
+            const type = String(activity?.type || '').toLowerCase();
+            const description = String(activity?.description || '').toLowerCase();
+
+            if (activity?.category) return activity.category;
+            if (activity?.photo_id || type.startsWith('photo_') || description.includes('foto')) return 'photos';
+            if (type.includes('document') || description.includes('documento')) return 'documents';
+            if (activity?.us_id || activity?.usm_id || type.startsWith('us_') || type.startsWith('usm_')) return 'records';
+            if (activity?.tomba_id || activity?.reperto_id || type.startsWith('tma_')) return 'records';
+            if (type.includes('giornale') || description.includes('giornale') || description.includes('cantiere')) return 'giornale';
+            if (type.startsWith('site_') || description.includes('sito')) return 'sites';
+            if (type.startsWith('user_') || type.startsWith('permission_') || type.includes('team') || description.includes('utente') || description.includes('permess')) return 'users';
+            return 'other';
+        },
+
         updateFilteredActivities() {
             if (this.activityFilter === 'all') {
                 this.filteredActivities = this.activities;
             } else {
-                this.filteredActivities = this.activities.filter(activity => activity.type === this.activityFilter);
+                this.filteredActivities = this.activities.filter(activity => this.getActivityCategory(activity) === this.activityFilter);
             }
         },
 
@@ -1086,6 +1181,20 @@ document.addEventListener("alpine:init", () => {
                 'users': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
             };
             return classes[type] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+        },
+
+        getActivitySiteName(activity) {
+            const site = activity?.site;
+            if (!site) return '';
+            if (typeof site === 'string') return site;
+            return site.name || site.site_name || site.code || '';
+        },
+
+        getActivityUserName(activity) {
+            const user = activity?.user;
+            if (!user) return '';
+            if (typeof user === 'string') return user;
+            return user.name || user.full_name || user.email || 'Sistema';
         },
 
         formatTime(timestamp) {

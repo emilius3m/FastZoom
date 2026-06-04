@@ -35,6 +35,34 @@ def add_deprecation_headers(response: Response, new_endpoint: str):
     response.headers["X-API-New-Endpoint"] = new_endpoint
     response.headers["X-API-Sunset"] = "2025-12-31"  # Data rimozione vecchi endpoint
 
+def get_activity_category(activity: UserActivity, activity_desc: str = "") -> str:
+    """Normalize raw activity types into dashboard filter categories."""
+    activity_type = (activity.activity_type or "").lower()
+    description = (activity_desc or "").lower()
+
+    if activity.photo_id or activity_type.startswith("photo_") or "foto" in description:
+        return "photos"
+    if "document" in activity_type or "documento" in description:
+        return "documents"
+    if activity.us_id or activity.usm_id or activity_type.startswith(("us_", "usm_")):
+        return "records"
+    if activity.tomba_id or activity.reperto_id or activity_type.startswith("tma_"):
+        return "records"
+    if "giornale" in activity_type or "giornale" in description or "cantiere" in description:
+        return "giornale"
+    if activity_type.startswith("site_") or "sito" in description:
+        return "sites"
+    if (
+        activity_type.startswith("user_")
+        or activity_type.startswith("permission_")
+        or "team" in activity_type
+        or "utente" in description
+        or "permess" in description
+    ):
+        return "users"
+
+    return "other"
+
 # NUOVI ENDPOINTS V1
 
 @router.get("/dashboard/stats/overview", summary="Statistiche overview", tags=["Unified Dashboard"])
@@ -184,7 +212,8 @@ async def v1_get_recent_activities(
             activity_dict = {
                 "id": str(activity.id),
                 "type": activity_type,
-                "title": activity_desc or get_activity_display_name(activity_type),
+                "category": get_activity_category(activity, activity_desc),
+                "title": get_activity_display_name(activity_type),
                 "description": activity_desc,
                 "timestamp": activity.activity_date,
                 "site": {
