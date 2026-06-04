@@ -1,17 +1,32 @@
-version: "3.9"
+# =============================================================
+# docker-compose.yml  —  PRODUZIONE
+# Usato da Portainer e da: .\setup.ps1 run
+#
+# Per sviluppo locale (auto-reload + volume mount) usa invece:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# oppure semplicemente:
+#   .\setup.ps1 run-dev
+# =============================================================
 
 services:
+
   app:
     build: .
+    image: fastzoom-app:latest
     restart: unless-stopped
     security_opt:
       - apparmor=unconfined
     working_dir: /app
-    command: python -m uvicorn app.app:app --host 0.0.0.0 --port 8000 --loop asyncio --reload --reload-dir=/app/app
+    # Produzione: nessun --reload, nessun volume mount del codice sorgente.
+    # Il codice è baked nell'immagine via COPY . . nel Dockerfile.
+    command: >
+      python -m uvicorn app.app:app
+      --host 0.0.0.0
+      --port 8000
+      --loop asyncio
+      --workers 1
     environment:
-#      DATABASE_URL: sqlite+aiosqlite:///./archaeological_catalog.db
       DATABASE_URL: sqlite+aiosqlite:////app/data/archaeological_catalog.db
-      PYTHONPATH: /app
       MINIO_CONFIG_PROFILE: local
       MINIO_LOCAL_URL: http://minio:9000
       MINIO_LOCAL_ACCESS_KEY: minioadmin
@@ -26,7 +41,7 @@ services:
     depends_on:
       - minio
     volumes:
-      - ./app:/app/app
+      # Solo i dati persistenti — NON il codice sorgente
       - ./data:/app/data
 
   minio:

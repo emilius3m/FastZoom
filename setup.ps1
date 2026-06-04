@@ -1,4 +1,4 @@
-﻿# FastZoom Archaeological System - Setup Script (Docker only)
+# FastZoom Archaeological System - Setup Script (Docker only)
 param(
     [Parameter(Position=0)]
     [string]$Command = "help"
@@ -65,7 +65,7 @@ function Show-Help {
 function Start-Dev {
     Assert-Docker
     Write-Host "🔧 Avvio in modalita SVILUPPO (foreground, auto-reload)..." -ForegroundColor Blue
-    Write-Host "   Volumi: ./app -> /app/app  |  ./data -> /app/data" -ForegroundColor DarkCyan
+    Write-Host "   Volumi: ./app -> /app/app  |  --reload attivo" -ForegroundColor DarkCyan
     Write-Host ""
     Write-Host "  App     : http://127.0.0.1:$FASTAPI_PORT" -ForegroundColor Green
     Write-Host "  Swagger : http://127.0.0.1:$FASTAPI_PORT/docs" -ForegroundColor Cyan
@@ -74,13 +74,15 @@ function Start-Dev {
     Write-Host "  Premi Ctrl+C per fermare." -ForegroundColor Yellow
     Write-Host ""
     Show-Credentials
-    docker compose up --build
+    # docker-compose.dev.yml aggiunge: --reload, volume ./app:/app/app, log-level debug
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 }
 
 function Start-Prod {
     Assert-Docker
-    Write-Host "🚀 Avvio in modalita PRODUZIONE (background)..." -ForegroundColor Blue
-    docker compose up -d --build
+    Write-Host "🚀 Avvio in modalita PRODUZIONE (background, docker-compose.yml)..." -ForegroundColor Blue
+    # Solo docker-compose.yml: nessun --reload, nessun volume mount del codice
+    docker compose -f docker-compose.yml up -d --build
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
         Write-Host "✅ Container avviati." -ForegroundColor Green
@@ -95,7 +97,7 @@ function Start-Prod {
 function Stop-All {
     Assert-Docker
     Write-Host "🛑 Arresto container..." -ForegroundColor Blue
-    docker compose down
+    docker compose -f docker-compose.yml down
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✅ Container fermati." -ForegroundColor Green
     }
@@ -109,7 +111,7 @@ function Restart-All {
 function Build-Image {
     Assert-Docker
     Write-Host "📦 Rebuild immagine Docker (no cache)..." -ForegroundColor Blue
-    docker compose build --no-cache
+    docker compose -f docker-compose.yml build --no-cache
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✅ Build completata." -ForegroundColor Green
     }
@@ -118,31 +120,31 @@ function Build-Image {
 function Show-Logs {
     Assert-Docker
     Write-Host "📝 Log live (Ctrl+C per uscire)..." -ForegroundColor Blue
-    docker compose logs -f
+    docker compose -f docker-compose.yml logs -f
 }
 
 function Show-LogsApp {
     Assert-Docker
     Write-Host "📝 Log app (Ctrl+C per uscire)..." -ForegroundColor Blue
-    docker compose logs -f app
+    docker compose -f docker-compose.yml logs -f app
 }
 
 function Show-LogsMinio {
     Assert-Docker
     Write-Host "📝 Log MinIO (Ctrl+C per uscire)..." -ForegroundColor Blue
-    docker compose logs -f minio
+    docker compose -f docker-compose.yml logs -f minio
 }
 
 function Show-Status {
     Assert-Docker
     Write-Host "📊 Stato container:" -ForegroundColor Blue
-    docker compose ps
+    docker compose -f docker-compose.yml ps
 }
 
 function Open-Shell {
     Assert-Docker
     Write-Host "🐚 Shell interattiva nel container app..." -ForegroundColor Blue
-    docker compose exec app /bin/bash
+    docker compose -f docker-compose.yml exec app /bin/bash
 }
 
 function Clean-All {
@@ -151,7 +153,7 @@ function Clean-All {
     Write-Host "   (i dati in ./data e ./app NON vengono cancellati)" -ForegroundColor DarkGray
     $confirm = Read-Host "Sei sicuro? [s/N]"
     if ($confirm -match "^[sS]$") {
-        docker compose down -v --rmi local
+        docker compose -f docker-compose.yml down -v --rmi local
         Write-Host "✅ Pulizia completata." -ForegroundColor Green
     } else {
         Write-Host "Operazione annullata." -ForegroundColor Yellow
