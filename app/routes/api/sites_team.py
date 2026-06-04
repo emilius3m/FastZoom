@@ -31,13 +31,14 @@ async def get_team_members(
     if not permission.can_read():
         raise HTTPException(status_code=403, detail="Permessi di lettura richiesti")
 
-    # Query corretta con JOIN per ottenere dati utente
+    # Query corretta con JOIN per ottenere dati utente e profilo
     query = select(
-        UserSitePermission,
-        User.email,
-        User.profile_data
+        User,
+        UserSitePermission
     ).join(
-        User, UserSitePermission.user_id == User.id
+        UserSitePermission, UserSitePermission.user_id == User.id
+    ).options(
+        selectinload(User.profile)
     ).where(
         UserSitePermission.site_id == str(site_id)
     ).order_by(UserSitePermission.created_at.desc())
@@ -47,31 +48,27 @@ async def get_team_members(
 
     # Format response
     team_members = []
-    for permission_obj, email, profile_data in team_data:
-        # Parse profile_data if it's JSON
-        profile = {}
-        if profile_data:
-            try:
-                profile = json.loads(profile_data)
-            except:
-                pass
+    for user, permission_obj in team_data:
+        profile = getattr(user, "profile", None)
 
         member_data = {
             "user_id": str(permission_obj.user_id),
-            "email": email,
+            "email": user.email,
+            "full_name": user.full_name,
             "permission_level": permission_obj.permission_level,
             "is_active": permission_obj.is_active,
             "is_pending": False,
-            "created_at": permission_obj.created_at.isoformat(),
+            "created_at": permission_obj.created_at.isoformat() if permission_obj.created_at else None,
+            "granted_at": permission_obj.created_at.isoformat() if permission_obj.created_at else None,
             "expires_at": permission_obj.expires_at.isoformat() if permission_obj.expires_at else None,
             "notes": permission_obj.notes,
             # Additional fields from profile
-            "archaeological_role": profile.get("archaeological_role"),
-            "specialization": profile.get("specialization"),
-            "institution": profile.get("institution"),
+            "archaeological_role": permission_obj.site_role or (profile.qualifica_professionale if profile else None),
+            "specialization": profile.qualifica_professionale if profile else None,
+            "institution": profile.ente_appartenenza if profile else None,
             # Stats
             "photos_uploaded": 0,
-            "last_login_at": None,
+            "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
         }
 
         team_members.append(member_data)
@@ -107,8 +104,10 @@ async def update_team_member_permissions(
         raise HTTPException(status_code=404, detail="Membro del team non trovato")
 
     # Update permissions
-    member.permission_level = PermissionLevel(permission_data.get('permission_level', member.permission_level))
+    member.permission_level = PermissionLevel(permission_data.get('permission_level', member.permission_level)).value
     member.is_active = permission_data.get('is_active', member.is_active)
+    if 'archaeological_role' in permission_data:
+        member.site_role = permission_data['archaeological_role'] or None
 
     # Update additional fields
     if 'notes' in permission_data:
@@ -133,23 +132,33 @@ async def get_site_team(db: AsyncSession, site_id: UUID) -> List[Dict]:
     team_query = select(User, UserSitePermission).join(
         UserSitePermission, User.id == UserSitePermission.user_id
     ).options(selectinload(User.profile)).where(
-        and_(
-            UserSitePermission.site_id == str(site_id),
-            UserSitePermission.is_active == True
-        )
+        UserSitePermission.site_id == str(site_id)
     ).order_by(UserSitePermission.permission_level.desc())
 
     team = await db.execute(team_query)
     team = team.all()
 
-    return [
-        {
+    members = []
+    for user, permission in team:
+        profile = getattr(user, "profile", None)
+        members.append({
             "user_id": str(user.id),
             "email": user.email,
             "full_name": user.full_name,
             "permission_level": permission.permission_level,
             "permission_display": permission.permission_level.replace('_', ' ').title(),
-            "granted_at": permission.created_at.isoformat()
-        }
-        for user, permission in team
-    ]
+            "is_active": permission.is_active,
+            "is_pending": False,
+            "created_at": permission.created_at.isoformat() if permission.created_at else None,
+            "granted_at": permission.created_at.isoformat() if permission.created_at else None,
+            "updated_at": permission.updated_at.isoformat() if permission.updated_at else None,
+            "expires_at": permission.expires_at.isoformat() if permission.expires_at else None,
+            "notes": permission.notes,
+            "archaeological_role": permission.site_role or (profile.qualifica_professionale if profile else None),
+            "specialization": profile.qualifica_professionale if profile else None,
+            "institution": profile.ente_appartenenza if profile else None,
+            "photos_uploaded": 0,
+            "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+        })
+
+    return members

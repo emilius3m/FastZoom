@@ -6,20 +6,20 @@
 {% block nav_team %}text-blue-600 bg-blue-50{% endblock %}
 
 {% block content %}
-<div class=" mx-auto p-6" x-data="teamManager">
+<div class="w-full px-4 py-4 sm:px-6 lg:px-8" x-data="teamManager">
 
     <!-- Header -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div class="px-6 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex flex-col">
+        <div class="px-4 py-4 sm:px-6">
+            <div class="flex w-full flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                <div class="flex min-w-0 flex-col">
                     <!-- Breadcrumb Navigation -->
-                    <nav class="flex items-center space-x-4 text-sm mb-2">
-                        <i class="fas fa-home text-gray-500 text-lg"></i>
-                        <div class="flex items-center space-x-4">
+                    <nav class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm mb-2">
+                        <i class="fas fa-home text-gray-500 text-lg flex-shrink-0"></i>
+                        <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                             <span class="text-gray-400 text-lg">→</span>
                             <a href="/view/{{ site.id }}/dashboard"
-                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
+                                class="min-w-0 break-words text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
                                 {{ site.name }} ({{ site.code }})
                             </a>
                             <span class="text-gray-400 text-lg">→</span>
@@ -32,9 +32,9 @@
                     </p>
                 </div>
 
-                <div class="flex items-center space-x-3">
+                <div class="ml-auto flex w-full flex-col gap-2 sm:w-auto sm:self-end sm:flex-row sm:items-center sm:justify-end sm:gap-3">
                     <button @click="showInviteModal = true"
-                        class="inline-flex items-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+                        class="inline-flex w-full items-center justify-center px-4 py-2 bg-blue-600 dark:bg-blue-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 sm:w-auto">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -42,7 +42,7 @@
                         Invita Utente
                     </button>
                     <button @click="exportTeamData"
-                        class="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                        class="inline-flex w-full items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 sm:w-auto">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
@@ -56,9 +56,9 @@
     </div>
 
     <!-- Team Overview Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 xl:grid-cols-4 lg:gap-6 lg:mb-8">
         <!-- Total Members -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,15 +67,15 @@
                         </path>
                     </svg>
                 </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Totale Membri</h3>
+                <div class="ml-4 min-w-0">
+                    <h3 class="text-base font-medium text-gray-900 dark:text-white sm:text-lg">Totale Membri</h3>
                     <p class="text-2xl font-semibold text-blue-600 dark:text-blue-400" x-text="stats.totalMembers"></p>
                 </div>
             </div>
         </div>
 
         <!-- Active Members -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,8 +83,8 @@
                             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Membri Attivi</h3>
+                <div class="ml-4 min-w-0">
+                    <h3 class="text-base font-medium text-gray-900 dark:text-white sm:text-lg">Membri Attivi</h3>
                     <p class="text-2xl font-semibold text-green-600 dark:text-green-400" x-text="stats.activeMembers">
                     </p>
                 </div>
@@ -92,7 +92,7 @@
         </div>
 
         <!-- Administrators -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -101,15 +101,15 @@
                         </path>
                     </svg>
                 </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Amministratori</h3>
+                <div class="ml-4 min-w-0">
+                    <h3 class="text-base font-medium text-gray-900 dark:text-white sm:text-lg">Amministratori</h3>
                     <p class="text-2xl font-semibold text-red-600 dark:text-red-400" x-text="stats.administrators"></p>
                 </div>
             </div>
         </div>
 
         <!-- Pending Invites -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <svg class="h-8 w-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,8 +117,8 @@
                             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Inviti Pendenti</h3>
+                <div class="ml-4 min-w-0">
+                    <h3 class="text-base font-medium text-gray-900 dark:text-white sm:text-lg">Inviti Pendenti</h3>
                     <p class="text-2xl font-semibold text-yellow-600 dark:text-yellow-400"
                         x-text="stats.pendingInvites"></p>
                 </div>
@@ -127,8 +127,8 @@
     </div>
 
     <!-- Roles Information Panel -->
-    <div class="dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-6 mb-6">
-        <div class="flex items-start">
+    <div class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6 sm:p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
             <div class="flex-shrink-0">
                 <svg class="h-6 w-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd"
@@ -136,10 +136,10 @@
                         clip-rule="evenodd"></path>
                 </svg>
             </div>
-            <div class="ml-3">
-                <h4 class="text-lg font-medium text-blue-800 dark:text-blue-200 mb-2">Ruoli e Permessi del Sito
+            <div class="min-w-0 sm:ml-3">
+                <h4 class="text-base font-medium text-blue-800 dark:text-blue-200 mb-2 sm:text-lg">Ruoli e Permessi del Sito
                     Archeologico</h4>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-700 dark:text-blue-300">
+                <div class="grid grid-cols-1 gap-4 text-sm text-blue-700 dark:text-blue-300 lg:grid-cols-3">
                     <div>
                         <strong class="font-semibold">Admin (Direttore di Scavo)</strong>
                         <ul class="mt-1 list-disc list-inside space-y-1">
@@ -171,6 +171,7 @@
                 </div>
             </div>
         </div>
+    </div>
 
         <!-- Search and Filters -->
         <div class="bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
@@ -218,7 +219,7 @@
         </div>
 
         <!-- Count Bar -->
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex flex-col gap-2 mb-6 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm text-gray-600 dark:text-gray-400">
                 <span x-text="filteredMembers.length"></span> di <span x-text="members.length"></span> membri
             </div>
@@ -230,7 +231,7 @@
         <!-- Team Members List -->
         <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
 
-            <div class="overflow-x-auto">
+            <div class="hidden overflow-x-auto md:block">
                 <table class="w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50 dark:bg-gray-700">
                         <tr>
@@ -474,12 +475,160 @@
                     </tbody>
                 </table>
             </div>
+
+            <div class="divide-y divide-gray-200 dark:divide-gray-700 md:hidden">
+                <!-- Empty State -->
+                <div x-show="filteredMembers.length === 0" class="px-4 py-10 text-center">
+                    <div class="flex flex-col items-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z">
+                            </path>
+                        </svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Nessun membro trovato</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            <span x-show="hasActiveFilters()">Prova a modificare i filtri di ricerca.</span>
+                            <span x-show="!hasActiveFilters()">Inizia invitando il primo membro del team.</span>
+                        </p>
+                        <div class="mt-6">
+                            <button @click="showInviteModal = true"
+                                class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Invita Primo Membro
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Member Cards -->
+                <template x-for="member in filteredMembers" :key="member.user_id || member.email">
+                    <article class="p-4" :class="{'opacity-50': !member.is_active}">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 h-10 w-10">
+                                <div class="h-10 w-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm"
+                                    x-text="getUserInitials(member)">
+                                </div>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <h3 class="break-words text-sm font-medium text-gray-900 dark:text-white"
+                                            x-text="getUserDisplayName(member)"></h3>
+                                        <p class="break-all text-sm text-gray-500 dark:text-gray-400"
+                                            x-text="member.email"></p>
+                                    </div>
+                                    <span :class="getPermissionBadgeClass(member.permission_level)"
+                                        class="inline-flex flex-shrink-0 items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                        x-text="getPermissionDisplayName(member.permission_level)">
+                                    </span>
+                                </div>
+
+                                <dl class="mt-4 grid grid-cols-1 gap-3 text-sm">
+                                    <div>
+                                        <dt class="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ruolo</dt>
+                                        <dd class="mt-1 text-gray-900 dark:text-gray-200"
+                                            x-text="member.archaeological_role || 'Non specificato'"></dd>
+                                        <dd x-show="member.institution" class="text-xs text-gray-500 dark:text-gray-400"
+                                            x-text="member.institution"></dd>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <dt class="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Accesso</dt>
+                                            <dd class="mt-1 text-gray-700 dark:text-gray-300">
+                                                <span x-text="formatDate(member.granted_at)"></span>
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Attivita</dt>
+                                            <dd class="mt-1 text-gray-700 dark:text-gray-300">
+                                                <span x-text="member.photos_uploaded || 0"></span> foto
+                                            </dd>
+                                        </div>
+                                    </div>
+                                </dl>
+
+                                <div class="mt-4 flex flex-wrap items-center gap-2">
+                                    <span x-show="member.is_active && !member.is_pending"
+                                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Attivo
+                                    </span>
+                                    <span x-show="!member.is_active"
+                                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        Inattivo
+                                    </span>
+                                    <span x-show="member.is_pending"
+                                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        Pendente
+                                    </span>
+                                    <span x-show="isExpired(member)"
+                                        class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        Scaduto
+                                    </span>
+                                    <span x-show="member.expires_at" class="text-xs text-gray-500 dark:text-gray-400">
+                                        Scade: <span x-text="formatDate(member.expires_at)"></span>
+                                    </span>
+                                </div>
+
+                                <div class="mt-4 flex items-center justify-end gap-2">
+                                    <button @click="editMemberPermissions(member)"
+                                        class="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-100 rounded-full"
+                                        title="Modifica permessi">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                                            </path>
+                                        </svg>
+                                    </button>
+                                    <button @click="toggleMemberStatus(member)"
+                                        :class="member.is_active ? 'text-red-600 hover:text-red-900 hover:bg-red-100' : 'text-green-600 hover:text-green-900 hover:bg-green-100'"
+                                        class="p-2 rounded-full"
+                                        :title="member.is_active ? 'Disattiva membro' : 'Attiva membro'">
+                                        <svg x-show="member.is_active" class="w-4 h-4" fill="none"
+                                            stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728">
+                                            </path>
+                                        </svg>
+                                        <svg x-show="!member.is_active" class="w-4 h-4" fill="none"
+                                            stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                    </button>
+                                    <button x-show="member.is_pending" @click="resendInvitation(member)"
+                                        class="p-2 text-yellow-600 hover:text-yellow-900 hover:bg-yellow-100 rounded-full"
+                                        title="Reinvia invito">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M3 8l7.89 7.89a2 2 0 002.829 0L21.06 8.94A2 2 0 0020.348 5H3.652a2 2 0 00-1.414 3.414z">
+                                            </path>
+                                        </svg>
+                                    </button>
+                                    <button @click="removeMember(member)"
+                                        class="p-2 text-red-600 hover:text-red-900 hover:bg-red-100 rounded-full"
+                                        title="Rimuovi dal team">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                            </path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </template>
+            </div>
         </div>
 
         <!-- Modals -->
         {% include 'sites/components/_team_invite_modal.html' %}
         {% include 'sites/components/_team_edit_permissions_modal.html' %}
-    </div>
 
     <script>
         document.addEventListener('alpine:init', () => {
@@ -644,10 +793,20 @@
                 });
 
                 if (response.ok) {
-                    member.is_active = !member.is_active;
+                    const data = await response.json();
+                    if (data.member) {
+                        const memberIndex = this.members.findIndex(m => m.user_id === member.user_id);
+                        if (memberIndex !== -1) {
+                            this.members[memberIndex] = data.member;
+                        }
+                        this.filterMembers();
+                    } else {
+                        await this.refreshTeam();
+                    }
                     this.calculateStats();
                 } else {
-                    alert('Errore nel cambio stato membro');
+                    const error = await response.json().catch(() => ({}));
+                    alert('Errore nel cambio stato membro: ' + (error.detail || 'operazione fallita'));
                 }
             } catch (error) {
                 console.error('Toggle error:', error);
@@ -952,14 +1111,16 @@
                 });
 
                 if (response.ok) {
-                    // Update the member in the local array
+                    const data = await response.json();
                     const memberIndex = this.members.findIndex(m => m.user_id === this.selectedMember.user_id);
                     if (memberIndex !== -1) {
-                        this.members[memberIndex] = {
+                        this.members[memberIndex] = data.member || {
                             ...this.members[memberIndex],
                             ...this.editData,
                             permission_level: this.editData.permission_level
                         };
+                    } else {
+                        await this.refreshTeam();
                     }
 
                     // Update filtered members too

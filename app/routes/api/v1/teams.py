@@ -26,7 +26,7 @@ from app.core.domain_exceptions import (
 )
 
 # Models
-from app.models import User, UserSitePermission, PermissionLevel, UserActivity
+from app.models import User, UserSitePermission, PermissionLevel, UserActivity, UserProfile
 from app.models.sites import ArchaeologicalSite
 
 router = APIRouter()
@@ -38,12 +38,70 @@ class TeamMemberUpdate(BaseModel):
     notes: Optional[str] = None
     expires_at: Optional[str] = None
     access_duration: Optional[str] = "no_change"
+    archaeological_role: Optional[str] = None
+    specialization: Optional[str] = None
+    institution: Optional[str] = None
 
 class TeamInvite(BaseModel):
-    email: str
+    email: Optional[str] = None
     permission_level: str
+    user_id: Optional[str] = None
+    invite_method: Optional[str] = "email"
+    full_name: Optional[str] = None
+    archaeological_role: Optional[str] = None
+    specialization: Optional[str] = None
+    institution: Optional[str] = None
+    access_duration: Optional[str] = "permanent"
+    welcome_message: Optional[str] = None
     notes: Optional[str] = None
     expires_at: Optional[str] = None
+
+def normalize_permission_level(permission_level: str) -> str:
+    """Validate and return the DB string value for a permission level."""
+    try:
+        return PermissionLevel(permission_level).value
+    except ValueError:
+        valid_levels = ", ".join(level.value for level in PermissionLevel)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"permission_level deve essere uno tra: {valid_levels}"
+        )
+
+def format_team_member(user: User, permission_obj: UserSitePermission) -> Dict[str, Any]:
+    """Format a team member consistently for initial page data and API responses."""
+    profile = getattr(user, "profile", None)
+    return {
+        "user_id": str(user.id),
+        "email": user.email,
+        "full_name": user.full_name,
+        "permission_level": permission_obj.permission_level,
+        "is_active": permission_obj.is_active,
+        "is_pending": False,
+        "created_at": permission_obj.created_at.isoformat() if permission_obj.created_at else None,
+        "granted_at": permission_obj.created_at.isoformat() if permission_obj.created_at else None,
+        "updated_at": permission_obj.updated_at.isoformat() if permission_obj.updated_at else None,
+        "expires_at": permission_obj.expires_at.isoformat() if permission_obj.expires_at else None,
+        "notes": permission_obj.notes,
+        "archaeological_role": permission_obj.site_role or (profile.qualifica_professionale if profile else None),
+        "specialization": profile.qualifica_professionale if profile else None,
+        "institution": profile.ente_appartenenza if profile else None,
+        "photos_uploaded": 0,
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+    }
+
+def update_user_profile_from_team_data(db: AsyncSession, user: User, data: Any) -> None:
+    """Persist user profile fields that the team form can edit."""
+    if not any([getattr(data, "specialization", None), getattr(data, "institution", None)]):
+        return
+
+    if not user.profile:
+        user.profile = UserProfile(user_id=str(user.id))
+        db.add(user.profile)
+
+    if getattr(data, "specialization", None) is not None:
+        user.profile.qualifica_professionale = data.specialization or None
+    if getattr(data, "institution", None) is not None:
+        user.profile.ente_appartenenza = data.institution or None
 
 def add_deprecation_headers(response: Response, new_endpoint: str):
     """Aggiunge headers di deprecazione per backward compatibility"""
@@ -105,14 +163,14 @@ async def v1_get_site_team_members(
     site_info = verify_site_access(site_id, user_sites)
     
     try:
-        # Query completa con JOIN per ottenere dati utente
+        # Query completa con JOIN per ottenere dati utente e profilo
         query = select(
-            UserSitePermission,
-            User.email,
-            User.full_name,
-            User.profile_data
+            User,
+            UserSitePermission
         ).join(
-            User, UserSitePermission.user_id == User.id
+            UserSitePermission, UserSitePermission.user_id == User.id
+        ).options(
+            selectinload(User.profile)
         ).where(
             UserSitePermission.site_id == str(site_id)
         ).order_by(UserSitePermission.created_at.desc())
@@ -121,34 +179,10 @@ async def v1_get_site_team_members(
         team_data = result.fetchall()
 
         # Format response
-        team_members = []
-        for permission_obj, email, full_name, profile_data in team_data:
-            # Parse profile_data if it's JSON
-            profile = {}
-            if profile_data:
-                try:
-                    import json
-                    profile = json.loads(profile_data)
-                except:
-                    pass
-
-            member_data = {
-                "user_id": str(permission_obj.user_id),
-                "email": email,
-                "full_name": full_name,
-                "permission_level": permission_obj.permission_level,
-                "is_active": permission_obj.is_active,
-                "created_at": permission_obj.created_at.isoformat(),
-                "updated_at": permission_obj.updated_at.isoformat() if permission_obj.updated_at else None,
-                "expires_at": permission_obj.expires_at.isoformat() if permission_obj.expires_at else None,
-                "notes": permission_obj.notes,
-                # Additional fields from profile
-                "archaeological_role": profile.get("archaeological_role"),
-                "specialization": profile.get("specialization"),
-                "institution": profile.get("institution"),
-            }
-
-            team_members.append(member_data)
+        team_members = [
+            format_team_member(user, permission_obj)
+            for user, permission_obj in team_data
+        ]
 
         return JSONResponse({
             "site_id": str(site_id),
@@ -179,13 +213,23 @@ async def v1_invite_team_member(
         raise InsufficientPermissionsError("Solo gli amministratori possono invitare membri al team")
     
     try:
+        permission_level = normalize_permission_level(invite_data.permission_level)
+
         # Verifica che l'utente esista
-        user_query = select(User).where(User.email == invite_data.email)
+        if invite_data.invite_method == "existing":
+            if not invite_data.user_id:
+                raise HTTPException(status_code=422, detail="Seleziona un utente esistente")
+            user_query = select(User).options(selectinload(User.profile)).where(User.id == str(invite_data.user_id))
+        else:
+            if not invite_data.email:
+                raise HTTPException(status_code=422, detail="Email obbligatoria per invito via email")
+            user_query = select(User).options(selectinload(User.profile)).where(User.email == invite_data.email)
+
         user_result = await db.execute(user_query)
         user = user_result.scalar_one_or_none()
         
         if not user:
-            raise ResourceNotFoundError("Utente", invite_data.email)
+            raise ResourceNotFoundError("Utente", invite_data.user_id or invite_data.email)
         
         # Verifica che l'utente non sia già nel team
         existing_permission_query = select(UserSitePermission).where(
@@ -204,15 +248,18 @@ async def v1_invite_team_member(
         new_permission = UserSitePermission(
             user_id=str(user.id),
             site_id=str(site_id),
-            permission_level=PermissionLevel(invite_data.permission_level),
+            permission_level=permission_level,
+            site_role=invite_data.archaeological_role,
             is_active=True,
-            notes=invite_data.notes,
+            notes=invite_data.notes or invite_data.welcome_message,
             expires_at=datetime.fromisoformat(invite_data.expires_at) if invite_data.expires_at else None
         )
         
         db.add(new_permission)
+        update_user_profile_from_team_data(db, user, invite_data)
         await db.commit()
         await db.refresh(new_permission)
+        formatted_member = format_team_member(user, new_permission)
         
         # Log attività
         await log_team_activity(
@@ -220,12 +267,13 @@ async def v1_invite_team_member(
             user_id=current_user_id,
             site_id=site_id,
             activity_type="TEAM_INVITE",
-            activity_desc=f"Invitato {invite_data.email} al team con permesso {invite_data.permission_level}",
-            extra_data={"invited_user_id": str(user.id), "permission_level": invite_data.permission_level}
+            activity_desc=f"Invitato {user.email} al team con permesso {permission_level}",
+            extra_data={"invited_user_id": str(user.id), "permission_level": permission_level}
         )
         
         return JSONResponse({
             "message": "Utente invitato con successo",
+            "member": formatted_member,
             "user_id": str(user.id),
             "email": user.email,
             "permission_level": new_permission.permission_level
@@ -256,23 +304,36 @@ async def v1_update_team_member(
         raise InsufficientPermissionsError("Solo gli amministratori possono modificare i permessi")
     
     try:
+        permission_level = normalize_permission_level(member_data.permission_level)
+
         # Recupera il membro del team
-        member_query = select(UserSitePermission).where(
+        member_query = select(
+            User,
+            UserSitePermission
+        ).join(
+            UserSitePermission, UserSitePermission.user_id == User.id
+        ).options(
+            selectinload(User.profile)
+        ).where(
             and_(
                 UserSitePermission.site_id == str(site_id),
                 UserSitePermission.user_id == str(user_id)
             )
         )
-        member = await db.execute(member_query)
-        member = member.scalar_one_or_none()
+        member_result = await db.execute(member_query)
+        member_row = member_result.first()
         
-        if not member:
+        if not member_row:
             raise HTTPException(status_code=404, detail="Membro del team non trovato")
+
+        user, member = member_row
         
         # Aggiorna i permessi
-        member.permission_level = PermissionLevel(member_data.permission_level)
+        member.permission_level = permission_level
         member.is_active = member_data.is_active
         member.notes = member_data.notes
+        member.site_role = member_data.archaeological_role or None
+        update_user_profile_from_team_data(db, user, member_data)
         
         # Gestione scadenza
         if member_data.access_duration != "no_change":
@@ -292,14 +353,15 @@ async def v1_update_team_member(
             site_id=site_id,
             activity_type="TEAM_UPDATE",
             activity_desc=f"Aggiornati permessi per utente {user_id}",
-            extra_data={"updated_user_id": str(user_id), "new_permission_level": member_data.permission_level}
+            extra_data={"updated_user_id": str(user_id), "new_permission_level": permission_level}
         )
         
         return JSONResponse({
             "message": "Permessi aggiornati con successo",
+            "member": formatted_member,
             "user_id": str(user_id),
-            "permission_level": member.permission_level,
-            "is_active": member.is_active
+            "permission_level": formatted_member["permission_level"],
+            "is_active": formatted_member["is_active"]
         })
         
     except HTTPException:
@@ -340,12 +402,12 @@ async def v1_remove_team_member(
             raise HTTPException(status_code=404, detail="Membro del team non trovato")
         
         # Impedisce la rimozione dell'ultimo admin
-        if member.permission_level == PermissionLevel.ADMIN:
+        if member.permission_level == PermissionLevel.ADMIN.value:
             # Conta altri admin
             admin_count_query = select(UserSitePermission).where(
                 and_(
                     UserSitePermission.site_id == str(site_id),
-                    UserSitePermission.permission_level == PermissionLevel.ADMIN,
+                    UserSitePermission.permission_level == PermissionLevel.ADMIN.value,
                     UserSitePermission.is_active == True,
                     UserSitePermission.user_id != str(user_id)
                 )
@@ -395,14 +457,14 @@ async def v1_get_team_member(
     site_info = verify_site_access(site_id, user_sites)
     
     try:
-        # Query completa con JOIN per ottenere dati utente
+        # Query completa con JOIN per ottenere dati utente e profilo
         query = select(
-            UserSitePermission,
-            User.email,
-            User.full_name,
-            User.profile_data
+            User,
+            UserSitePermission
         ).join(
-            User, UserSitePermission.user_id == User.id
+            UserSitePermission, UserSitePermission.user_id == User.id
+        ).options(
+            selectinload(User.profile)
         ).where(
             and_(
                 UserSitePermission.site_id == str(site_id),
@@ -416,32 +478,8 @@ async def v1_get_team_member(
         if not member_data:
             raise HTTPException(status_code=404, detail="Membro del team non trovato")
         
-        permission_obj, email, full_name, profile_data = member_data
-        
-        # Parse profile_data if it's JSON
-        profile = {}
-        if profile_data:
-            try:
-                import json
-                profile = json.loads(profile_data)
-            except:
-                pass
-
-        member_details = {
-            "user_id": str(permission_obj.user_id),
-            "email": email,
-            "full_name": full_name,
-            "permission_level": permission_obj.permission_level,
-            "is_active": permission_obj.is_active,
-            "created_at": permission_obj.created_at.isoformat(),
-            "updated_at": permission_obj.updated_at.isoformat() if permission_obj.updated_at else None,
-            "expires_at": permission_obj.expires_at.isoformat() if permission_obj.expires_at else None,
-            "notes": permission_obj.notes,
-            # Additional fields from profile
-            "archaeological_role": profile.get("archaeological_role"),
-            "specialization": profile.get("specialization"),
-            "institution": profile.get("institution"),
-        }
+        user, permission_obj = member_data
+        member_details = format_team_member(user, permission_obj)
 
         return JSONResponse({
             "member": member_details,

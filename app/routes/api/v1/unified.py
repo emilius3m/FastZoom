@@ -1,13 +1,11 @@
 """
 API v1 - Unified Dashboard
 Endpoints per dashboard unificato del sistema archeologico.
-Implementa backward compatibility con avvisi di deprecazione.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import JSONResponse, Response
+from fastapi import APIRouter, Depends
 from uuid import UUID
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 from sqlalchemy import select, func
@@ -15,25 +13,9 @@ from sqlalchemy import select, func
 # Dependencies
 from app.core.security import get_current_user_id_with_blacklist, get_current_user_sites_with_blacklist
 from app.database.db import get_async_session
-from app.models import Photo, Site, User, UserSitePermission, UserActivity, get_activity_display_name
-
-# Import existing unified dashboard functions for backward compatibility
-# Note: unified_dashboard.py doesn't exist yet, so we'll implement these directly
-# from app.routes.api.unified_dashboard import (
-#     get_overview_stats_api_unified_stats_overview_get,
-#     get_sites_list_api_unified_sites_list_get,
-#     get_recent_activities_api_unified_activities_recent_get,
-#     get_system_status_api_unified_system_status_get
-# )
+from app.models import Photo, User, UserSitePermission, UserActivity, get_activity_display_name
 
 router = APIRouter()
-
-def add_deprecation_headers(response: Response, new_endpoint: str):
-    """Aggiunge headers di deprecazione per backward compatibility"""
-    response.headers["X-API-Deprecated"] = "true"
-    response.headers["X-API-Deprecated-Reason"] = "Endpoint ristrutturato. Usa la nuova API v1."
-    response.headers["X-API-New-Endpoint"] = new_endpoint
-    response.headers["X-API-Sunset"] = "2025-12-31"  # Data rimozione vecchi endpoint
 
 def get_activity_category(activity: UserActivity, activity_desc: str = "") -> str:
     """Normalize raw activity types into dashboard filter categories."""
@@ -358,6 +340,3 @@ async def v1_get_documents_count(
         count = 0
     
     return {"count": count}
-
-# ENDPOINT DI BACKWARD COMPATIBILITY CON DEPRECAZIONE
-
