@@ -24,74 +24,53 @@ FastZoom is a FastAPI web platform for archaeological documentation and site ope
 - MinIO object storage
 - SQLite (default local dev DB) with async driver
 
-## Prerequisites
+## Prerequisiti
 
-- Python `3.12+` (project targets Python 3.12)
-- MinIO (local or remote profile)
-- Optional: Poetry
-- Optional: Docker + Docker Compose
+- **Docker Desktop** (include Docker + Docker Compose)
+- File `.env` compilato a partire da `.env.example`
 
-## Quick Start (Docker Compose)
-
-1. Copy environment file:
-   ```bash
-   cp .env.example .env
-   ```
-2. Start services:
-   ```bash
-   docker compose up --build
-   ```
-3. Open:
-   - App: `http://localhost:8000`
-   - MinIO Console: `http://localhost:9001`
-4. Stop services:
-   ```bash
-   docker compose down
-   ```
-
-## Local Setup (Without Docker)
-
-1. Create and activate virtual environment:
-   ```powershell
-   python -m venv venv
-   .\venv\Scripts\Activate.ps1
-   ```
-2. Install dependencies:
-   ```powershell
-   pip install -r requirements.txt
-   ```
-   Or with Poetry:
-   ```powershell
-   poetry install
-   ```
-3. Create env file:
-   ```powershell
-   Copy-Item .env.example .env
-   ```
-4. Run migrations:
-   ```powershell
-   alembic upgrade head
-   ```
-5. Start the app:
-   ```powershell
-   uvicorn app.app:app --reload --host 127.0.0.1 --port 8000
-   ```
-
-## PowerShell Setup Script
-
-Windows users can use `setup.ps1`:
+## Quick Start
 
 ```powershell
-.\setup.ps1 help
-.\setup.ps1 setup
+# 1. Copia il file di configurazione
+Copy-Item .env.example .env
+
+# 2. Avvia in modalità sviluppo (foreground, auto-reload)
 .\setup.ps1 run-dev
 ```
 
-Useful commands include:
-- `setup`, `install`, `env`, `migrate`, `init-db`, `populate-db`
-- `run`, `run-dev`
-- `minio-install`, `minio-start`, `minio-stop`, `minio-setup`, `minio-status`, `minio-console`
-- `credentials`, `status`, `clean`
+Apri il browser su:
+- App → `http://localhost:8000`
+- Swagger UI → `http://localhost:8000/docs`
+- MinIO Console → `http://localhost:9001`
+
+## Comandi `setup.ps1`
+
+Tutti i comandi usano Docker Compose. Richiedono Docker Desktop avviato.
+
+| Comando | Descrizione |
+|---|---|
+| `run-dev` | Avvia in foreground con **auto-reload** (sviluppo) |
+| `run` | Avvia in background / detached (produzione) |
+| `stop` | Ferma tutti i container |
+| `restart` | Ferma e riavvia i container |
+| `build` | Rebuild immagine Docker (no cache) |
+| `logs` | Stream log in tempo reale (tutti i container) |
+| `logs-app` | Log solo del container `app` |
+| `logs-minio` | Log solo di MinIO |
+| `status` | Stato dei container (`docker compose ps`) |
+| `shell` | Shell bash interattiva nel container `app` |
+| `credentials` | Mostra credenziali di accesso |
+| `clean` | Rimuove container, volumi e immagini (con conferma) |
+
+```powershell
+# Esempi
+.\setup.ps1 run-dev      # sviluppo
+.\setup.ps1 logs         # vedi i log live
+.\setup.ps1 stop         # ferma tutto
+.\setup.ps1 shell        # apri una shell nel container
+.\setup.ps1 clean        # pulizia completa
+```
 
 ## Environment Configuration
 

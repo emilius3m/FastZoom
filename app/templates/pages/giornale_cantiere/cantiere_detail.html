@@ -898,6 +898,7 @@
             loadingExportWord: false,
             uploadingCantiereDocument: false,
             documentiCantiere: {{ documenti_cantiere|tojson if documenti_cantiere else '[]' }},
+            giornaleDocumentDescription: '',
             documentUploadForm: {
                 file: null,
                 title: '',
@@ -1326,6 +1327,7 @@
                 this.showCreateModal = true;
                 this.editingGiornale = false;
                 this.editingGiornaleData = null;
+                this.giornaleDocumentDescription = '';
                 this.draftId = null;
                 this.draftLinkedPhotoIds = [];
                 this.resetForm();
@@ -1347,6 +1349,7 @@
                 this.stopDraftWatcher();
                 this.showCreateModal = false;
                 this.errorMessage = '';
+                this.giornaleDocumentDescription = '';
             },
 
             prepareLegalDataFromGiornale(giornale) {
@@ -1981,7 +1984,8 @@
                     const formData = new FormData();
                     formData.append('file', file);
                     formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
-                    formData.append('category', 'documentazione');
+                    formData.append('description', (this.giornaleDocumentDescription || '').trim());
+                    formData.append('category', 'amministrativi');
                     formData.append('site_id', '{{ site.id }}');
                     formData.append('doc_type', this.guessDocumentTypeFromFile(file));
                     formData.append('tags', tags.join(','));
@@ -2013,6 +2017,7 @@
                         file.name;
 
                     this.formData.allegati_paths.push(storedPath);
+                    this.giornaleDocumentDescription = '';
                     this.showAlert('success', 'Documento caricato con successo');
                 } catch (error) {
                     const message = error.message || 'Errore durante il caricamento del documento';

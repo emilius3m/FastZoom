@@ -91,7 +91,7 @@
         <!-- Document Categories Grid -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <!-- Excavation Reports -->
-            <div @click="filterByCategory('excavation_report')"
+            <div @click="filterByCategory('relazioni')"
                 class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors group">
                 <div class="flex items-center justify-between">
                     <div>
@@ -154,7 +154,7 @@
             </div>
 
             <!-- Other Documents -->
-            <div @click="filterByCategory('altro')"
+            <div @click="filterByCategory('__other_documents__')"
                 class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:border-orange-500 dark:hover:border-orange-400 transition-colors group">
                 <div class="flex items-center justify-between">
                     <div>
@@ -732,12 +732,8 @@
             if (!this.documents || !Array.isArray(this.documents)) return [];
             const tagsSet = new Set();
             this.documents.forEach(doc => {
-                if (doc.tags && typeof doc.tags === 'string') {
-                    doc.tags.split(',').forEach(tag => {
-                        const cleanTag = tag.trim().toLowerCase();
-                        if (cleanTag) tagsSet.add(cleanTag);
-                    });
-                }
+                const tags = this.normalizeTags(doc ? doc.tags : null);
+                tags.forEach(tag => tagsSet.add(tag));
             });
             return Array.from(tagsSet).sort();
         },
@@ -769,13 +765,21 @@
                     (doc.title && doc.title.toLowerCase().includes(term)) ||
                     (doc.author && doc.author.toLowerCase().includes(term)) ||
                     (doc.description && doc.description.toLowerCase().includes(term)) ||
-                    (doc.tags && doc.tags.toLowerCase().includes(term))
+                    this.normalizeTags(doc ? doc.tags : null).some(tag => tag.includes(term))
                 );
             }
 
             // Category filter
             if (this.categoryFilter) {
-                filtered = filtered.filter(doc => doc.category === this.categoryFilter);
+                if (this.categoryFilter === '__other_documents__') {
+                    filtered = filtered.filter(doc => this.isOtherCategory(doc ? doc.category : null));
+                } else {
+                    const acceptedCategories = this.getCategoryAliases(this.categoryFilter);
+                    filtered = filtered.filter(doc => {
+                        const category = String(doc && doc.category ? doc.category : '').toLowerCase();
+                        return acceptedCategories.includes(category);
+                    });
+                }
             }
 
             // Year filter
@@ -786,8 +790,7 @@
             // Tag filter
             if (this.tagFilter) {
                 filtered = filtered.filter(doc => {
-                    if (!doc.tags) return false;
-                    const dsTags = doc.tags.split(',').map(t => t.trim().toLowerCase());
+                    const dsTags = this.normalizeTags(doc ? doc.tags : null);
                     return dsTags.includes(this.tagFilter);
                 });
             }
@@ -803,6 +806,36 @@
 
         hasActiveFilters() {
             return !!(this.searchTerm || this.categoryFilter || this.yearFilter || this.tagFilter);
+        },
+
+        getCategoryAliases(rawCategory) {
+            const category = String(rawCategory || '').toLowerCase();
+            const aliases = {
+                relazioni: ['relazioni', 'excavation_report'],
+                excavation_report: ['relazioni', 'excavation_report'],
+                pubblicazioni: ['pubblicazioni', 'publication'],
+                publication: ['pubblicazioni', 'publication'],
+                documentazione: ['documentazione', 'lab_analysis'],
+                lab_analysis: ['documentazione', 'lab_analysis'],
+                planimetrie: ['planimetrie', 'drawing', 'map'],
+                amministrativi: ['amministrativi'],
+                altro: ['altro', 'other'],
+                other: ['altro', 'other']
+            };
+            return aliases[category] || [category];
+        },
+
+        isOtherCategory(rawCategory) {
+            const category = String(rawCategory || '').toLowerCase();
+            const coreCategories = new Set([
+                'relazioni',
+                'excavation_report',
+                'pubblicazioni',
+                'publication',
+                'documentazione',
+                'lab_analysis'
+            ]);
+            return !coreCategories.has(category);
         },
 
         // Document actions
@@ -965,6 +998,22 @@
         formatDate(dateString) {
             if (!dateString) return '';
             return new Date(dateString).toLocaleDateString('it-IT');
+        },
+
+        normalizeTags(rawTags) {
+            if (!rawTags) return [];
+            if (Array.isArray(rawTags)) {
+                return rawTags
+                    .map(tag => String(tag || '').trim().toLowerCase())
+                    .filter(Boolean);
+            }
+            if (typeof rawTags === 'string') {
+                return rawTags
+                    .split(',')
+                    .map(tag => tag.trim().toLowerCase())
+                    .filter(Boolean);
+            }
+            return [];
         },
 
         // Upload new document
