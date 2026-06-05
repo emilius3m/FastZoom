@@ -180,13 +180,13 @@
                     <button @click="exportGiornaliPDF()" type="button"
                         class="inline-flex items-center px-4 py-2 bg-red-600 dark:bg-red-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-800">
                         <i class="fas fa-file-pdf mr-2"></i>
-                        PDF
+                        Registro PDF
                     </button>
 
                     <button @click="exportGiornaliWord()" type="button"
                         class="inline-flex items-center px-4 py-2 bg-indigo-600 dark:bg-indigo-700 border border-transparent rounded-lg text-sm font-medium text-white hover:bg-indigo-700 dark:hover:bg-indigo-800">
                         <i class="fas fa-file-word mr-2"></i>
-                        Word
+                        Registro Word
                     </button>
 
                 </div>
@@ -493,13 +493,13 @@
                                             <button type="button"
                                                 class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg dark:text-purple-400 dark:hover:bg-gray-600 transition-colors"
                                                 @click="exportSingleGiornalePDF(giornale)" :disabled="loadingExport"
-                                                :aria-label="`Esporta PDF giornale ${giornale.data || ''}`" title="Esporta PDF">
+                                                :aria-label="`Esporta registro PDF giornale ${giornale.data || ''}`" title="Registro PDF">
                                                 <i class="fas fa-file-pdf" aria-hidden="true"></i>
                                             </button>
                                             <button type="button"
                                                 class="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg dark:text-indigo-400 dark:hover:bg-gray-600 transition-colors"
                                                 @click="exportSingleGiornaleWord(giornale)"
-                                                :disabled="loadingExportWord" :aria-label="`Esporta Word giornale ${giornale.data || ''}`" title="Esporta Word">
+                                                :disabled="loadingExportWord" :aria-label="`Esporta registro Word giornale ${giornale.data || ''}`" title="Registro Word">
                                                 <i class="fas fa-file-word" aria-hidden="true"></i>
                                             </button>
                                             <button type="button"
@@ -553,13 +553,13 @@
                                                     <button type="button"
                                                         class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg dark:text-purple-400 dark:hover:bg-gray-600 transition-colors"
                                                         @click="exportSingleGiornalePDF(giornale)" :disabled="loadingExport"
-                                                        :aria-label="`Esporta PDF giornale ${giornale.data || ''}`" title="Esporta PDF">
+                                                        :aria-label="`Esporta registro PDF giornale ${giornale.data || ''}`" title="Registro PDF">
                                                         <i class="fas fa-file-pdf" aria-hidden="true"></i>
                                                     </button>
                                                     <button type="button"
                                                         class="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg dark:text-indigo-400 dark:hover:bg-gray-600 transition-colors"
                                                         @click="exportSingleGiornaleWord(giornale)"
-                                                        :disabled="loadingExportWord" :aria-label="`Esporta Word giornale ${giornale.data || ''}`" title="Esporta Word">
+                                                        :disabled="loadingExportWord" :aria-label="`Esporta registro Word giornale ${giornale.data || ''}`" title="Registro Word">
                                                         <i class="fas fa-file-word" aria-hidden="true"></i>
                                                     </button>
                                                     <button type="button"
@@ -2503,7 +2503,7 @@
 
                     // Get filename from Content-Disposition header if available
                     const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = `Giornale_{{ cantiere.nome.replace(' ', '_') }}_${new Date().toISOString().split('T')[0]}.pdf`;
+                    let filename = `Registro_Giornale_{{ cantiere.nome.replace(' ', '_') }}_${new Date().toISOString().split('T')[0]}.pdf`;
 
                     if (contentDisposition) {
                         const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
@@ -2584,7 +2584,7 @@
 
                     // Get filename from Content-Disposition header if available
                     const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = `Giornale_{{ cantiere.nome.replace(' ', '_') }}_${new Date().toISOString().split('T')[0]}.docx`;
+                    let filename = `Registro_Giornale_{{ cantiere.nome.replace(' ', '_') }}_${new Date().toISOString().split('T')[0]}.docx`;
 
                     if (contentDisposition) {
                         const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
@@ -2654,7 +2654,7 @@
 
                     // Get filename from Content-Disposition header
                     const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.docx`;
+                    let filename = `Registro_Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.docx`;
 
                     if (contentDisposition) {
                         const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
@@ -2720,7 +2720,7 @@
 
                     // Get filename from Content-Disposition header
                     const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = `Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.pdf`;
+                    let filename = `Registro_Giornale_${giornale.data}_${new Date().toISOString().split('T')[0]}.pdf`;
 
                     if (contentDisposition) {
                         const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);

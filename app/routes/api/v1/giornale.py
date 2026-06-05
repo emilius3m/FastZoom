@@ -1421,7 +1421,7 @@ async def export_giornali_pdf(
         pdf_content = generate_giornale_pdf_quick(giornali_data, cantiere_info, site_info)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"Giornale_{cantiere_info.get('nome', 'Cantiere').replace(' ', '_')}_{timestamp}.pdf"
+        filename = f"Registro_Giornale_{cantiere_info.get('nome', 'Cantiere').replace(' ', '_')}_{timestamp}.pdf"
         
         return Response(
             content=pdf_content,
@@ -1514,7 +1514,7 @@ async def export_single_giornale_pdf(
         pdf_content = generate_giornale_pdf_quick([giornale_dict], cantiere_info, site_info)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"Giornale_{timestamp}.pdf"
+        filename = f"Registro_Giornale_{timestamp}.pdf"
         
         return Response(
             content=pdf_content,
@@ -1623,7 +1623,7 @@ async def export_giornali_word(
         word_content = generate_giornale_word_quick(giornali_data, cantiere_info, site_info)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"Giornale_{cantiere_info.get('nome', 'Cantiere').replace(' ', '_')}_{timestamp}.docx"
+        filename = f"Registro_Giornale_{cantiere_info.get('nome', 'Cantiere').replace(' ', '_')}_{timestamp}.docx"
         
         return Response(
             content=word_content,
@@ -1711,7 +1711,7 @@ async def export_single_giornale_word(
         word_content = generate_giornale_word_quick([giornale_dict], cantiere_info, site_info)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"Giornale_{timestamp}.docx"
+        filename = f"Registro_Giornale_{timestamp}.docx"
         
         return Response(
             content=word_content,
