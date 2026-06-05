@@ -1,5 +1,6 @@
 <!-- templates/sites/team.html - GESTIONE TEAM SITO ARCHEOLOGICO -->
 {% extends "base/site_base.html" %}
+{% from "components/breadcrumb.html" import breadcrumb %}
 
 {% block title %}Team Management - {{ site.name }} | Sistema Archeologico{% endblock %}
 
@@ -13,19 +14,10 @@
         <div class="px-4 py-4 sm:px-6">
             <div class="flex w-full flex-col justify-between gap-4 lg:flex-row lg:items-center">
                 <div class="flex min-w-0 flex-col">
-                    <!-- Breadcrumb Navigation -->
-                    <nav class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm mb-2">
-                        <i class="fas fa-home text-gray-500 text-lg flex-shrink-0"></i>
-                        <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                            <span class="text-gray-400 text-lg">→</span>
-                            <a href="/view/{{ site.id }}/dashboard"
-                                class="min-w-0 break-words text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
-                                {{ site.name }} ({{ site.code }})
-                            </a>
-                            <span class="text-gray-400 text-lg">→</span>
-                            <span class="text-gray-700 dark:text-gray-300 font-semibold px-2 py-1">Gestione Team</span>
-                        </div>
-                    </nav>
+                    {{ breadcrumb([
+                        {"label": "Dashboard", "href": "/dashboard"},
+                        {"label": site.name ~ " (" ~ site.code ~ ")", "href": "/view/" ~ site.id ~ "/dashboard"}
+                    ], "Gestione Team") }}
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Gestione Team</h1>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
                         Gestione membri e permessi per il sito archeologico

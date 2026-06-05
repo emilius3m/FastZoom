@@ -41,19 +41,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="flex items-center space-x-3">
-                    <!-- Quick Actions -->
-
-                    <button @click="refreshStats"
-                        class="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
-                            </path>
-                        </svg>
-                    </button>
-                </div>
             </div>
         </div>
     </div>
@@ -251,56 +238,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 gap-6">
-
-        <!-- Recent Activities -->
-        <div class="bg-white dark:bg-gray-800 shadow rounded-lg h-fit">
-            <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4">Attività Recenti</h3>
-
-                {% if recent_activities %}
-                <div class="flow-root">
-                    <ul class="-mb-8">
-                        {% for activity in recent_activities %}
-                        <li>
-                            <div
-                                class="relative pb-8 {% if not loop.last %}border-l-2 border-gray-200 dark:border-gray-600 ml-4{% endif %}">
-                                <div class="relative flex space-x-3">
-                                    <div>
-                                        <span
-                                            class="h-8 w-8 rounded-full bg-blue-500 dark:bg-blue-600 flex items-center justify-center ring-8 ring-white dark:ring-gray-800">
-                                            <i class="fas fa-plus text-white text-xs"></i>
-                                        </span>
-                                    </div>
-                                    <div class="min-w-0 flex-1">
-                                        <div>
-                                            <div class="text-sm">
-                                                <span class="font-medium text-gray-900 dark:text-white">{{ activity.user
-                                                    }}</span>
-                                            </div>
-                                            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{
-                                                activity.description }}</p>
-                                            <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                                                <time datetime="{{ activity.date }}">{{ moment(activity.date).fromNow()
-                                                    }}</time>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% else %}
-                <p class="text-sm text-gray-500 dark:text-gray-400">Nessuna attività recente</p>
-                {% endif %}
-            </div>
-        </div>
-
-    </div>
     <!-- Alpine.js Script -->
     <script>
         document.addEventListener('alpine:init', () => {
@@ -318,19 +255,6 @@
             users_count: {{ stats.users_count }},
             recent_photos: {{ stats.recent_photos }},
             storage_mb: {{ stats.storage_mb }}
-        },
-
-
-
-            async refreshStats() {
-            try {
-                const response = await fetch('/api/v1/sites/{{ site.id }}/dashboard/stats');
-                if(response.ok) {
-            this.stats = await response.json();
-        }
-            } catch (error) {
-            console.error('Error refreshing stats:', error);
-        }
         },
 
         handleFileSelect(event) {

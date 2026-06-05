@@ -348,6 +348,68 @@
 .dark #theme-toggle-dark-icon {
   display: block;
 }
+
+/* WCAG-first site selector badge colors. Use real CSS so contrast does not
+   depend on Tailwind utility order in the compiled stylesheet. */
+.site-selector-permission-badge {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 700;
+}
+
+.site-selector-permission-regional-admin {
+  background-color: #f3e8ff;
+  color: #581c87;
+}
+
+.site-selector-permission-admin {
+  background-color: #dbeafe;
+  color: #1e3a8a;
+}
+
+.site-selector-permission-write {
+  background-color: #dcfce7;
+  color: #14532d;
+}
+
+.site-selector-permission-default {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.dark .site-selector-permission-badge {
+  background-color: #334155;
+  color: #f8fafc;
+  border: 1px solid #64748b;
+}
+
+.dark .site-selector-permission-regional-admin {
+  background-color: #4c1d95;
+  color: #ffffff;
+  border-color: #8b5cf6;
+}
+
+.dark .site-selector-permission-admin {
+  background-color: #1e3a8a;
+  color: #ffffff;
+  border-color: #60a5fa;
+}
+
+.dark .site-selector-permission-write {
+  background-color: #14532d;
+  color: #ffffff;
+  border-color: #4ade80;
+}
+
+.dark .site-selector-permission-default {
+  background-color: #374151;
+  color: #ffffff;
+  border-color: #9ca3af;
+}
 /* Enhanced dropdown indicators for sidebar menu */
 [data-collapse-toggle] svg {
     transition: transform 0.2s ease-in-out;

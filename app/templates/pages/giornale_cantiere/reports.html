@@ -2,6 +2,7 @@
 # AGGIORNAMENTO TEMPLATE REPORTS CON API REALI
 
 {% extends "base/site_base.html" %}
+{% from "components/breadcrumb.html" import breadcrumb %}
 
 {% block title %}{{ title or "Report Giornali di Cantiere" }}{% endblock %}
 
@@ -10,27 +11,10 @@
     
     <!-- Header con breadcrumb -->
     <div class="mb-6">
-        <nav class="flex mb-4" aria-label="Breadcrumb">
-            <ol class="inline-flex items-center space-x-1 md:space-x-3">
-                <li class="inline-flex items-center">
-                    <a href="/dashboard" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                        <i class="fas fa-home mr-2"></i>Dashboard
-                    </a>
-                </li>
-                <li>
-                    <div class="flex items-center">
-                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <a href="/giornale-cantiere" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">Giornale Cantiere</a>
-                    </div>
-                </li>
-                <li aria-current="page">
-                    <div class="flex items-center">
-                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
-                        <span class="text-gray-500 dark:text-gray-400">Report</span>
-                    </div>
-                </li>
-            </ol>
-        </nav>
+        {{ breadcrumb([
+            {"label": "Dashboard", "href": "/dashboard"},
+            {"label": "Giornale Cantiere", "href": "/giornale-cantiere"}
+        ], "Report") }}
         
         <div class="flex justify-between items-center">
             <div>

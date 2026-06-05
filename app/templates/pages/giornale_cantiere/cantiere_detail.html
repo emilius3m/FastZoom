@@ -1,5 +1,6 @@
 {% extends "base/site_base.html" %}
 {% set layout_type = 'full' %}
+{% from "components/breadcrumb.html" import breadcrumb %}
 
 {% block title %}{{ cantiere.nome }} - {{ site.name }}{% endblock %}
 
@@ -13,21 +14,23 @@
         transform: translateY(-2px);
     }
 
-    /* Keep sidebar hidden until full page load to avoid startup flash */
-    html.hide-sidebar-boot #logo-sidebar {
-        display: none !important;
+    html:not(.cantiere-detail-ready) #logo-sidebar {
+        transition: none !important;
+    }
+
+    #logo-sidebar[class~="-translate-x-full"] {
+        transform: translateX(-100%) !important;
     }
 </style>
 <script>
-    document.documentElement.classList.add('hide-sidebar-boot');
-    window.addEventListener('load', function () {
-        document.documentElement.classList.remove('hide-sidebar-boot');
+    document.addEventListener('DOMContentLoaded', function () {
+        document.documentElement.classList.add('cantiere-detail-ready');
     });
 </script>
 {% endblock %}
 
 {% block content %}
-<div class="w-full px-4 py-8 sm:px-6 lg:px-8" x-data="cantiereDetailApp()" x-cloak
+<div class="w-full px-4 py-8 sm:px-6 lg:px-8" x-data="cantiereDetailApp()"
     @open-edit-giornale-modal.window="handleEditGiornaleEvent($event)">
 
     <!-- Header stile cantieri -->
@@ -35,28 +38,11 @@
         <div class="px-6 py-4">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div class="flex flex-col">
-                    <nav class="flex items-center space-x-4 text-sm mb-2" aria-label="Breadcrumb">
-                        <i class="fas fa-home text-gray-500 text-lg"></i>
-                        <div class="flex items-center space-x-4">
-                            <span class="text-gray-400 text-lg">→</span>
-                            <a href="/dashboard"
-                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
-                                Dashboard
-                            </a>
-                            <span class="text-gray-400 text-lg">→</span>
-                            <a href="/view/{{ site.id }}/dashboard"
-                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
-                                {{ site.name }}
-                            </a>
-                            <span class="text-gray-400 text-lg">→</span>
-                            <a href="/view/{{ site.id }}/cantieri"
-                                class="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50">
-                                Gestione Cantieri
-                            </a>
-                            <span class="text-gray-400 text-lg">→</span>
-                            <span class="text-gray-700 dark:text-gray-300 font-semibold px-2 py-1">{{ cantiere.nome }}</span>
-                        </div>
-                    </nav>
+                    {{ breadcrumb([
+                        {"label": "Dashboard", "href": "/dashboard"},
+                        {"label": site.name, "href": "/view/" ~ site.id ~ "/dashboard"},
+                        {"label": "Gestione Cantieri", "href": "/view/" ~ site.id ~ "/cantieri"}
+                    ], cantiere.nome) }}
 
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ cantiere.nome }}</h1>
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ cantiere.descrizione or "Nessuna descrizione disponibile" }}</p>
@@ -188,21 +174,21 @@
                 data-tabs-toggle="#default-tab-content" role="tablist">
                 <li class="me-2" role="presentation">
                     <button
-                        class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+                        class="inline-block p-4 border-b-2 rounded-t-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 hover:border-gray-300 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-300"
                         id="giornali-tab" data-tabs-target="#giornali" type="button" role="tab" aria-controls="giornali"
                         aria-selected="false">
                         <i class="fas fa-book mr-2"></i>Giornali di Cantiere
                     </button>
                 </li>
                 <li class="me-2" role="presentation">
-                    <button class="inline-block p-4 border-b-2 rounded-t-lg" id="info-tab" data-tabs-target="#info"
+                    <button class="inline-block p-4 border-b-2 rounded-t-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 hover:border-gray-300 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-300" id="info-tab" data-tabs-target="#info"
                         type="button" role="tab" aria-controls="info" aria-selected="false">
                         <i class="fas fa-info-circle mr-2"></i>Informazioni
                     </button>
                 </li>
                 <li class="me-2" role="presentation">
                     <button
-                        class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+                        class="inline-block p-4 border-b-2 rounded-t-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 hover:border-gray-300 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-300"
                         id="timeline-tab" data-tabs-target="#timeline" type="button" role="tab" aria-controls="timeline"
                         aria-selected="false">
                         <i class="fas fa-clock mr-2"></i>Timeline
@@ -210,7 +196,7 @@
                 </li>
                 <li role="presentation">
                     <button
-                        class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+                        class="inline-block p-4 border-b-2 rounded-t-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 hover:border-gray-300 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-300"
                         id="files-tab" data-tabs-target="#files" type="button" role="tab" aria-controls="files"
                         aria-selected="false">
                         <i class="fas fa-folder mr-2"></i>File
@@ -389,25 +375,25 @@
                                             class="flex md:flex-col justify-end gap-2 md:border-l md:border-gray-200 dark:md:border-gray-600 pl-0 md:pl-4">
                                             <button type="button"
                                                 class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg dark:text-blue-400 dark:hover:bg-gray-600 transition-colors"
-                                                @click="editGiornale(giornale)" title="Modifica">
-                                                <i class="fas fa-edit"></i>
+                                                @click="editGiornale(giornale)" :aria-label="`Modifica giornale ${giornale.data || ''}`" title="Modifica">
+                                                <i class="fas fa-edit" aria-hidden="true"></i>
                                             </button>
                                             <button type="button"
                                                 class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg dark:text-purple-400 dark:hover:bg-gray-600 transition-colors"
                                                 @click="exportSingleGiornalePDF(giornale)" :disabled="loadingExport"
-                                                title="Esporta PDF">
-                                                <i class="fas fa-file-pdf"></i>
+                                                :aria-label="`Esporta PDF giornale ${giornale.data || ''}`" title="Esporta PDF">
+                                                <i class="fas fa-file-pdf" aria-hidden="true"></i>
                                             </button>
                                             <button type="button"
                                                 class="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg dark:text-indigo-400 dark:hover:bg-gray-600 transition-colors"
                                                 @click="exportSingleGiornaleWord(giornale)"
-                                                :disabled="loadingExportWord" title="Esporta Word">
-                                                <i class="fas fa-file-word"></i>
+                                                :disabled="loadingExportWord" :aria-label="`Esporta Word giornale ${giornale.data || ''}`" title="Esporta Word">
+                                                <i class="fas fa-file-word" aria-hidden="true"></i>
                                             </button>
                                             <button type="button"
                                                 class="p-2 text-red-600 hover:bg-red-50 rounded-lg dark:text-red-400 dark:hover:bg-gray-600 transition-colors"
-                                                @click="deleteGiornale(giornale)" title="Elimina">
-                                                <i class="fas fa-trash"></i>
+                                                @click="deleteGiornale(giornale)" :aria-label="`Elimina giornale ${giornale.data || ''}`" title="Elimina">
+                                                <i class="fas fa-trash" aria-hidden="true"></i>
                                             </button>
                                         </div>
                                     </div>
@@ -449,25 +435,25 @@
                                                 <div class="flex items-center gap-1">
                                                     <button type="button"
                                                         class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg dark:text-blue-400 dark:hover:bg-gray-600 transition-colors"
-                                                        @click="editGiornale(giornale)" title="Modifica">
-                                                        <i class="fas fa-edit"></i>
+                                                        @click="editGiornale(giornale)" :aria-label="`Modifica giornale ${giornale.data || ''}`" title="Modifica">
+                                                        <i class="fas fa-edit" aria-hidden="true"></i>
                                                     </button>
                                                     <button type="button"
                                                         class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg dark:text-purple-400 dark:hover:bg-gray-600 transition-colors"
                                                         @click="exportSingleGiornalePDF(giornale)" :disabled="loadingExport"
-                                                        title="Esporta PDF">
-                                                        <i class="fas fa-file-pdf"></i>
+                                                        :aria-label="`Esporta PDF giornale ${giornale.data || ''}`" title="Esporta PDF">
+                                                        <i class="fas fa-file-pdf" aria-hidden="true"></i>
                                                     </button>
                                                     <button type="button"
                                                         class="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg dark:text-indigo-400 dark:hover:bg-gray-600 transition-colors"
                                                         @click="exportSingleGiornaleWord(giornale)"
-                                                        :disabled="loadingExportWord" title="Esporta Word">
-                                                        <i class="fas fa-file-word"></i>
+                                                        :disabled="loadingExportWord" :aria-label="`Esporta Word giornale ${giornale.data || ''}`" title="Esporta Word">
+                                                        <i class="fas fa-file-word" aria-hidden="true"></i>
                                                     </button>
                                                     <button type="button"
                                                         class="p-2 text-red-600 hover:bg-red-50 rounded-lg dark:text-red-400 dark:hover:bg-gray-600 transition-colors"
-                                                        @click="deleteGiornale(giornale)" title="Elimina">
-                                                        <i class="fas fa-trash"></i>
+                                                        @click="deleteGiornale(giornale)" :aria-label="`Elimina giornale ${giornale.data || ''}`" title="Elimina">
+                                                        <i class="fas fa-trash" aria-hidden="true"></i>
                                                     </button>
                                                 </div>
                                             </td>
@@ -855,13 +841,13 @@
                                         <a :href="`/api/v1/sites/{{ site.id }}/documents/${doc.id}/preview?inline=true`"
                                             target="_blank"
                                             class="p-2 rounded-md text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-gray-600"
-                                            title="Anteprima">
-                                            <i class="fas fa-eye"></i>
+                                            :aria-label="`Anteprima documento ${doc.title}`" title="Anteprima">
+                                            <i class="fas fa-eye" aria-hidden="true"></i>
                                         </a>
                                         <a :href="`/api/v1/sites/{{ site.id }}/documents/${doc.id}/download`"
                                             class="p-2 rounded-md text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-gray-600"
-                                            title="Scarica">
-                                            <i class="fas fa-download"></i>
+                                            :aria-label="`Scarica documento ${doc.title}`" title="Scarica">
+                                            <i class="fas fa-download" aria-hidden="true"></i>
                                         </a>
                                     </div>
                                 </div>
