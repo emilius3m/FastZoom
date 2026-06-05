@@ -685,7 +685,7 @@ async def export_site_operatori_pdf(
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         site_name_safe = site_info.get('name', 'Sito').replace(' ', '_')
-        filename = f"Operatori_{site_name_safe}_{timestamp}.pdf"
+        filename = f"Registro_Operatori_{site_name_safe}_{timestamp}.pdf"
         
         return Response(
             content=pdf_content,
