@@ -1,0 +1,18 @@
+{% macro breadcrumb(items, current_label) %}
+<nav class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm mb-2" aria-label="Breadcrumb">
+    <i class="fas fa-home text-gray-600 dark:text-gray-300 text-lg flex-shrink-0" aria-hidden="true"></i>
+    <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        {% for item in items %}
+        <span class="text-gray-500 dark:text-gray-300 text-lg" aria-hidden="true">&rarr;</span>
+        <a href="{{ item.href }}"
+            class="min-w-0 break-words text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 font-semibold hover:underline transition-colors px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/40 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-300">
+            {{ item.label }}
+        </a>
+        {% endfor %}
+        <span class="text-gray-500 dark:text-gray-300 text-lg" aria-hidden="true">&rarr;</span>
+        <span class="text-gray-800 dark:text-gray-100 font-semibold px-2 py-1" aria-current="page">
+            {{ current_label }}
+        </span>
+    </div>
+</nav>
+{% endmacro %}
