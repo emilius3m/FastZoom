@@ -345,6 +345,7 @@ async def v1_update_team_member(
         member.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
+        formatted_member = format_team_member(user, member)
         
         # Log attività
         await log_team_activity(

@@ -434,8 +434,7 @@ async def v1_preview_document(
 async def v1_update_document(
     site_id: UUID,
     document_id: UUID,
-    document_data: DocumentUpdate,
-    file: Optional[UploadFile] = File(None),
+    request: Request,
     current_user_id: UUID = Depends(get_current_user_id_with_blacklist),
     user_sites: List[Dict[str, Any]] = Depends(get_current_user_sites_with_blacklist),
     db: AsyncSession = Depends(get_database_session)
@@ -449,24 +448,30 @@ async def v1_update_document(
     # Verifica permessi di modifica
     if site_info.get("permission_level") not in ["admin", "editor", "regional_admin"]:
         raise InsufficientPermissionsError("Modifica documenti richiede permessi editor, admin o regional admin")
-    
-    # Simula request form data
-    class MockRequest:
-        def __init__(self, form_data: dict, uploaded_file: Optional[UploadFile]):
-            self._form_data = form_data
-            self._file = uploaded_file
-        
-        async def form(self):
-            return self._form_data
-        
-        def files(self):
-            return {"file": self._file} if self._file else {}
-    
-    form_data = document_data.model_dump(exclude_unset=True)
-    mock_request = MockRequest(form_data, file)
-    
+
     # Direct implementation instead of backward compatibility
     try:
+        content_type = request.headers.get("content-type", "")
+        file = None
+
+        if "multipart/form-data" in content_type:
+            form = await request.form()
+            file = form.get("file")
+            update_data = {
+                field: form.get(field)
+                for field in DocumentUpdate.model_fields
+                if field in form
+            }
+        else:
+            payload = await request.json()
+            update_data = DocumentUpdate(**payload).model_dump(exclude_unset=True)
+
+        if "is_public" in update_data and isinstance(update_data["is_public"], str):
+            update_data["is_public"] = update_data["is_public"].lower() in ("true", "1", "yes", "on")
+
+        if "doc_date" in update_data:
+            update_data["doc_date"] = datetime.fromisoformat(update_data["doc_date"]) if update_data["doc_date"] else None
+
         # Get document
         query = select(Document).where(
             and_(
@@ -483,13 +488,12 @@ async def v1_update_document(
             raise HTTPException(status_code=404, detail="Documento non trovato")
 
         # Update document fields
-        update_data = document_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             if hasattr(doc, field):
                 setattr(doc, field, value)
 
         # Handle file update if provided
-        if file:
+        if file and getattr(file, "filename", None):
             # Validate file
             file_size = await archaeological_minio_service._get_file_size(file)
             if file_size > 52428800:  # 50MB

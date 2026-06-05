@@ -13,7 +13,7 @@ $MINIO_CONSOLE_PORT = 9001
 # ============= HELPER: verifica Docker =============
 function Assert-Docker {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-        Write-Host "❌ Docker non trovato. Installa Docker Desktop e riprova." -ForegroundColor Red
+        Write-Host "[ERROR] Docker non trovato. Installa Docker Desktop e riprova." -ForegroundColor Red
         exit 1
     }
 }
@@ -21,7 +21,7 @@ function Assert-Docker {
 # ============= HELPER: credenziali =============
 function Show-Credentials {
     Write-Host ""
-    Write-Host "🔐 Credenziali" -ForegroundColor Blue
+    Write-Host "[INFO] Credenziali" -ForegroundColor Blue
     Write-Host "==============" -ForegroundColor Blue
     Write-Host "  App URL    : http://127.0.0.1:$FASTAPI_PORT" -ForegroundColor Cyan
     Write-Host "  Email      : superuser@admin.com" -ForegroundColor Yellow
@@ -64,7 +64,7 @@ function Show-Help {
 
 function Start-Dev {
     Assert-Docker
-    Write-Host "🔧 Avvio in modalita SVILUPPO (foreground, auto-reload)..." -ForegroundColor Blue
+    Write-Host "[DEV] Avvio in modalita SVILUPPO (foreground, auto-reload)..." -ForegroundColor Blue
     Write-Host "   Volumi: ./app -> /app/app  |  --reload attivo" -ForegroundColor DarkCyan
     Write-Host ""
     Write-Host "  App     : http://127.0.0.1:$FASTAPI_PORT" -ForegroundColor Green
@@ -80,12 +80,12 @@ function Start-Dev {
 
 function Start-Prod {
     Assert-Docker
-    Write-Host "🚀 Avvio in modalita PRODUZIONE (background, docker-compose.yml)..." -ForegroundColor Blue
+    Write-Host "[RUN] Avvio in modalita PRODUZIONE (background, docker-compose.yml)..." -ForegroundColor Blue
     # Solo docker-compose.yml: nessun --reload, nessun volume mount del codice
     docker compose -f docker-compose.yml up -d --build
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
-        Write-Host "✅ Container avviati." -ForegroundColor Green
+        Write-Host "[OK] Container avviati." -ForegroundColor Green
         Write-Host "  App     : http://127.0.0.1:$FASTAPI_PORT" -ForegroundColor Cyan
         Write-Host "  MinIO   : http://127.0.0.1:$MINIO_CONSOLE_PORT" -ForegroundColor Cyan
         Write-Host ""
@@ -96,10 +96,10 @@ function Start-Prod {
 
 function Stop-All {
     Assert-Docker
-    Write-Host "🛑 Arresto container..." -ForegroundColor Blue
+    Write-Host "[STOP] Arresto container..." -ForegroundColor Blue
     docker compose -f docker-compose.yml down
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Container fermati." -ForegroundColor Green
+        Write-Host "[OK] Container fermati." -ForegroundColor Green
     }
 }
 
@@ -110,51 +110,51 @@ function Restart-All {
 
 function Build-Image {
     Assert-Docker
-    Write-Host "📦 Rebuild immagine Docker (no cache)..." -ForegroundColor Blue
+    Write-Host "[BUILD] Rebuild immagine Docker (no cache)..." -ForegroundColor Blue
     docker compose -f docker-compose.yml build --no-cache
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Build completata." -ForegroundColor Green
+        Write-Host "[OK] Build completata." -ForegroundColor Green
     }
 }
 
 function Show-Logs {
     Assert-Docker
-    Write-Host "📝 Log live (Ctrl+C per uscire)..." -ForegroundColor Blue
+    Write-Host "[LOGS] Log live (Ctrl+C per uscire)..." -ForegroundColor Blue
     docker compose -f docker-compose.yml logs -f
 }
 
 function Show-LogsApp {
     Assert-Docker
-    Write-Host "📝 Log app (Ctrl+C per uscire)..." -ForegroundColor Blue
+    Write-Host "[LOGS] Log app (Ctrl+C per uscire)..." -ForegroundColor Blue
     docker compose -f docker-compose.yml logs -f app
 }
 
 function Show-LogsMinio {
     Assert-Docker
-    Write-Host "📝 Log MinIO (Ctrl+C per uscire)..." -ForegroundColor Blue
+    Write-Host "[LOGS] Log MinIO (Ctrl+C per uscire)..." -ForegroundColor Blue
     docker compose -f docker-compose.yml logs -f minio
 }
 
 function Show-Status {
     Assert-Docker
-    Write-Host "📊 Stato container:" -ForegroundColor Blue
+    Write-Host "[STATUS] Stato container:" -ForegroundColor Blue
     docker compose -f docker-compose.yml ps
 }
 
 function Open-Shell {
     Assert-Docker
-    Write-Host "🐚 Shell interattiva nel container app..." -ForegroundColor Blue
+    Write-Host "[SHELL] Shell interattiva nel container app..." -ForegroundColor Blue
     docker compose -f docker-compose.yml exec app /bin/bash
 }
 
 function Clean-All {
     Assert-Docker
-    Write-Host "🧹 Rimozione container, volumi e immagini del progetto..." -ForegroundColor Yellow
+    Write-Host "[CLEAN] Rimozione container, volumi e immagini del progetto..." -ForegroundColor Yellow
     Write-Host "   (i dati in ./data e ./app NON vengono cancellati)" -ForegroundColor DarkGray
     $confirm = Read-Host "Sei sicuro? [s/N]"
     if ($confirm -match "^[sS]$") {
         docker compose -f docker-compose.yml down -v --rmi local
-        Write-Host "✅ Pulizia completata." -ForegroundColor Green
+        Write-Host "[OK] Pulizia completata." -ForegroundColor Green
     } else {
         Write-Host "Operazione annullata." -ForegroundColor Yellow
     }
@@ -176,7 +176,7 @@ switch ($Command.ToLower()) {
     "clean"       { Clean-All }
     "help"        { Show-Help }
     default {
-        Write-Host "❌ Comando sconosciuto: '$Command'" -ForegroundColor Red
+        Write-Host "[ERROR] Comando sconosciuto: '$Command'" -ForegroundColor Red
         Write-Host ""
         Show-Help
     }

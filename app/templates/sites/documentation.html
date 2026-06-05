@@ -89,7 +89,7 @@
             </div>
         </template>
         <!-- Document Categories Grid -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <!-- Excavation Reports -->
             <div @click="filterByCategory('relazioni')"
                 class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors group">
@@ -133,7 +133,7 @@
             </div>
 
             <!-- Lab Analyses -->
-            <div @click="filterByCategory('documentazione')"
+            <div @click="filterByCategory('lab_analysis')"
                 class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:border-purple-500 dark:hover:border-purple-400 transition-colors group">
                 <div class="flex items-center justify-between">
                     <div>
@@ -147,6 +147,27 @@
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z">
+                            </path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Photo Documentation -->
+            <div @click="filterByCategory('documentazione')"
+                class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:border-cyan-500 dark:hover:border-cyan-400 transition-colors group">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Doc
+                            Foto</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white mt-1"
+                            x-text="stats.photo_documentation"></p>
+                    </div>
+                    <div
+                        class="p-3 rounded-full bg-cyan-50 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-100 group-hover:bg-cyan-100 dark:group-hover:bg-cyan-800 transition-colors">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 7h3l2-3h8l2 3h3v13H3V7zm9 10a4 4 0 100-8 4 4 0 000 8z">
                             </path>
                         </svg>
                     </div>
@@ -207,7 +228,8 @@
                             <option value="">Tutte le categorie</option>
                             <option value="relazioni">Rapporti di Scavo</option>
                             <option value="pubblicazioni">Pubblicazioni</option>
-                            <option value="documentazione">Analisi di Lab</option>
+                            <option value="documentazione">Documentazione fotografica</option>
+                            <option value="lab_analysis">Analisi di Lab</option>
                             <option value="planimetrie">Planimetrie</option>
                             <option value="amministrativi">Amministrativi</option>
                             <option value="altro">Altri</option>
@@ -266,7 +288,7 @@
                                         class="flex flex-wrap gap-1 mt-2">
                                         <template x-for="tag in (document.tags || [])" :key="tag">
                                             <span
-                                                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border border-blue-100 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900 dark:text-blue-100"
                                                 x-text="'#'+tag"></span>
                                         </template>
                                     </div>
@@ -425,7 +447,26 @@
                                 di <span class="font-medium" x-text="filteredDocuments.length"></span> risultati
                             </p>
                         </div>
-                        <!-- Pagination controls here -->
+                        <nav class="isolate inline-flex rounded-md shadow-sm" aria-label="Paginazione documenti">
+                            <button type="button" @click="previousPage" :disabled="currentPage === 1"
+                                class="relative inline-flex items-center rounded-l-md px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:bg-gray-100 disabled:text-gray-500 dark:disabled:bg-gray-800 dark:disabled:text-gray-400 disabled:cursor-not-allowed">
+                                Precedente
+                            </button>
+                            <template x-for="page in Array.from({ length: totalPages }, (_, index) => index + 1)" :key="page">
+                                <button type="button" @click="goToPage(page)"
+                                    :aria-current="currentPage === page ? 'page' : null"
+                                    :class="currentPage === page
+                                        ? 'z-10 bg-blue-600 text-white border-blue-600 dark:bg-blue-500 dark:border-blue-500'
+                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-100 border-gray-300 dark:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'"
+                                    class="relative -ml-px inline-flex items-center px-4 py-2 text-sm font-medium border">
+                                    <span x-text="page"></span>
+                                </button>
+                            </template>
+                            <button type="button" @click="nextPage" :disabled="currentPage === totalPages"
+                                class="relative -ml-px inline-flex items-center rounded-r-md px-3 py-2 text-sm font-medium border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:bg-gray-100 disabled:text-gray-500 dark:disabled:bg-gray-800 dark:disabled:text-gray-400 disabled:cursor-not-allowed">
+                                Successivo
+                            </button>
+                        </nav>
                     </div>
                 </div>
             </div>
@@ -673,6 +714,7 @@
             stats: {
             excavation_reports: 0,
             publications: 0,
+            photo_documentation: 0,
             lab_analyses: 0,
             other_documents: 0
         },
@@ -750,7 +792,8 @@
             this.stats = {
                 excavation_reports: docs.filter(d => d && (d.category === 'excavation_report' || d.category === 'relazioni')).length,
                 publications: docs.filter(d => d && (d.category === 'publication' || d.category === 'pubblicazioni')).length,
-                lab_analyses: docs.filter(d => d && (d.category === 'lab_analysis' || d.category === 'documentazione')).length,
+                photo_documentation: docs.filter(d => d && d.category === 'documentazione').length,
+                lab_analyses: docs.filter(d => d && d.category === 'lab_analysis').length,
                 other_documents: docs.filter(d => d && !['excavation_report', 'publication', 'lab_analysis', 'relazioni', 'pubblicazioni', 'documentazione'].includes(d.category)).length
             };
         },
@@ -815,8 +858,8 @@
                 excavation_report: ['relazioni', 'excavation_report'],
                 pubblicazioni: ['pubblicazioni', 'publication'],
                 publication: ['pubblicazioni', 'publication'],
-                documentazione: ['documentazione', 'lab_analysis'],
-                lab_analysis: ['documentazione', 'lab_analysis'],
+                documentazione: ['documentazione'],
+                lab_analysis: ['lab_analysis'],
                 planimetrie: ['planimetrie', 'drawing', 'map'],
                 amministrativi: ['amministrativi'],
                 altro: ['altro', 'other'],
@@ -925,11 +968,17 @@
 
         // Pagination
         previousPage() {
-            if (this.currentPage > 1) this.currentPage--;
+            this.goToPage(this.currentPage - 1);
         },
 
         nextPage() {
-            if (this.currentPage < this.totalPages) this.currentPage++;
+            this.goToPage(this.currentPage + 1);
+        },
+
+        goToPage(page) {
+            const nextPage = Math.min(Math.max(Number(page) || 1, 1), this.totalPages || 1);
+            if (nextPage === this.currentPage) return;
+            this.currentPage = nextPage;
         },
 
         // Helper methods
@@ -938,6 +987,7 @@
                 'excavation_report': 'bg-blue-100 text-blue-600',
                 'publication': 'bg-green-100 text-green-600',
                 'lab_analysis': 'bg-purple-100 text-purple-600',
+                'documentazione': 'bg-cyan-100 text-cyan-700',
                 'conservation': 'bg-yellow-100 text-yellow-600',
                 'drawing': 'bg-pink-100 text-pink-600',
                 'map': 'bg-indigo-100 text-indigo-600',
@@ -951,7 +1001,7 @@
                 // Italian categories
                 'relazioni': 'bg-blue-100 text-blue-800',
                 'pubblicazioni': 'bg-green-100 text-green-800',
-                'documentazione': 'bg-purple-100 text-purple-800',
+                'documentazione': 'bg-cyan-100 text-cyan-800',
                 'planimetrie': 'bg-pink-100 text-pink-800',
                 'amministrativi': 'bg-yellow-100 text-yellow-800',
                 'altro': 'bg-gray-100 text-gray-800',
