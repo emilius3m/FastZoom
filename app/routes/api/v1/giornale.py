@@ -161,6 +161,33 @@ from sqlalchemy.orm import selectinload
 
 # Helper removed - moved to Repository
 
+async def _load_export_cantiere_info(
+    db: AsyncSession,
+    cantiere_id: Any,
+    base_info: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Load the complete cantiere record used by PDF and Word exports."""
+    from app.models.cantiere import Cantiere
+
+    result = await db.execute(select(Cantiere).where(Cantiere.id == str(cantiere_id)))
+    cantiere = result.scalar_one_or_none()
+    if not cantiere:
+        if base_info:
+            return base_info
+        raise HTTPException(status_code=404, detail="Cantiere non trovato")
+
+    full_info = cantiere.to_dict() if hasattr(cantiere, "to_dict") else {
+        "id": str(cantiere.id),
+        "nome": cantiere.nome,
+        "codice": cantiere.codice,
+    }
+
+    merged = dict(base_info or {})
+    for key, item in full_info.items():
+        if item not in (None, "") or key not in merged:
+            merged[key] = item
+    return merged
+
 @router.get("/sites/{site_id}/giornali", summary="Lista giornali sito", tags=["Giornale di Cantiere"])
 async def v1_get_site_giornali(
     site_id: UUID,
@@ -1363,16 +1390,11 @@ async def export_giornali_pdf(
                 detail="Nessun giornale trovato per il periodo specificato"
             )
             
-        # Get cantiere info from first record
-        cantiere_info = giornali_data[0].get("cantiere")
-        if not cantiere_info:
-             # Fallback if somehow missing
-             from app.models.cantiere import Cantiere
-             c_res = await db.execute(select(Cantiere).where(Cantiere.id == str(cantiere_id)))
-             c = c_res.scalar_one_or_none()
-             if not c:
-                 raise HTTPException(status_code=404, detail="Cantiere non trovato")
-             cantiere_info = {"nome": c.nome, "codice": c.codice} # Minimal fallback
+        cantiere_info = await _load_export_cantiere_info(
+            db,
+            cantiere_id,
+            giornali_data[0].get("cantiere"),
+        )
 
         # Process attachments if requested
         if include_allegati:
@@ -1459,6 +1481,12 @@ async def export_single_giornale_pdf(
         giornale_dict = await service.get_giornale(site_id, giornale_id)
         
         cantiere_info = giornale_dict.get("cantiere")
+        cantiere_id = (
+            (cantiere_info or {}).get("id")
+            or giornale_dict.get("cantiere_id")
+        )
+        if cantiere_id:
+            cantiere_info = await _load_export_cantiere_info(db, cantiere_id, cantiere_info)
         if not cantiere_info:
              # Fallback
              cantiere_info = {
@@ -1568,15 +1596,11 @@ async def export_giornali_word(
                 detail="Nessun giornale trovato per il periodo specificato"
             )
             
-        cantiere_info = giornali_data[0].get("cantiere")
-        if not cantiere_info:
-             # Fallback
-             from app.models.cantiere import Cantiere
-             c_res = await db.execute(select(Cantiere).where(Cantiere.id == str(cantiere_id)))
-             c = c_res.scalar_one_or_none()
-             if not c:
-                 raise HTTPException(status_code=404, detail="Cantiere non trovato")
-             cantiere_info = {"nome": c.nome, "codice": c.codice}
+        cantiere_info = await _load_export_cantiere_info(
+            db,
+            cantiere_id,
+            giornali_data[0].get("cantiere"),
+        )
 
         if include_allegati:
             import json
@@ -1660,6 +1684,12 @@ async def export_single_giornale_word(
         giornale_dict = await service.get_giornale(site_id, giornale_id)
         
         cantiere_info = giornale_dict.get("cantiere")
+        cantiere_id = (
+            (cantiere_info or {}).get("id")
+            or giornale_dict.get("cantiere_id")
+        )
+        if cantiere_id:
+            cantiere_info = await _load_export_cantiere_info(db, cantiere_id, cantiere_info)
         if not cantiere_info:
              cantiere_info = {
                 "nome": "Cantiere Sconosciuto",

@@ -1450,6 +1450,15 @@
                 this.giornaleDocumentDescription = '';
             },
 
+            clearRequestedGiornaleOpenState() {
+                try {
+                    localStorage.removeItem('fastzoom_open_giornale_id');
+                    localStorage.removeItem('fastzoom_open_giornale_draft_id');
+                } catch (_) {
+                    // ignore storage failures
+                }
+            },
+
             prepareLegalDataFromGiornale(giornale) {
                 if (!giornale) {
                     return {
@@ -1532,6 +1541,26 @@
                     // ignore parse error, keep fallback
                 }
                 return message;
+            },
+
+            async requestJson(url, options = {}, fallbackMessage = 'Errore nella richiesta') {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(options.headers || {})
+                    },
+                    ...options
+                });
+
+                if (!response.ok) {
+                    throw new Error(await this.parseApiError(response, fallbackMessage));
+                }
+
+                return response.json();
+            },
+
+            reloadSoon(delay = 1500) {
+                setTimeout(() => location.reload(), delay);
             },
 
             resetForm() {
@@ -1676,23 +1705,14 @@
                 try {
                     await this.saveDraftSnapshot(this.buildGiornaleApiPayload());
 
-                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali-drafts/finalize`, {
+                    const result = await this.requestJson(`/api/v1/giornale/sites/{{ site.id }}/giornali-drafts/finalize`, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
                         credentials: 'same-origin',
                         body: JSON.stringify({
                             draft_id: this.draftId,
                             giornale_id: this.getEditingGiornaleId()
                         })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(await this.parseApiError(response, 'Errore finalizzazione giornale da bozza'));
-                    }
-
-                    const result = await response.json();
+                    }, 'Errore finalizzazione giornale da bozza');
                     const finalizedGiornaleId = result?.giornale_id || null;
 
                     this.draftId = null;
@@ -1708,15 +1728,9 @@
                     this.showAlert('success', this.editingGiornale ? 'Giornale aggiornato con successo' : 'Giornale creato con successo');
                     this.closeModal();
 
-                    if (finalizedGiornaleId) {
-                        try {
-                            localStorage.setItem('fastzoom_open_giornale_id', String(finalizedGiornaleId));
-                        } catch (_) {
-                            // ignore storage failures
-                        }
-                    }
+                    this.clearRequestedGiornaleOpenState();
 
-                    setTimeout(() => location.reload(), 900);
+                    this.reloadSoon(900);
                 } catch (error) {
                     const message = error.message || 'Errore durante il salvataggio del giornale';
                     this.errorMessage = message;
@@ -1737,40 +1751,14 @@
                 this.errorMessage = '';
 
                 try {
-                    // Prepara i dati per l'API con operatori enhanced
-                    const apiData = {
-                        ...this.formData,
-                        // Solo invia i campi orario se non sono vuoti
-                        ora_inizio: this.formData.ora_inizio || null,
-                        ora_fine: this.formData.ora_fine || null,
-                        // Gestisci temperature
-                        temperatura_min: this.formData.temperatura_min || null,
-                        temperatura_max: this.formData.temperatura_max || null,
-                        // Enhanced operatori structure
-                        operatori: this.getEnhancedOperatoriData(),
-                        // Enhanced mezzi structure
-                        mezzi: this.getEnhancedMezziData()
-                    };
-
-                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}`, {
+                    await this.requestJson(`/api/v1/giornale/sites/{{ site.id }}/giornali/${this.editingGiornaleData.id}`, {
                         method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(apiData)
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(await this.parseApiError(response, 'Errore aggiornamento del giornale'));
-                    }
-
-                    const result = await response.json();
+                        body: JSON.stringify(this.buildGiornaleApiPayload())
+                    }, 'Errore aggiornamento del giornale');
 
                     this.showAlert('success', 'Giornale aggiornato con successo');
                     this.closeModal();
-
-                    // Ricarica pagina per mostrare le modifiche
-                    setTimeout(() => location.reload(), 1500);
+                    this.reloadSoon();
                 } catch (error) {
                     const message = error.message || 'Errore durante aggiornamento del giornale';
                     this.errorMessage = message;
@@ -1798,25 +1786,14 @@
                 this.errorMessage = '';
 
                 try {
-                    const response = await fetch(`/api/v1/cantieri/cantieri/{{ cantiere.id }}`, {
+                    await this.requestJson(`/api/v1/cantieri/cantieri/{{ cantiere.id }}`, {
                         method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
                         body: JSON.stringify(this.formData)
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(await this.parseApiError(response, 'Errore durante il salvataggio del cantiere'));
-                    }
-
-                    const result = await response.json();
+                    }, 'Errore durante il salvataggio del cantiere');
 
                     this.showAlert('success', 'Cantiere aggiornato con successo');
                     this.closeModal();
-
-                    // Ricarica pagina per mostrare le modifiche
-                    setTimeout(() => location.reload(), 1500);
+                    this.reloadSoon();
                 } catch (error) {
                     const message = error.message || 'Errore durante il salvataggio del cantiere';
                     this.errorMessage = message;
@@ -1837,41 +1814,14 @@
                 this.errorMessage = '';
 
                 try {
-                    // Prepara i dati per l'API con operatori enhanced, gestendo campi vuoti
-                    const apiData = {
-                        ...this.formData,
-                        // Solo invia i campi orario se non sono vuoti
-                        ora_inizio: this.formData.ora_inizio || null,
-                        ora_fine: this.formData.ora_fine || null,
-                        // Gestisci temperature
-                        temperatura_min: this.formData.temperatura_min || null,
-                        temperatura_max: this.formData.temperatura_max || null,
-                        // Enhanced operatori structure
-                        operatori: this.getEnhancedOperatoriData(),
-                        // Enhanced mezzi structure
-                        mezzi: this.getEnhancedMezziData()
-                    };
-
-                    // Chiama API reale per salvare il giornale
-                    const response = await fetch(`/api/v1/giornale/sites/{{ site.id }}/giornali`, {
+                    await this.requestJson(`/api/v1/giornale/sites/{{ site.id }}/giornali`, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(apiData)
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(await this.parseApiError(response, 'Errore nel salvataggio del giornale'));
-                    }
-
-                    const result = await response.json();
+                        body: JSON.stringify(this.buildGiornaleApiPayload())
+                    }, 'Errore nel salvataggio del giornale');
 
                     this.showAlert('success', 'Giornale creato con successo');
                     this.closeModal();
-
-                    // Ricarica pagina per mostrare il nuovo giornale
-                    setTimeout(() => location.reload(), 1500);
+                    this.reloadSoon();
                 } catch (error) {
                     const message = error.message || 'Errore durante il salvataggio del giornale';
                     this.errorMessage = message;

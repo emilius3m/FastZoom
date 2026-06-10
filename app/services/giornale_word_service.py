@@ -17,6 +17,8 @@ from datetime import datetime, date
 from typing import Dict, Any, List, Optional
 from loguru import logger
 
+from app.services.giornale_export_builder import build_giornale_export_model
+
 try:
     from docx import Document
     from docx.shared import Inches, Pt, RGBColor, Cm
@@ -64,37 +66,17 @@ class GiornaleWordGeneratorV2:
         11. Note e validazione
         """
         try:
+            model = build_giornale_export_model(giornali, cantiere_info, site_info)
             doc = Document()
             
             # Margini professionali
             for section in doc.sections:
                 section.top_margin = Cm(1.5)
                 section.bottom_margin = Cm(1.5)
-                section.left_margin = Cm(2)
-                section.right_margin = Cm(2)
+                section.left_margin = Cm(1.6)
+                section.right_margin = Cm(1.6)
 
-            # Pagina titolo
-            self._add_title_page(doc, cantiere_info, site_info, len(giornali))
-            doc.add_page_break()
-
-            # Indice
-            if len(giornali) > 3:
-                self._add_index(doc, giornali)
-                doc.add_page_break()
-
-            # Sezione stato cantiere
-            self._add_stato_cantiere_section(doc, cantiere_info)
-            doc.add_page_break()
-
-            # Giornali
-            for i, giornale in enumerate(giornali, 1):
-                self._add_giornale_page(doc, giornale, i, len(giornali), cantiere_info)
-                if i < len(giornali):
-                    doc.add_page_break()
-
-            # Pagina firme
-            doc.add_page_break()
-            self._add_signature_page(doc, cantiere_info, site_info)
+            self._render_giornale_export_word(doc, model)
 
             # Salva in buffer
             buffer = io.BytesIO()
@@ -109,6 +91,244 @@ class GiornaleWordGeneratorV2:
         except Exception as e:
             logger.error(f"✗ Errore generazione Word: {e}")
             raise
+
+    def _render_giornale_export_word(self, doc, model: Dict[str, Any]) -> None:
+        self._word_title(doc, model["title"], size=18)
+        self._word_subtitle(doc, model["subtitle"])
+        self._word_divider(doc)
+        self._word_key_value_table(doc, model["cover_rows"])
+
+        doc.add_page_break()
+        self._word_title(doc, "SCHEDA CANTIERE", size=16)
+        for section in model["summary_sections"]:
+            self._word_add_section(doc, section)
+
+        for entry in model["giornali"]:
+            doc.add_page_break()
+            self._word_title(doc, entry["heading"].upper(), size=15)
+            for section in entry["sections"]:
+                self._word_add_section(doc, section)
+
+        doc.add_page_break()
+        self._word_title(doc, "FIRME E VALIDAZIONI", size=16)
+        p = doc.add_paragraph("Le firme sotto riportate attestano la presa visione del registro esportato.")
+        self._set_paragraph_font(p, 9)
+        signature_rows = [
+            (label, "Firma ______________________________    Data __________")
+            for label, _ in model["signature_rows"]
+        ]
+        self._word_key_value_table(doc, signature_rows)
+        doc.add_paragraph()
+        footer = doc.add_paragraph(
+            f"Documento generato da FastZoom il {model['generated_at'].strftime('%d/%m/%Y alle %H:%M')}"
+        )
+        footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        self._set_paragraph_font(footer, 8, italic=True, color=self.COLOR_GREY)
+
+    def _word_add_section(self, doc, section: Dict[str, Any]) -> None:
+        self._add_section_heading(doc, section["title"])
+        kind = section.get("kind")
+
+        if kind == "table":
+            self._word_key_value_table(doc, section.get("rows", []))
+        elif kind == "text":
+            items = section.get("items", [])
+            if items:
+                for label, text in items:
+                    p = doc.add_paragraph()
+                    label_run = p.add_run(f"{label}: ")
+                    label_run.bold = True
+                    p.add_run(str(text))
+                    self._set_paragraph_font(p, 9)
+            else:
+                self._set_paragraph_font(doc.add_paragraph("N/D"), 9)
+        elif kind == "mixed":
+            for label, text in section.get("items", []):
+                p = doc.add_paragraph()
+                label_run = p.add_run(f"{label}: ")
+                label_run.bold = True
+                p.add_run(str(text))
+                self._set_paragraph_font(p, 9)
+            for table in section.get("tables", []):
+                p = doc.add_paragraph()
+                run = p.add_run(table["title"])
+                run.bold = True
+                run.font.size = Pt(9)
+                run.font.color.rgb = self.COLOR_ACCENT
+                self._word_plain_table(doc, table.get("headers", []), table.get("rows", []))
+            if section.get("photos"):
+                p = doc.add_paragraph()
+                run = p.add_run("Immagini")
+                run.bold = True
+                run.font.size = Pt(9)
+                run.font.color.rgb = self.COLOR_ACCENT
+                self._word_add_photos(doc, section["photos"])
+        doc.add_paragraph()
+
+    def _word_title(self, doc, text: str, size: int = 18) -> None:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(text)
+        run.font.size = Pt(size)
+        run.font.bold = True
+        run.font.color.rgb = self.COLOR_HEADER_BG
+
+    def _word_subtitle(self, doc, text: str) -> None:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(text)
+        run.font.size = Pt(11)
+        run.font.italic = True
+        run.font.color.rgb = self.COLOR_GREY
+
+    def _word_divider(self, doc) -> None:
+        table = doc.add_table(rows=1, cols=1)
+        table.autofit = False
+        table.columns[0].width = Cm(17.8)
+        cell = table.rows[0].cells[0]
+        cell.text = ""
+        self._set_cell_shading(cell, "2C5AA0")
+        self._set_cell_borders(cell, "2C5AA0", size="8")
+        cell.height = Cm(0.08)
+        doc.add_paragraph()
+
+    def _word_key_value_table(self, doc, rows) -> None:
+        table = doc.add_table(rows=max(len(rows), 1), cols=2)
+        table.style = 'Table Grid'
+        table.autofit = False
+        table.columns[0].width = Cm(5)
+        table.columns[1].width = Cm(11)
+        source_rows = rows or [("", "")]
+        for idx, (label, value) in enumerate(source_rows):
+            cells = table.rows[idx].cells
+            cells[0].text = str(label)
+            cells[1].text = str(value)
+            self._format_cell(cells[0], bold=True, color=self.COLOR_HEADER_BG, shading="E8EEF5")
+            self._format_cell(cells[1])
+            self._set_cell_borders(cells[0])
+            self._set_cell_borders(cells[1])
+
+    def _word_plain_table(self, doc, headers: List[str], rows: List[List[str]]) -> None:
+        headers = headers or [""]
+        table = doc.add_table(rows=1, cols=len(headers))
+        table.style = 'Table Grid'
+        table.autofit = True
+        for idx, header in enumerate(headers):
+            table.rows[0].cells[idx].text = str(header)
+            self._format_cell(table.rows[0].cells[idx], bold=True, color=self.COLOR_HEADER_TEXT, shading="2C5AA0")
+            self._set_cell_borders(table.rows[0].cells[idx])
+        for row_data in rows:
+            row = table.add_row()
+            for idx, value in enumerate(row_data[:len(headers)]):
+                row.cells[idx].text = str(value)
+                self._format_cell(row.cells[idx])
+                self._set_cell_borders(row.cells[idx])
+
+    def _word_add_photos(self, doc, photos: List[Dict[str, Any]]) -> None:
+        table = doc.add_table(rows=0, cols=2)
+        table.style = 'Table Grid'
+        table.autofit = False
+        table.columns[0].width = Cm(8)
+        table.columns[1].width = Cm(8)
+
+        for idx in range(0, len(photos), 2):
+            row = table.add_row()
+            for cell_index in range(2):
+                cell = row.cells[cell_index]
+                self._set_cell_borders(cell)
+                photo_index = idx + cell_index
+                if photo_index >= len(photos):
+                    cell.text = ""
+                    continue
+                self._word_fill_photo_cell(cell, photos[photo_index])
+
+    def _word_fill_photo_cell(self, cell, photo: Dict[str, Any]) -> None:
+        image_paragraph = cell.paragraphs[0]
+        image_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        image_bytes = photo.get("image_bytes")
+        if image_bytes:
+            try:
+                image_paragraph.add_run().add_picture(io.BytesIO(image_bytes), width=Inches(2.75))
+            except Exception as exc:
+                logger.warning(f"Errore inserimento immagine Word: {exc}")
+                image_paragraph.add_run("[Immagine non leggibile]")
+        else:
+            image_paragraph.add_run("[Immagine non disponibile nell'export]")
+
+        caption = cell.add_paragraph()
+        caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        title = photo.get("title") or "N/D"
+        description = photo.get("description")
+        caption_text = f"Foto {photo.get('index')}: {title}"
+        if description and description != "N/D":
+            caption_text += f"\n{description}"
+        run = caption.add_run(caption_text)
+        run.font.size = Pt(8)
+        run.font.italic = True
+        run.font.color.rgb = self.COLOR_GREY
+
+    def _word_add_photos_legacy(self, doc, photos: List[Dict[str, Any]]) -> None:
+        for photo in photos:
+            image_bytes = photo.get("image_bytes")
+            if image_bytes:
+                try:
+                    doc.add_picture(io.BytesIO(image_bytes), width=Inches(5.2))
+                except Exception as exc:
+                    logger.warning(f"Errore inserimento immagine Word: {exc}")
+                    self._set_paragraph_font(doc.add_paragraph("[Immagine non leggibile]"), 8, italic=True)
+            else:
+                self._set_paragraph_font(doc.add_paragraph("[Immagine non disponibile nell'export]"), 8, italic=True)
+
+            caption = doc.add_paragraph()
+            caption.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            title = photo.get("title") or "N/D"
+            description = photo.get("description")
+            caption_text = f"Foto {photo.get('index')}: {title}"
+            if description and description != "N/D":
+                caption_text += f" - {description}"
+            run = caption.add_run(caption_text)
+            run.font.size = Pt(8)
+            run.font.italic = True
+            run.font.color.rgb = self.COLOR_GREY
+
+    def _format_cell(self, cell, bold: bool = False, color=None, shading: Optional[str] = None) -> None:
+        if shading:
+            self._set_cell_shading(cell, shading)
+        for paragraph in cell.paragraphs:
+            self._set_paragraph_font(paragraph, 8, bold=bold, color=color)
+
+    def _set_paragraph_font(self, paragraph, size: int, bold: bool = False, italic: bool = False, color=None) -> None:
+        for run in paragraph.runs:
+            run.font.size = Pt(size)
+            run.font.bold = bold
+            run.font.italic = italic
+            if color:
+                run.font.color.rgb = color
+
+    def _set_cell_shading(self, cell, fill: str) -> None:
+        tc_pr = cell._tc.get_or_add_tcPr()
+        shading = tc_pr.find(qn('w:shd'))
+        if shading is None:
+            shading = OxmlElement('w:shd')
+            tc_pr.append(shading)
+        shading.set(qn('w:fill'), fill)
+
+    def _set_cell_borders(self, cell, color: str = "4A7BA7", size: str = "4") -> None:
+        tc_pr = cell._tc.get_or_add_tcPr()
+        borders = tc_pr.find(qn('w:tcBorders'))
+        if borders is None:
+            borders = OxmlElement('w:tcBorders')
+            tc_pr.append(borders)
+        for edge in ("top", "left", "bottom", "right"):
+            tag = f"w:{edge}"
+            element = borders.find(qn(tag))
+            if element is None:
+                element = OxmlElement(tag)
+                borders.append(element)
+            element.set(qn('w:val'), 'single')
+            element.set(qn('w:sz'), size)
+            element.set(qn('w:space'), '0')
+            element.set(qn('w:color'), color)
 
     def _add_title_page(self, doc, cantiere_info, site_info, num_giornali):
         """Pagina titolo professionale con informazioni complete del cantiere"""
@@ -783,7 +1003,15 @@ class GiornaleWordGeneratorV2:
 
     def _add_section_heading(self, doc, text):
         """Aggiunge heading di sezione"""
-        p = doc.add_paragraph()
+        table = doc.add_table(rows=1, cols=1)
+        table.style = 'Table Grid'
+        table.autofit = False
+        table.columns[0].width = Cm(17.8)
+        cell = table.rows[0].cells[0]
+        cell.text = ""
+        self._set_cell_shading(cell, "E8EEF5")
+        self._set_cell_borders(cell, "2C5AA0", size="8")
+        p = cell.paragraphs[0]
         run = p.add_run(text)
         run.font.size = Pt(11)
         run.font.bold = True

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import List
 from functools import lru_cache
 
@@ -6,9 +7,12 @@ from pydantic import field_validator  # v2
 from pydantic_settings import BaseSettings, SettingsConfigDict  # v2
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
 class Settings(BaseSettings):
     # Configurazioni esistenti
-    database_url: str = "sqlite+aiosqlite:///./archaeological_catalog.db"
+    database_url: str = "sqlite+aiosqlite:///./data/archaeological_catalog.db"
     secret_key: str = "archaeological-site-secret-key-2025"
     algorithm: str = "HS256"
 
@@ -118,6 +122,34 @@ class Settings(BaseSettings):
     )
 
     # Validator v2 (sostituisce @validator)
+    @field_validator("database_url")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        """Resolve relative SQLite URLs from the project root, not the process cwd."""
+        sqlite_prefixes = ("sqlite+aiosqlite:///", "sqlite:///")
+        prefix = next((item for item in sqlite_prefixes if v.startswith(item)), None)
+        if not prefix:
+            return v
+
+        raw_path = v[len(prefix):]
+        if raw_path == ":memory:":
+            return v
+
+        db_path = Path(raw_path)
+        if not db_path.is_absolute():
+            db_path = (PROJECT_ROOT / db_path).resolve()
+
+        data_db_path = PROJECT_ROOT / "data" / "archaeological_catalog.db"
+        points_to_empty_root_db = (
+            db_path == (PROJECT_ROOT / "archaeological_catalog.db").resolve()
+            and data_db_path.exists()
+            and (not db_path.exists() or db_path.stat().st_size == 0)
+        )
+        if points_to_empty_root_db:
+            db_path = data_db_path.resolve()
+
+        return f"{prefix}{db_path.as_posix()}"
+
     @field_validator("minio_config_profile")
     @classmethod
     def validate_profile(cls, v: str) -> str:

@@ -219,19 +219,19 @@
                     <th scope="col" class="px-6 py-3">Azioni</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody x-ref="cantieriTableBody">
                 {% for cantiere_data in cantieri %}
-                <tr @click="viewCantiere('{{ cantiere_data.id }}')"
+                <tr data-cantiere-id="{{ cantiere_data.id }}" @click="viewCantiere('{{ cantiere_data.id }}')"
                     class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer">
                     <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
                         <div class="flex items-center">
                             <i class="fas fa-hard-hat mr-2 text-blue-600"></i>
-                            <span>{{ cantiere_data.nome }}</span>
+                            <span data-field="nome">{{ cantiere_data.nome }}</span>
                         </div>
                     </th>
-                    <td class="px-6 py-4">{{ cantiere_data.codice or '-' }}</td>
+                    <td class="px-6 py-4" data-field="codice">{{ cantiere_data.codice or '-' }}</td>
                     <td class="px-6 py-4">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full
+                        <span data-field="stato" class="px-2 py-1 text-xs font-medium rounded-full
                                 {% if cantiere_data.stato == 'pianificato' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300
                                 {% elif cantiere_data.stato == 'in_corso' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300
                                 {% elif cantiere_data.stato == 'sospeso' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300
@@ -241,8 +241,8 @@
                             {{ cantiere_data.stato_formattato or cantiere_data.stato.replace('_', ' ').title() }}
                         </span>
                     </td>
-                    <td class="px-6 py-4">{{ cantiere_data.responsabile_cantiere or '-' }}</td>
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-4" data-field="responsabile_cantiere">{{ cantiere_data.responsabile_cantiere or '-' }}</td>
+                    <td class="px-6 py-4" data-field="impresa_esecutrice">
                         {% if cantiere_data.impresa_esecutrice %}
                         <span
                             class="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-2 py-1 rounded">
@@ -253,7 +253,7 @@
                         <span class="text-gray-400">-</span>
                         {% endif %}
                     </td>
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-4" data-field="importo_lavori">
                         {% if cantiere_data.importo_lavori %}
                         <span class="text-sm font-semibold text-green-700 dark:text-green-300">
                             €{{ "{:,.0f}".format(cantiere_data.importo_lavori) }}
@@ -262,7 +262,7 @@
                         <span class="text-gray-400">-</span>
                         {% endif %}
                     </td>
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-4" data-field="data_inizio">
                         {% if cantiere_data.data_inizio_prevista %}
                         {{ cantiere_data.data_inizio_prevista[:10] }}
                         {% elif cantiere_data.data_inizio_effettiva %}
@@ -825,12 +825,9 @@
                 await this.loadCantieri();
                 await this.loadStats();
             } else {
-                // Update existing cantiere in the list
-                const index = this.cantieri.findIndex(c => c.id === this.modal.formData.id);
-                if (index !== -1) {
-                    this.cantieri[index] = { ...this.modal.formData };
-                }
                 this.showAlert('success', 'Cantiere aggiornato con successo');
+                await this.loadCantieri();
+                await this.loadStats();
             }
 
             this.modal.loading = false;
@@ -877,6 +874,106 @@
         });
     },
 
+    escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    },
+
+    truncateText(value, maxLength) {
+        const text = String(value || '');
+        return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+    },
+
+    formatCurrency(value) {
+        if (!value) return '-';
+        return new Intl.NumberFormat('it-IT', {
+            style: 'currency',
+            currency: 'EUR',
+            maximumFractionDigits: 0
+        }).format(Number(value));
+    },
+
+    getStartDate(cantiere) {
+        const startDate = cantiere.data_inizio_prevista || cantiere.data_inizio_effettiva;
+        return startDate ? String(startDate).slice(0, 10) : '-';
+    },
+
+    getStatoClass(stato) {
+        const classes = {
+            pianificato: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+            in_corso: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+            sospeso: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+            completato: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+            annullato: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+        };
+        return classes[stato] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+    },
+
+    renderCantieriTable() {
+        const tbody = this.$refs.cantieriTableBody;
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+        this.filteredCantieri.forEach((cantiere) => {
+            const row = document.createElement('tr');
+            row.dataset.cantiereId = cantiere.id;
+            row.className = 'bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer';
+            row.addEventListener('click', () => this.viewCantiere(cantiere.id));
+
+            const impresa = cantiere.impresa_esecutrice
+                ? `<span class="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-2 py-1 rounded">${this.escapeHtml(this.truncateText(cantiere.impresa_esecutrice, 15))}</span>`
+                : '<span class="text-gray-400">-</span>';
+            const importo = cantiere.importo_lavori
+                ? `<span class="text-sm font-semibold text-green-700 dark:text-green-300">${this.escapeHtml(this.formatCurrency(cantiere.importo_lavori))}</span>`
+                : '<span class="text-gray-400">-</span>';
+
+            row.innerHTML = `
+                <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                    <div class="flex items-center">
+                        <i class="fas fa-hard-hat mr-2 text-blue-600"></i>
+                        <span>${this.escapeHtml(cantiere.nome)}</span>
+                    </div>
+                </th>
+                <td class="px-6 py-4">${this.escapeHtml(cantiere.codice || '-')}</td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full ${this.getStatoClass(cantiere.stato)}">
+                        ${this.escapeHtml(cantiere.stato_formattato || this.getStatoLabel(cantiere.stato))}
+                    </span>
+                </td>
+                <td class="px-6 py-4">${this.escapeHtml(cantiere.responsabile_cantiere || '-')}</td>
+                <td class="px-6 py-4">${impresa}</td>
+                <td class="px-6 py-4">${importo}</td>
+                <td class="px-6 py-4">${this.escapeHtml(this.getStartDate(cantiere))}</td>
+                <td class="px-6 py-4">
+                    <div class="flex items-center gap-2">
+                        <a href="/view/${this.escapeHtml(cantiere.id)}/cantiere/" type="button"
+                            class="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded p-1"
+                            title="Visualizza">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <button type="button"
+                            class="js-edit-cantiere inline-flex items-center justify-center w-8 h-8 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded p-1"
+                            title="Modifica">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+
+            row.querySelector('a')?.addEventListener('click', (event) => event.stopPropagation());
+            row.querySelector('.js-edit-cantiere')?.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this.openEditModal(cantiere);
+            });
+            tbody.appendChild(row);
+        });
+    },
+
                 // API Methods
                 async loadCantieri() {
         try {
@@ -892,6 +989,7 @@
 
             const data = await response.json();
             this.cantieri = data.cantieri || [];
+            this.$nextTick(() => this.renderCantieriTable());
 
         } catch (error) {
             console.error('Error loading cantieri:', error);
@@ -925,6 +1023,7 @@
     watchFilters() {
         this.$watch('filters.search', () => this.loadCantieri());
         this.$watch('filters.stato', () => this.loadCantieri());
+        this.$watch('filters.sortBy', () => this.renderCantieriTable());
     }
             }
         }
